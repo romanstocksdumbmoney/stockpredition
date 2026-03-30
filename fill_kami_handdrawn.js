@@ -1,5 +1,6 @@
 const fs = require("fs");
 const { PDFDocument, StandardFonts, rgb, degrees } = require("pdf-lib");
+const fontkit = require("@pdf-lib/fontkit");
 
 function mulberry32(seed) {
   let t = seed >>> 0;
@@ -17,6 +18,10 @@ const geneA = rgb(0.13, 0.36, 0.92); // dad: blue
 const geneB = rgb(0.53, 0.25, 0.8); // dad: purple
 const genea = rgb(0.87, 0.2, 0.2); // mom: red
 const geneb = rgb(0.14, 0.62, 0.24); // mom: green
+const LINE_JITTER = 0.9;
+const OVAL_JITTER = 0.9;
+const TEXT_JITTER_X = 0.25;
+const TEXT_JITTER_Y = 0.15;
 
 function j(v, amt) {
   return v + (rand() - 0.5) * amt;
@@ -34,8 +39,8 @@ function drawSketchLine(
 ) {
   for (let i = 0; i < passes; i += 1) {
     page.drawLine({
-      start: { x: j(x1, 1.6), y: j(y1, 1.6) },
-      end: { x: j(x2, 1.6), y: j(y2, 1.6) },
+      start: { x: j(x1, LINE_JITTER), y: j(y1, LINE_JITTER) },
+      end: { x: j(x2, LINE_JITTER), y: j(y2, LINE_JITTER) },
       thickness: thickness * (0.9 + rand() * 0.4),
       color,
       opacity: 0.95,
@@ -49,8 +54,8 @@ function drawSketchOval(page, cx, cy, rx, ry) {
   for (let i = 0; i <= n; i += 1) {
     const t = (Math.PI * 2 * i) / n;
     points.push({
-      x: cx + Math.cos(t) * (rx + (rand() - 0.5) * 2),
-      y: cy + Math.sin(t) * (ry + (rand() - 0.5) * 2),
+      x: cx + Math.cos(t) * (rx + (rand() - 0.5) * OVAL_JITTER),
+      y: cy + Math.sin(t) * (ry + (rand() - 0.5) * OVAL_JITTER),
     });
   }
   for (let p = 0; p < 2; p += 1) {
@@ -88,12 +93,12 @@ function drawHandText(page, font, text, x, y, size = 10, lineGap = 2, color = pe
   const lines = text.split("\n");
   lines.forEach((line, idx) => {
     page.drawText(line, {
-      x: j(x, 1.8),
-      y: j(y - idx * (size + lineGap), 1),
-      size: size + (rand() - 0.5) * 0.5,
+      x: j(x, TEXT_JITTER_X),
+      y: j(y - idx * (size + lineGap), TEXT_JITTER_Y),
+      size,
       font,
       color,
-      rotate: degrees((rand() - 0.5) * 2.3),
+      rotate: degrees(0),
     });
   });
 }
@@ -218,64 +223,64 @@ function drawMeiosisPhasesPage(page, font) {
   ];
 
   top.forEach(({ x, y, type }) => {
-    drawSketchOval(page, x, y, 38, 38);
+    drawSketchOval(page, x, y, 32, 32);
     if (type === "proI") {
-      drawChromosomeX(page, x - 10, y + 5, 6.5, geneA);
-      drawChromosomeX(page, x + 5, y + 5, 6.5, genea);
-      drawChromosomeX(page, x - 2, y - 14, 6.5, geneB);
-      drawChromosomeX(page, x + 13, y - 14, 6.5, geneb);
+      drawChromosomeX(page, x - 9, y + 4, 5.5, geneA);
+      drawChromosomeX(page, x + 4, y + 4, 5.5, genea);
+      drawChromosomeX(page, x - 3, y - 9, 5.5, geneB);
+      drawChromosomeX(page, x + 10, y - 9, 5.5, geneb);
       drawSketchLine(page, x - 6, y + 11, x, y - 1, 0.8, 2);
     } else if (type === "metaI") {
-      const vx = [x - 12, x - 2, x + 8, x + 18];
+      const vx = [x - 10, x - 2, x + 6, x + 14];
       [geneA, genea, geneB, geneb].forEach((c, i) =>
-        drawChromosomeX(page, vx[i], y, 5.5, c)
+        drawChromosomeX(page, vx[i], y, 4.8, c)
       );
     } else if (type === "anaI") {
-      drawChromosomeX(page, x - 14, y, 6, geneA);
-      drawChromosomeX(page, x - 1, y - 7, 6, geneB);
-      drawChromosomeX(page, x + 14, y, 6, genea);
-      drawChromosomeX(page, x + 27, y - 7, 6, geneb);
+      drawChromosomeX(page, x - 11, y, 5, geneA);
+      drawChromosomeX(page, x, y - 6, 5, geneB);
+      drawChromosomeX(page, x + 11, y, 5, genea);
+      drawChromosomeX(page, x + 22, y - 6, 5, geneb);
     } else {
-      drawSketchOval(page, x - 10, y, 12, 11);
-      drawSketchOval(page, x + 12, y, 12, 11);
-      drawChromosomeX(page, x - 12, y + 1, 4.5, geneA);
-      drawChromosomeX(page, x - 6, y - 5, 4.5, geneB);
-      drawChromosomeX(page, x + 10, y + 1, 4.5, genea);
-      drawChromosomeX(page, x + 16, y - 5, 4.5, geneb);
+      drawSketchOval(page, x - 9, y, 10, 9);
+      drawSketchOval(page, x + 9, y, 10, 9);
+      drawChromosomeX(page, x - 11, y + 1, 3.8, geneA);
+      drawChromosomeX(page, x - 6, y - 4, 3.8, geneB);
+      drawChromosomeX(page, x + 8, y + 1, 3.8, genea);
+      drawChromosomeX(page, x + 13, y - 4, 3.8, geneb);
     }
   });
 
   // Middle row
-  drawSketchOval(page, 95, 335, 38, 38); // anaphase II
-  drawChromosomeI(page, 83, 343, 6, geneA);
-  drawChromosomeI(page, 83, 327, 6, geneB);
-  drawChromosomeI(page, 108, 343, 6, geneA);
-  drawChromosomeI(page, 108, 327, 6, geneB);
+  drawSketchOval(page, 95, 335, 31, 31); // anaphase II
+  drawChromosomeI(page, 85, 341, 5, geneA);
+  drawChromosomeI(page, 85, 329, 5, geneB);
+  drawChromosomeI(page, 105, 341, 5, geneA);
+  drawChromosomeI(page, 105, 329, 5, geneB);
 
-  drawSketchOval(page, 352, 335, 38, 38); // metaphase II
-  drawChromosomeX(page, 346, 335, 5.5, genea);
-  drawChromosomeX(page, 358, 335, 5.5, geneb);
+  drawSketchOval(page, 352, 335, 31, 31); // metaphase II
+  drawChromosomeX(page, 347, 335, 4.8, genea);
+  drawChromosomeX(page, 357, 335, 4.8, geneb);
 
-  drawSketchOval(page, 565, 335, 38, 38); // prophase II
-  drawChromosomeX(page, 555, 345, 6, genea);
-  drawChromosomeX(page, 573, 327, 6, geneb);
+  drawSketchOval(page, 565, 335, 31, 31); // prophase II
+  drawChromosomeX(page, 557, 341, 5, genea);
+  drawChromosomeX(page, 571, 329, 5, geneb);
 
   // Bottom row
-  drawSketchOval(page, 95, 190, 38, 34); // telophase II
-  drawSketchOval(page, 85, 190, 11, 9);
-  drawSketchOval(page, 106, 190, 11, 9);
-  drawChromosomeI(page, 85, 190, 4, genea);
-  drawChromosomeI(page, 106, 190, 4, geneb);
+  drawSketchOval(page, 95, 190, 30, 28); // telophase II
+  drawSketchOval(page, 87, 190, 9, 8);
+  drawSketchOval(page, 103, 190, 9, 8);
+  drawChromosomeI(page, 87, 190, 3.2, genea);
+  drawChromosomeI(page, 103, 190, 3.2, geneb);
 
   // Daughter cells
-  drawSketchOval(page, 648, 190, 24, 24);
-  drawSketchOval(page, 686, 190, 24, 24);
-  drawSketchOval(page, 724, 190, 24, 24);
-  drawSketchOval(page, 762, 190, 24, 24);
-  drawChromosomeI(page, 648, 190, 4, geneA);
-  drawChromosomeI(page, 686, 190, 4, geneB);
-  drawChromosomeI(page, 724, 190, 4, genea);
-  drawChromosomeI(page, 762, 190, 4, geneb);
+  drawSketchOval(page, 648, 190, 19, 19);
+  drawSketchOval(page, 684, 190, 19, 19);
+  drawSketchOval(page, 720, 190, 19, 19);
+  drawSketchOval(page, 756, 190, 19, 19);
+  drawChromosomeI(page, 648, 190, 3.5, geneA);
+  drawChromosomeI(page, 684, 190, 3.5, geneB);
+  drawChromosomeI(page, 720, 190, 3.5, genea);
+  drawChromosomeI(page, 756, 190, 3.5, geneb);
   drawHandText(page, font, "4 haploid", 677, 158, 8.5);
 }
 
@@ -339,7 +344,11 @@ async function main() {
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
-  const font = await pdf.embedFont(StandardFonts.CourierOblique);
+  pdf.registerFontkit(fontkit);
+  const fontBytes = fs.readFileSync(
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+  );
+  const font = await pdf.embedFont(fontBytes, { subset: true });
   const pages = pdf.getPages();
 
   drawMitosisPage(pages[0], font);
