@@ -1,6 +1,5 @@
 const fs = require("fs");
-const { PDFDocument, rgb } = require("pdf-lib");
-const fontkit = require("@pdf-lib/fontkit");
+const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
 
 function mulberry32(seed) {
   let t = seed >>> 0;
@@ -279,16 +278,11 @@ function drawMeiosisPhasesPage(page, font) {
   drawChromosomeI(page, 90, 190, 2.5, genea);
   drawChromosomeI(page, 100, 190, 2.5, geneb);
 
-  // Daughter cells
-  drawSketchOval(page, 648, 190, 10, 10);
-  drawSketchOval(page, 684, 190, 10, 10);
-  drawSketchOval(page, 720, 190, 10, 10);
-  drawSketchOval(page, 756, 190, 10, 10);
-  drawChromosomeI(page, 648, 190, 2.8, geneA);
-  drawChromosomeI(page, 684, 190, 2.8, geneB);
-  drawChromosomeI(page, 720, 190, 2.8, genea);
-  drawChromosomeI(page, 756, 190, 2.8, geneb);
-  drawHandText(page, font, "4 haploid", 677, 158, 8.5);
+  // Daughter cells (centered in the worksheet's 2x2 blank circles)
+  drawChromosomeI(page, 582, 208, 3, geneA);
+  drawChromosomeI(page, 676, 208, 3, geneB);
+  drawChromosomeI(page, 582, 112, 3, genea);
+  drawChromosomeI(page, 676, 112, 3, geneb);
 }
 
 function fillSummaryTable(page4, page5, page6, font) {
@@ -347,15 +341,11 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v2.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v3.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
-  pdf.registerFontkit(fontkit);
-  const fontBytes = fs.readFileSync(
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-  );
-  const font = await pdf.embedFont(fontBytes, { subset: true });
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
   const pages = pdf.getPages();
 
   drawMitosisPage(pages[0], font);
