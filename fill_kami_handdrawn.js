@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { PDFDocument, StandardFonts, rgb, degrees } = require("pdf-lib");
+const { PDFDocument, rgb } = require("pdf-lib");
 const fontkit = require("@pdf-lib/fontkit");
 
 function mulberry32(seed) {
@@ -98,17 +98,17 @@ function drawHandText(page, font, text, x, y, size = 10, lineGap = 2, color = pe
       size,
       font,
       color,
-      rotate: degrees(0),
     });
   });
 }
 
 function drawMitosisPage(page, font) {
   // Prophase
-  drawSketchOval(page, 290, 296, 45, 52);
-  drawSketchOval(page, 290, 296, 26, 30);
+  drawSketchOval(page, 290, 296, 18, 20);
   drawCentrosome(page, 252, 338);
   drawCentrosome(page, 326, 338);
+  drawSketchLine(page, 256, 333, 281, 309, 0.75, 1);
+  drawSketchLine(page, 322, 333, 299, 309, 0.75, 1);
   drawChromosomeX(page, 278, 305, 7, geneA);
   drawChromosomeX(page, 304, 305, 7, genea);
   drawChromosomeX(page, 278, 284, 7, geneB);
@@ -119,22 +119,28 @@ function drawMitosisPage(page, font) {
   drawHandText(page, font, "b", 312, 272, 8, 2, geneb);
 
   // Metaphase
-  drawSketchOval(page, 430, 296, 45, 52);
+  drawSketchOval(page, 430, 296, 18, 20);
   drawCentrosome(page, 390, 296);
   drawCentrosome(page, 470, 296);
   const mx = [414, 425, 436, 447];
   [geneA, genea, geneB, geneb].forEach((c, i) => drawChromosomeX(page, mx[i], 296, 6.5, c));
-  drawSketchLine(page, 390, 296, 414, 296, 0.9, 2);
-  drawSketchLine(page, 470, 296, 447, 296, 0.9, 2);
+  drawSketchLine(page, 390, 296, 414, 296, 0.9, 1);
+  drawSketchLine(page, 470, 296, 447, 296, 0.9, 1);
+  drawSketchLine(page, 390, 296, 425, 296, 0.6, 1);
+  drawSketchLine(page, 470, 296, 436, 296, 0.6, 1);
   drawHandText(page, font, "A", 405, 270, 8, 2, geneA);
   drawHandText(page, font, "a", 418, 270, 8, 2, genea);
   drawHandText(page, font, "B", 432, 270, 8, 2, geneB);
   drawHandText(page, font, "b", 445, 270, 8, 2, geneb);
 
   // Anaphase
-  drawSketchOval(page, 548, 296, 45, 52);
+  drawSketchOval(page, 548, 296, 18, 20);
   drawCentrosome(page, 507, 296);
   drawCentrosome(page, 589, 296);
+  drawSketchLine(page, 510, 296, 526, 304, 0.75, 1);
+  drawSketchLine(page, 510, 296, 538, 286, 0.75, 1);
+  drawSketchLine(page, 586, 296, 558, 304, 0.75, 1);
+  drawSketchLine(page, 586, 296, 570, 286, 0.75, 1);
   drawChromosomeI(page, 526, 304, 7, geneA);
   drawChromosomeI(page, 526, 286, 7, geneA);
   drawChromosomeI(page, 538, 304, 7, geneB);
@@ -149,10 +155,8 @@ function drawMitosisPage(page, font) {
   drawHandText(page, font, "b", 572, 318, 8, 2, geneb);
 
   // Daughter cells area
-  drawSketchOval(page, 145, 122, 40, 36);
-  drawSketchOval(page, 228, 122, 40, 36);
-  drawSketchOval(page, 145, 122, 19, 16);
-  drawSketchOval(page, 228, 122, 19, 16);
+  drawSketchOval(page, 145, 122, 16, 13);
+  drawSketchOval(page, 228, 122, 16, 13);
   drawChromosomeI(page, 133, 129, 5, geneA);
   drawChromosomeI(page, 141, 129, 5, genea);
   drawChromosomeI(page, 149, 129, 5, geneB);
@@ -171,21 +175,22 @@ function drawMitosisPage(page, font) {
   drawHandText(page, font, "b", 241, 100, 8, 2, geneb);
 
   // Telophase bubble
-  drawSketchOval(page, 670, 132, 44, 38);
-  drawSketchOval(page, 656, 132, 15, 13);
-  drawSketchOval(page, 684, 132, 15, 13);
+  drawSketchOval(page, 670, 132, 18, 15);
+  drawSketchOval(page, 662, 132, 6, 5);
+  drawSketchOval(page, 678, 132, 6, 5);
   drawChromosomeI(page, 652, 136, 4.5, geneA);
   drawChromosomeI(page, 658, 136, 4.5, geneB);
   drawChromosomeI(page, 682, 136, 4.5, genea);
   drawChromosomeI(page, 688, 136, 4.5, geneb);
-  drawSketchLine(page, 670, 94, 670, 170, 0.8, 1);
 }
 
 function drawMeiosisLabelPage(page, font) {
   // Draw one large prophase I style diagram with labels on page 2
-  drawSketchOval(page, 210, 250, 105, 85);
+  drawSketchOval(page, 210, 250, 72, 58);
   drawCentrosome(page, 122, 311);
   drawCentrosome(page, 296, 311);
+  drawSketchLine(page, 128, 307, 176, 266, 0.75, 1);
+  drawSketchLine(page, 289, 307, 240, 238, 0.75, 1);
 
   drawChromosomeX(page, 176, 266, 9, geneA);
   drawChromosomeX(page, 194, 266, 9, genea);
@@ -223,64 +228,66 @@ function drawMeiosisPhasesPage(page, font) {
   ];
 
   top.forEach(({ x, y, type }) => {
-    drawSketchOval(page, x, y, 32, 32);
+    drawSketchOval(page, x, y, 14, 14);
     if (type === "proI") {
-      drawChromosomeX(page, x - 9, y + 4, 5.5, geneA);
-      drawChromosomeX(page, x + 4, y + 4, 5.5, genea);
-      drawChromosomeX(page, x - 3, y - 9, 5.5, geneB);
-      drawChromosomeX(page, x + 10, y - 9, 5.5, geneb);
-      drawSketchLine(page, x - 6, y + 11, x, y - 1, 0.8, 2);
+      drawChromosomeX(page, x - 5, y + 3, 4.5, geneA);
+      drawChromosomeX(page, x + 5, y + 3, 4.5, genea);
+      drawChromosomeX(page, x - 5, y - 7, 4.5, geneB);
+      drawChromosomeX(page, x + 5, y - 7, 4.5, geneb);
+      drawSketchLine(page, x - 2, y + 8, x + 2, y - 4, 0.7, 1);
     } else if (type === "metaI") {
-      const vx = [x - 10, x - 2, x + 6, x + 14];
+      const vx = [x - 7, x - 2, x + 3, x + 8];
       [geneA, genea, geneB, geneb].forEach((c, i) =>
-        drawChromosomeX(page, vx[i], y, 4.8, c)
+        drawChromosomeX(page, vx[i], y, 3.8, c)
       );
+      drawSketchLine(page, x - 14, y, x + 14, y, 0.65, 1);
     } else if (type === "anaI") {
-      drawChromosomeX(page, x - 11, y, 5, geneA);
-      drawChromosomeX(page, x, y - 6, 5, geneB);
-      drawChromosomeX(page, x + 11, y, 5, genea);
-      drawChromosomeX(page, x + 22, y - 6, 5, geneb);
+      drawChromosomeX(page, x - 8, y + 2, 4, geneA);
+      drawChromosomeX(page, x - 2, y - 5, 4, geneB);
+      drawChromosomeX(page, x + 8, y + 2, 4, genea);
+      drawChromosomeX(page, x + 14, y - 5, 4, geneb);
     } else {
-      drawSketchOval(page, x - 9, y, 10, 9);
-      drawSketchOval(page, x + 9, y, 10, 9);
-      drawChromosomeX(page, x - 11, y + 1, 3.8, geneA);
-      drawChromosomeX(page, x - 6, y - 4, 3.8, geneB);
-      drawChromosomeX(page, x + 8, y + 1, 3.8, genea);
-      drawChromosomeX(page, x + 13, y - 4, 3.8, geneb);
+      drawSketchOval(page, x - 6, y, 5, 4);
+      drawSketchOval(page, x + 6, y, 5, 4);
+      drawChromosomeX(page, x - 6, y + 1, 3.2, geneA);
+      drawChromosomeX(page, x - 3, y - 3, 3.2, geneB);
+      drawChromosomeX(page, x + 6, y + 1, 3.2, genea);
+      drawChromosomeX(page, x + 9, y - 3, 3.2, geneb);
     }
   });
 
   // Middle row
-  drawSketchOval(page, 95, 335, 31, 31); // anaphase II
-  drawChromosomeI(page, 85, 341, 5, geneA);
-  drawChromosomeI(page, 85, 329, 5, geneB);
-  drawChromosomeI(page, 105, 341, 5, geneA);
-  drawChromosomeI(page, 105, 329, 5, geneB);
+  drawSketchOval(page, 95, 335, 14, 14); // anaphase II
+  drawChromosomeI(page, 90, 339, 4, geneA);
+  drawChromosomeI(page, 90, 331, 4, geneB);
+  drawChromosomeI(page, 100, 339, 4, geneA);
+  drawChromosomeI(page, 100, 331, 4, geneB);
 
-  drawSketchOval(page, 352, 335, 31, 31); // metaphase II
-  drawChromosomeX(page, 347, 335, 4.8, genea);
-  drawChromosomeX(page, 357, 335, 4.8, geneb);
+  drawSketchOval(page, 352, 335, 14, 14); // metaphase II
+  drawChromosomeX(page, 348, 335, 3.8, genea);
+  drawChromosomeX(page, 356, 335, 3.8, geneb);
+  drawSketchLine(page, 342, 335, 362, 335, 0.65, 1);
 
-  drawSketchOval(page, 565, 335, 31, 31); // prophase II
-  drawChromosomeX(page, 557, 341, 5, genea);
-  drawChromosomeX(page, 571, 329, 5, geneb);
+  drawSketchOval(page, 565, 335, 14, 14); // prophase II
+  drawChromosomeX(page, 560, 339, 4, genea);
+  drawChromosomeX(page, 570, 331, 4, geneb);
 
   // Bottom row
-  drawSketchOval(page, 95, 190, 30, 28); // telophase II
-  drawSketchOval(page, 87, 190, 9, 8);
-  drawSketchOval(page, 103, 190, 9, 8);
-  drawChromosomeI(page, 87, 190, 3.2, genea);
-  drawChromosomeI(page, 103, 190, 3.2, geneb);
+  drawSketchOval(page, 95, 190, 14, 12); // telophase II
+  drawSketchOval(page, 90, 190, 4, 3.5);
+  drawSketchOval(page, 100, 190, 4, 3.5);
+  drawChromosomeI(page, 90, 190, 2.5, genea);
+  drawChromosomeI(page, 100, 190, 2.5, geneb);
 
   // Daughter cells
-  drawSketchOval(page, 648, 190, 19, 19);
-  drawSketchOval(page, 684, 190, 19, 19);
-  drawSketchOval(page, 720, 190, 19, 19);
-  drawSketchOval(page, 756, 190, 19, 19);
-  drawChromosomeI(page, 648, 190, 3.5, geneA);
-  drawChromosomeI(page, 684, 190, 3.5, geneB);
-  drawChromosomeI(page, 720, 190, 3.5, genea);
-  drawChromosomeI(page, 756, 190, 3.5, geneb);
+  drawSketchOval(page, 648, 190, 10, 10);
+  drawSketchOval(page, 684, 190, 10, 10);
+  drawSketchOval(page, 720, 190, 10, 10);
+  drawSketchOval(page, 756, 190, 10, 10);
+  drawChromosomeI(page, 648, 190, 2.8, geneA);
+  drawChromosomeI(page, 684, 190, 2.8, geneB);
+  drawChromosomeI(page, 720, 190, 2.8, genea);
+  drawChromosomeI(page, 756, 190, 2.8, geneb);
   drawHandText(page, font, "4 haploid", 677, 158, 8.5);
 }
 
