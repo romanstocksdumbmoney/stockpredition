@@ -20,8 +20,8 @@ const genea = rgb(0.87, 0.2, 0.2); // mom: red
 const geneb = rgb(0.14, 0.62, 0.24); // mom: green
 const LINE_JITTER = 0.9;
 const OVAL_JITTER = 0.9;
-const TEXT_JITTER_X = 0.25;
-const TEXT_JITTER_Y = 0.15;
+const TEXT_JITTER_X = 0.45;
+const TEXT_JITTER_Y = 0.25;
 
 function j(v, amt) {
   return v + (rand() - 0.5) * amt;
@@ -95,10 +95,10 @@ function drawHandText(page, font, text, x, y, size = 10, lineGap = 2, color = pe
     page.drawText(line, {
       x: j(x, TEXT_JITTER_X),
       y: j(y - idx * (size + lineGap), TEXT_JITTER_Y),
-      size,
+      size: size + (rand() - 0.5) * 0.25,
       font,
       color,
-      rotate: degrees(0),
+      rotate: degrees((rand() - 0.5) * 0.6),
     });
   });
 }
