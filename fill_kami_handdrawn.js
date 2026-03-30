@@ -219,70 +219,87 @@ function drawMeiosisLabelPage(page, font) {
 }
 
 function drawMeiosisPhasesPage(page, font) {
-  const top = [
-    { x: 180, y: 490, type: "proI" },
-    { x: 292, y: 490, type: "metaI" },
-    { x: 436, y: 490, type: "anaI" },
-    { x: 580, y: 490, type: "teloI" },
-  ];
+  // Top row: Meiosis I
+  drawSketchOval(page, 180, 490, 16, 16); // Prophase I
+  drawChromosomeX(page, 174, 495, 5, geneA);
+  drawChromosomeX(page, 186, 495, 5, genea);
+  drawChromosomeX(page, 174, 484, 5, geneB);
+  drawChromosomeX(page, 186, 484, 5, geneb);
+  drawSketchLine(page, 177, 499, 183, 486, 0.7, 1);
 
-  top.forEach(({ x, y, type }) => {
-    drawSketchOval(page, x, y, 14, 14);
-    if (type === "proI") {
-      drawChromosomeX(page, x - 5, y + 3, 4.5, geneA);
-      drawChromosomeX(page, x + 5, y + 3, 4.5, genea);
-      drawChromosomeX(page, x - 5, y - 7, 4.5, geneB);
-      drawChromosomeX(page, x + 5, y - 7, 4.5, geneb);
-      drawSketchLine(page, x - 2, y + 8, x + 2, y - 4, 0.7, 1);
-    } else if (type === "metaI") {
-      const vx = [x - 7, x - 2, x + 3, x + 8];
-      [geneA, genea, geneB, geneb].forEach((c, i) =>
-        drawChromosomeX(page, vx[i], y, 3.8, c)
-      );
-      drawSketchLine(page, x - 14, y, x + 14, y, 0.65, 1);
-    } else if (type === "anaI") {
-      drawChromosomeX(page, x - 8, y + 2, 4, geneA);
-      drawChromosomeX(page, x - 2, y - 5, 4, geneB);
-      drawChromosomeX(page, x + 8, y + 2, 4, genea);
-      drawChromosomeX(page, x + 14, y - 5, 4, geneb);
-    } else {
-      drawSketchOval(page, x - 6, y, 5, 4);
-      drawSketchOval(page, x + 6, y, 5, 4);
-      drawChromosomeX(page, x - 6, y + 1, 3.2, geneA);
-      drawChromosomeX(page, x - 3, y - 3, 3.2, geneB);
-      drawChromosomeX(page, x + 6, y + 1, 3.2, genea);
-      drawChromosomeX(page, x + 9, y - 3, 3.2, geneb);
-    }
+  drawSketchOval(page, 292, 490, 16, 16); // Metaphase I
+  [284, 290, 296, 302].forEach((x, i) => {
+    const colors = [geneA, genea, geneB, geneb];
+    drawChromosomeX(page, x, 490, 4.3, colors[i]);
   });
+  drawSketchLine(page, 276, 490, 308, 490, 0.7, 1);
 
-  // Middle row
-  drawSketchOval(page, 95, 335, 14, 14); // anaphase II
-  drawChromosomeI(page, 90, 339, 4, geneA);
-  drawChromosomeI(page, 90, 331, 4, geneB);
-  drawChromosomeI(page, 100, 339, 4, geneA);
-  drawChromosomeI(page, 100, 331, 4, geneB);
+  drawSketchOval(page, 436, 490, 16, 16); // Anaphase I
+  drawChromosomeX(page, 428, 493, 4.5, geneA);
+  drawChromosomeX(page, 434, 484, 4.5, geneB);
+  drawChromosomeX(page, 444, 493, 4.5, genea);
+  drawChromosomeX(page, 450, 484, 4.5, geneb);
 
-  drawSketchOval(page, 352, 335, 14, 14); // metaphase II
-  drawChromosomeX(page, 348, 335, 3.8, genea);
-  drawChromosomeX(page, 356, 335, 3.8, geneb);
-  drawSketchLine(page, 342, 335, 362, 335, 0.65, 1);
+  // Telophase I has two connected cells; fill both sides
+  drawSketchOval(page, 580, 490, 16, 16);
+  drawSketchOval(page, 612, 490, 16, 16);
+  drawSketchOval(page, 576, 490, 5, 4);
+  drawSketchOval(page, 584, 490, 5, 4);
+  drawSketchOval(page, 608, 490, 5, 4);
+  drawSketchOval(page, 616, 490, 5, 4);
+  drawChromosomeI(page, 576, 490, 2.5, geneA);
+  drawChromosomeI(page, 584, 490, 2.5, geneB);
+  drawChromosomeI(page, 608, 490, 2.5, genea);
+  drawChromosomeI(page, 616, 490, 2.5, geneb);
 
-  drawSketchOval(page, 565, 335, 14, 14); // prophase II
-  drawChromosomeX(page, 560, 339, 4, genea);
-  drawChromosomeX(page, 570, 331, 4, geneb);
+  // Middle row: fill both circles for each stage II block
+  // Anaphase II pair
+  drawSketchOval(page, 95, 335, 16, 16);
+  drawSketchOval(page, 210, 335, 16, 16);
+  drawChromosomeI(page, 90, 340, 4, geneA);
+  drawChromosomeI(page, 90, 330, 4, geneB);
+  drawChromosomeI(page, 100, 340, 4, geneA);
+  drawChromosomeI(page, 100, 330, 4, geneB);
+  drawChromosomeI(page, 205, 340, 4, genea);
+  drawChromosomeI(page, 205, 330, 4, geneb);
+  drawChromosomeI(page, 215, 340, 4, genea);
+  drawChromosomeI(page, 215, 330, 4, geneb);
 
-  // Bottom row
-  drawSketchOval(page, 95, 190, 14, 12); // telophase II
-  drawSketchOval(page, 90, 190, 4, 3.5);
-  drawSketchOval(page, 100, 190, 4, 3.5);
-  drawChromosomeI(page, 90, 190, 2.5, genea);
-  drawChromosomeI(page, 100, 190, 2.5, geneb);
+  // Metaphase II pair
+  drawSketchOval(page, 352, 335, 16, 16);
+  drawSketchOval(page, 460, 335, 16, 16);
+  drawChromosomeX(page, 347, 335, 4.3, geneA);
+  drawChromosomeX(page, 357, 335, 4.3, geneB);
+  drawChromosomeX(page, 455, 335, 4.3, genea);
+  drawChromosomeX(page, 465, 335, 4.3, geneb);
+  drawSketchLine(page, 338, 335, 366, 335, 0.65, 1);
+  drawSketchLine(page, 446, 335, 474, 335, 0.65, 1);
 
-  // Daughter cells (centered in the worksheet's 2x2 blank circles)
-  drawChromosomeI(page, 582, 208, 3, geneA);
-  drawChromosomeI(page, 676, 208, 3, geneB);
-  drawChromosomeI(page, 582, 112, 3, genea);
-  drawChromosomeI(page, 676, 112, 3, geneb);
+  // Prophase II pair
+  drawSketchOval(page, 565, 335, 16, 16);
+  drawSketchOval(page, 675, 335, 16, 16);
+  drawChromosomeX(page, 560, 340, 4.5, geneA);
+  drawChromosomeX(page, 570, 330, 4.5, geneB);
+  drawChromosomeX(page, 670, 340, 4.5, genea);
+  drawChromosomeX(page, 680, 330, 4.5, geneb);
+
+  // Bottom row: Telophase II pair (both cells filled)
+  drawSketchOval(page, 95, 190, 16, 14);
+  drawSketchOval(page, 210, 190, 16, 14);
+  drawSketchOval(page, 90, 190, 5, 4);
+  drawSketchOval(page, 100, 190, 5, 4);
+  drawSketchOval(page, 205, 190, 5, 4);
+  drawSketchOval(page, 215, 190, 5, 4);
+  drawChromosomeI(page, 90, 190, 2.8, geneA);
+  drawChromosomeI(page, 100, 190, 2.8, geneB);
+  drawChromosomeI(page, 205, 190, 2.8, genea);
+  drawChromosomeI(page, 215, 190, 2.8, geneb);
+
+  // Daughter cells (2x2 blank circles)
+  drawChromosomeI(page, 582, 208, 3.4, geneA);
+  drawChromosomeI(page, 676, 208, 3.4, geneB);
+  drawChromosomeI(page, 582, 112, 3.4, genea);
+  drawChromosomeI(page, 676, 112, 3.4, geneb);
 }
 
 function fillSummaryTable(page4, page5, page6, font) {
@@ -341,7 +358,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v3.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v4.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
