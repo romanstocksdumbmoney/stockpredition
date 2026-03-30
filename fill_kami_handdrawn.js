@@ -347,7 +347,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v2.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
