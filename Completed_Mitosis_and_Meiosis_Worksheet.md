@@ -13,49 +13,67 @@ Date: ____________________
 - Homologous pair 2: **B** (dad) and **b** (mom)
 - DNA is replicated before mitosis, so each chromosome has two sister chromatids.
 
-Legend for simple drawings:
-- `X` shape = replicated chromosome (2 sister chromatids)
-- `|` = single chromatid (after separation)
-- `[SF]` = spindle fibers
+Legend for drawings:
+- `*` = centrosome (contains centrioles)
+- `---` = spindle fibers
+- `( )` = nuclear membrane
+- `X` = replicated chromosome (sister chromatids)
+- `|` = single chromosome after chromatid separation
 
 ### Prophase
 ```
-   __________________________
-  /                          \
- |   X(A)    X(a)   X(B) X(b) |
- |        (nuclear membrane   |
- |         breaking down)     |
-  \__________________________/
+           _________________________________
+         /                                   \
+        /                                     \
+       |     *                         *       |
+       |      \                       /        |
+       |       \                     /         |
+       |          (   X(A)   X(a)   )         |
+       |          (   X(B)   X(b)   )         |
+       |            nuclear membrane           |
+       |            breaking down              |
+        \                                     /
+         \___________________________________/
 ```
 
-### Metaphase (chromosomes line up single file at center)
+### Metaphase (chromosomes line up at equator)
 ```
-   __________________________
-  /                          \
- | [SF]--> X(A)              |
- | [SF]--> X(a)   |equator|  |
- | [SF]--> X(B)              |
- | [SF]--> X(b)              |
-  \__________________________/
+           _________________________________
+         /                                   \
+        /                                     \
+       |   *-----------------------------*     |
+       |        X(A)   X(a)   X(B)   X(b)     |
+       |              |  equator  |           |
+       |   spindle fibers attached to          |
+       |   centromeres from opposite poles     |
+        \                                     /
+         \___________________________________/
 ```
 
 ### Anaphase (sister chromatids separate)
 ```
-   __________________________
-  /                          \
- |  A|  a|   B|  b|   ->     |
- |     <-   |A  |a  |B  |b   |
- | (chromatids pulled apart) |
-  \__________________________/
+           _________________________________
+         /                                   \
+        /                                     \
+       |     *                         *       |
+       |    /|\                       /|\      |
+       |   A |  B |             | a  | b      |
+       |   A |  B |             | a  | b      |
+       |   chromatids pulled to opposite poles |
+        \                                     /
+         \___________________________________/
 ```
 
 ### Telophase + Cytokinesis
 ```
-  _____________      _____________
- /             \    /             \
-|   A  a  B  b  |  |   A  a  B  b  |
-| (new nucleus) |  | (new nucleus) |
- \_____________/    \_____________/
+             _______________      _______________
+            /               \    /               \
+           |   ( A  a  B b ) |  | ( A  a  B  b ) |
+           |    new nucleus  |  |   new nucleus  |
+           |      forms      |  |      forms     |
+            \_______   ______/    \______   _____/
+                    \ /                  \ /
+                  cleavage furrow / cytokinesis
 ```
 
 ### Daughter cells (final)
@@ -79,18 +97,20 @@ Show crossing over in Prophase I.
 - centrioles
 - nuclear membrane
 
-### Prophase I
+### Prophase I (synapsis + crossing over)
 ```
-   ________________________________
-  /                                \
- | Homologous pair 1: X(A) next to X(a) |
- | Homologous pair 2: X(B) next to X(b) |
- |  (synapsis/tetrads form)             |
- |  crossing over between non-sister    |
- |  chromatids occurs at chiasmata       |
- |  centrosomes + centrioles move poles  |
- |  nuclear membrane breaks down         |
-  \____________________________________/
+           _______________________________________
+         /                                         \
+        /                                           \
+       |     *                               *       |
+       |      \                             /        |
+       |       (  X(A) == X(a)  )   <- homologous pair
+       |       (   X(B) == X(b) )   <- homologous pair
+       |            x        x       <- chiasmata
+       |      crossing over between non-sister       |
+       |      chromatids (gene segments swap)        |
+        \                                           /
+         \_________________________________________/
 ```
 
 Crossing-over example (gene segment swap):
@@ -100,70 +120,83 @@ Crossing-over example (gene segment swap):
 
 ### Metaphase I
 ```
-   __________________________
-  /                          \
- | [SF]--> X(A)X(a)          |
- | [SF]--> X(B)X(b)  |equator|
- | (homologous pairs align)  |
-  \__________________________/
+           _______________________________________
+         /                                         \
+        /                                           \
+       |   *-----------------------------------*    |
+       |        X(A)X(a)      X(B)X(b)              |
+       |          tetrad         tetrad             |
+       |            |      equator      |           |
+       |   homologous chromosomes aligned as pairs  |
+        \                                           /
+         \_________________________________________/
 ```
 
 ### Anaphase I
 ```
-   __________________________
-  /                          \
- |  X(A)  X(B)   ->          |
- |          <-   X(a)  X(b)  |
- | (homologs separate;        |
- |  sister chromatids stay)   |
-  \__________________________/
+           _______________________________________
+         /                                         \
+        /                                           \
+       |      *                             *       |
+       |     / \                           / \      |
+       |   X(A)  X(B)               X(a)   X(b)    |
+       |   (to left pole)          (to right pole) |
+       |   homologs separate; sister chromatids stay|
+        \                                           /
+         \_________________________________________/
 ```
 
 ### Telophase I + Cytokinesis
 ```
-  ________________      ________________
- /                \    /                \
-|   X(A)   X(B)    |  |   X(a)   X(b)    |
-|   (n = 2)        |  |   (n = 2)        |
- \________________/    \________________/
+             __________________    __________________
+            /                  \  /                  \
+           |   X(A)    X(B)     ||   X(a)    X(b)    |
+           |      haploid (n=2) ||     haploid (n=2) |
+            \__________  _______/ \_______  _________/
+                       \/                 \/
+                    cytokinesis forms 2 cells
 ```
 
 ### Prophase II
 ```
-  ________________      ________________
- /                \    /                \
-| X(A)   X(B)      |  | X(a)   X(b)      |
-| new spindles form|  | new spindles form|
- \________________/    \________________/
+          ________________            ________________
+         /                \          /                \
+        |  *        *      |        |   *       *     |
+        |   \      /       |        |    \     /      |
+        |    X(A) X(B)     |        |    X(a) X(b)    |
+        | new spindle forms|        | new spindle forms|
+         \________________/          \________________/
 ```
 
 ### Metaphase II
 ```
-  ________________      ________________
- /                \    /                \
-| [SF]--> X(A)     |  | [SF]--> X(a)     |
-| [SF]--> X(B)     |  | [SF]--> X(b)     |
-|      |equator|   |  |      |equator|   |
- \________________/    \________________/
+          ________________            ________________
+         /                \          /                \
+        | *----------*     |        | *----------*    |
+        |     X(A)         |        |      X(a)       |
+        |     X(B)         |        |      X(b)       |
+        |   | equator |    |        |    | equator |  |
+         \________________/          \________________/
 ```
 
 ### Anaphase II
 ```
-  ________________      ________________
- /                \    /                \
-| A|   B|   <- -> |  | a|   b|   <- -> |
-| |A   |B         |  | |a   |b         |
-| (sister chromatids separate in each cell) |
- \________________/    \________________/
+          ________________            ________________
+         /                \          /                \
+        | *          *     |        | *          *    |
+        | A|      |A       |        | a|      |a      |
+        | B|      |B       |        | b|      |b      |
+        | chromatids separate in each cell             |
+         \________________/          \________________/
 ```
 
 ### Telophase II + Cytokinesis (final daughter cells)
 ```
-   _________   _________   _________   _________
-  /         \ /         \ /         \ /         \
- |  A   B    | a   b    | A-a  B    | a-A  b    |
- | (n=2)     | (n=2)    | (n=2)     | (n=2)     |
-  \_________/ \_________/ \_________/ \_________/
+        __________   __________   __________   __________
+       /          \ /          \ /          \ /          \
+      |  A   B     |  a   b     |  A-a  B    |  a-A  b   |
+      |   n = 2    |   n = 2    |   n = 2    |   n = 2   |
+       \__________/ \__________/ \__________/ \__________/
 ```
 
 Note: Exact allele combinations vary due to crossing over and independent assortment; all final cells are haploid.
