@@ -20,162 +20,151 @@ function text(page, font, s, x, y, size = 9, color = pen) {
 }
 
 function xChrom(page, cx, cy, size, color) {
-  line(page, cx - size, cy - size, cx + size, cy + size, 1.3, color);
-  line(page, cx - size, cy + size, cx + size, cy - size, 1.3, color);
+  line(page, cx - size, cy - size, cx + size, cy + size, 1.4, color);
+  line(page, cx - size, cy + size, cx + size, cy - size, 1.4, color);
 }
 
 function iChrom(page, cx, cy, size, color) {
-  line(page, cx, cy - size, cx, cy + size, 1.3, color);
+  line(page, cx, cy - size, cx, cy + size, 1.4, color);
 }
 
-function drawMainCell(page, cx, cy, r = 16) {
-  circle(page, cx, cy, r, 1, pen);
+function drawFourX(page, cx, cy, size = 7) {
+  xChrom(page, cx - 8, cy + 7, size, geneA);
+  xChrom(page, cx + 8, cy + 7, size, genea);
+  xChrom(page, cx - 8, cy - 7, size, geneB);
+  xChrom(page, cx + 8, cy - 7, size, geneb);
 }
 
-function drawMitosisPage(page, font) {
-  // Prophase (center of first phase circle)
-  const p1 = { x: 325, y: 304 };
-  drawMainCell(page, p1.x, p1.y, 16);
-  xChrom(page, p1.x - 6, p1.y + 4, 5, geneA);
-  xChrom(page, p1.x + 6, p1.y + 4, 5, genea);
-  xChrom(page, p1.x - 6, p1.y - 6, 5, geneB);
-  xChrom(page, p1.x + 6, p1.y - 6, 5, geneb);
+function drawFourI(page, cx, cy, size = 6) {
+  iChrom(page, cx - 9, cy + 2, size, geneA);
+  iChrom(page, cx - 3, cy + 2, size, geneB);
+  iChrom(page, cx + 3, cy + 2, size, genea);
+  iChrom(page, cx + 9, cy + 2, size, geneb);
+}
+
+function drawMitosisPage(page) {
+  // Centers from phase labels on page 1
+  const pro = { x: 288, y: 304 };
+  const meta = { x: 427, y: 304 };
+  const ana = { x: 541, y: 304 };
+
+  // Prophase (large and centered)
+  circle(page, pro.x, pro.y, 19, 1);
+  drawFourX(page, pro.x, pro.y, 7);
 
   // Metaphase
-  const p2 = { x: 540, y: 304 };
-  drawMainCell(page, p2.x, p2.y, 16);
-  const xs = [p2.x - 8, p2.x - 3, p2.x + 2, p2.x + 7];
-  [geneA, genea, geneB, geneb].forEach((c, i) => xChrom(page, xs[i], p2.y, 4.3, c));
-  line(page, p2.x - 14, p2.y, p2.x + 14, p2.y, 0.9, pen);
+  circle(page, meta.x, meta.y, 19, 1);
+  xChrom(page, meta.x - 10, meta.y, 6, geneA);
+  xChrom(page, meta.x - 3, meta.y, 6, genea);
+  xChrom(page, meta.x + 4, meta.y, 6, geneB);
+  xChrom(page, meta.x + 11, meta.y, 6, geneb);
+  line(page, meta.x - 15, meta.y, meta.x + 15, meta.y, 1, pen);
 
   // Anaphase
-  const p3 = { x: 655, y: 304 };
-  drawMainCell(page, p3.x, p3.y, 16);
-  iChrom(page, p3.x - 6, p3.y + 4, 4.5, geneA);
-  iChrom(page, p3.x - 1, p3.y + 4, 4.5, geneB);
-  iChrom(page, p3.x + 5, p3.y + 4, 4.5, genea);
-  iChrom(page, p3.x + 10, p3.y + 4, 4.5, geneb);
+  circle(page, ana.x, ana.y, 19, 1);
+  iChrom(page, ana.x - 10, ana.y + 2, 6, geneA);
+  iChrom(page, ana.x - 3, ana.y + 2, 6, geneB);
+  iChrom(page, ana.x + 4, ana.y + 2, 6, genea);
+  iChrom(page, ana.x + 11, ana.y + 2, 6, geneb);
 
-  // Telophase (inside right half of peanut)
-  const p4a = { x: 798, y: 143 };
-  const p4b = { x: 820, y: 143 };
-  drawMainCell(page, p4a.x, p4a.y, 6.5);
-  drawMainCell(page, p4b.x, p4b.y, 6.5);
-  iChrom(page, p4a.x - 2, p4a.y + 1, 2.5, geneA);
-  iChrom(page, p4a.x + 2, p4a.y + 1, 2.5, geneB);
-  iChrom(page, p4b.x - 2, p4b.y + 1, 2.5, genea);
-  iChrom(page, p4b.x + 2, p4b.y + 1, 2.5, geneb);
+  // Telophase (inside peanut, right half)
+  circle(page, 664, 143, 8, 1);
+  circle(page, 684, 143, 8, 1);
+  iChrom(page, 661, 145, 3.2, geneA);
+  iChrom(page, 667, 145, 3.2, geneB);
+  iChrom(page, 681, 145, 3.2, genea);
+  iChrom(page, 687, 145, 3.2, geneb);
 
-  // Daughter cells: centered in each big circle
-  const d1 = { x: 176, y: 122 };
-  const d2 = { x: 320, y: 122 };
-  drawMainCell(page, d1.x, d1.y, 12);
-  drawMainCell(page, d2.x, d2.y, 12);
-  [d1, d2].forEach((d) => {
-    iChrom(page, d.x - 6, d.y + 2, 3.4, geneA);
-    iChrom(page, d.x - 1, d.y + 2, 3.4, genea);
-    iChrom(page, d.x + 4, d.y + 2, 3.4, geneB);
-    iChrom(page, d.x + 9, d.y + 2, 3.4, geneb);
-  });
+  // Daughter cells (centered in each big circle)
+  circle(page, 145, 122, 14, 1);
+  circle(page, 228, 122, 14, 1);
+  drawFourI(page, 145, 122, 4.2);
+  drawFourI(page, 228, 122, 4.2);
 }
 
 function drawMeiosisLabelPage(page, font) {
-  // Keep a clean centered prophase-I example in the main diagram area
-  const c = { x: 210, y: 250 };
-  drawMainCell(page, c.x, c.y, 56);
-  xChrom(page, c.x - 24, c.y + 16, 12, geneA);
-  xChrom(page, c.x - 4, c.y + 16, 12, genea);
-  xChrom(page, c.x + 22, c.y - 10, 12, geneB);
-  xChrom(page, c.x + 42, c.y - 10, 12, geneb);
+  // Compact, centered in the demonstration region only
+  circle(page, 208, 260, 42, 1);
+  xChrom(page, 192, 272, 10, geneA);
+  xChrom(page, 208, 272, 10, genea);
+  xChrom(page, 224, 248, 10, geneB);
+  xChrom(page, 240, 248, 10, geneb);
+  line(page, 198, 278, 203, 266, 1, pen);
+  line(page, 230, 254, 235, 242, 1, pen);
 
   text(page, font, "homologous pair", 74, 265, 8.5);
-  line(page, 145, 264, 182, 267, 0.8, pen);
-  text(page, font, "sister", 76, 236, 8.5);
-  text(page, font, "chromatids", 76, 226, 8.5);
-  line(page, 145, 236, 171, 257, 0.8, pen);
+  line(page, 145, 264, 182, 267, 0.9, pen);
+  text(page, font, "sister chromatids", 76, 232, 8.5);
+  line(page, 145, 236, 171, 257, 0.9, pen);
   text(page, font, "genes", 308, 255, 8.5);
-  line(page, 302, 250, 252, 243, 0.8, pen);
+  line(page, 302, 250, 252, 243, 0.9, pen);
   text(page, font, "spindle fibers", 300, 215, 8.5);
-  line(page, 296, 212, 248, 302, 0.8, pen);
   text(page, font, "centrosome", 78, 304, 8.5);
   text(page, font, "centrioles", 300, 302, 8.5);
   text(page, font, "nuclear membrane", 118, 160, 8.5);
 }
 
-function fourInsideCell(page, cx, cy, type = "x") {
-  drawMainCell(page, cx, cy, 16);
-  if (type === "x") {
-    xChrom(page, cx - 6, cy + 4, 5, geneA);
-    xChrom(page, cx - 1, cy + 4, 5, geneB);
-    xChrom(page, cx + 5, cy + 4, 5, genea);
-    xChrom(page, cx + 10, cy + 4, 5, geneb);
-  } else {
-    iChrom(page, cx - 6, cy + 3, 4.2, geneA);
-    iChrom(page, cx - 1, cy + 3, 4.2, geneB);
-    iChrom(page, cx + 5, cy + 3, 4.2, genea);
-    iChrom(page, cx + 10, cy + 3, 4.2, geneb);
-  }
-}
+function drawMeiosisPhasesPage(page) {
+  // All drawings are centered and similarly sized inside the main circles.
 
-function drawMeiosisPhasesPage(page, font) {
-  // Use one centered nucleus per stage circle, all same size.
-  // Top row
-  const proI = { x: 180, y: 490 };
-  const metaI = { x: 292, y: 490 };
-  const anaI = { x: 436, y: 490 };
-  fourInsideCell(page, proI.x, proI.y, "x");
+  // Top row (I)
+  circle(page, 180, 490, 16, 1); // Prophase I
+  drawFourX(page, 180, 490, 6);
 
-  drawMainCell(page, metaI.x, metaI.y, 16);
-  [metaI.x - 8, metaI.x - 3, metaI.x + 2, metaI.x + 7].forEach((x, i) => {
-    [geneA, genea, geneB, geneb].forEach((c, j) => {
-      if (i === j) xChrom(page, x, metaI.y, 4.3, c);
-    });
-  });
-  line(page, metaI.x - 14, metaI.y, metaI.x + 14, metaI.y, 0.9, pen);
+  circle(page, 292, 490, 16, 1); // Metaphase I
+  xChrom(page, 282, 490, 5.2, geneA);
+  xChrom(page, 289, 490, 5.2, genea);
+  xChrom(page, 296, 490, 5.2, geneB);
+  xChrom(page, 303, 490, 5.2, geneb);
+  line(page, 276, 490, 308, 490, 0.9, pen);
 
-  drawMainCell(page, anaI.x, anaI.y, 16);
-  xChrom(page, anaI.x - 8, anaI.y + 3, 4.5, geneA);
-  xChrom(page, anaI.x - 2, anaI.y - 5, 4.5, geneB);
-  xChrom(page, anaI.x + 4, anaI.y + 3, 4.5, genea);
-  xChrom(page, anaI.x + 10, anaI.y - 5, 4.5, geneb);
+  circle(page, 434, 490, 16, 1); // Anaphase I
+  xChrom(page, 425, 493, 5.2, geneA);
+  xChrom(page, 431, 484, 5.2, geneB);
+  xChrom(page, 437, 493, 5.2, genea);
+  xChrom(page, 443, 484, 5.2, geneb);
 
-  // Telophase I in right half of peanut
-  const tel1L = { x: 720, y: 490 };
-  const tel1R = { x: 830, y: 490 };
-  drawMainCell(page, tel1L.x, tel1L.y, 12);
-  drawMainCell(page, tel1R.x, tel1R.y, 12);
-  iChrom(page, tel1L.x - 2, tel1L.y + 2, 3.2, geneA);
-  iChrom(page, tel1L.x + 3, tel1L.y + 2, 3.2, geneB);
-  iChrom(page, tel1R.x - 2, tel1R.y + 2, 3.2, genea);
-  iChrom(page, tel1R.x + 3, tel1R.y + 2, 3.2, geneb);
+  // Telophase I in peanut (both halves)
+  circle(page, 724, 490, 12, 1);
+  circle(page, 834, 490, 12, 1);
+  drawFourI(page, 724, 490, 3.4);
+  drawFourI(page, 834, 490, 3.4);
 
-  // Middle row pair blocks
-  fourInsideCell(page, 97, 335, "i");    // Anaphase II left
-  fourInsideCell(page, 207, 335, "i");   // Anaphase II right
+  // Middle row (pair circles for II)
+  circle(page, 97, 335, 16, 1);   // Anaphase II left
+  drawFourI(page, 97, 335, 5.1);
+  circle(page, 207, 335, 16, 1);  // Anaphase II right
+  drawFourI(page, 207, 335, 5.1);
 
-  fourInsideCell(page, 352, 335, "x");   // Metaphase II left
-  fourInsideCell(page, 462, 335, "x");   // Metaphase II right
+  circle(page, 352, 335, 16, 1);  // Metaphase II left
+  drawFourX(page, 352, 335, 5.2);
+  line(page, 338, 335, 366, 335, 0.9, pen);
+  circle(page, 462, 335, 16, 1);  // Metaphase II right
+  drawFourX(page, 462, 335, 5.2);
+  line(page, 448, 335, 476, 335, 0.9, pen);
 
-  fourInsideCell(page, 564, 335, "x");   // Prophase II left
-  fourInsideCell(page, 674, 335, "x");   // Prophase II right
+  circle(page, 564, 335, 16, 1);  // Prophase II left
+  drawFourX(page, 564, 335, 5.2);
+  circle(page, 674, 335, 16, 1);  // Prophase II right
+  drawFourX(page, 674, 335, 5.2);
 
-  // Bottom row telophase II (both circles)
-  drawMainCell(page, 97, 190, 14);
-  drawMainCell(page, 207, 190, 14);
-  drawMainCell(page, 90, 190, 5);
-  drawMainCell(page, 100, 190, 5);
-  drawMainCell(page, 200, 190, 5);
-  drawMainCell(page, 210, 190, 5);
-  iChrom(page, 90, 190, 2.7, geneA);
-  iChrom(page, 100, 190, 2.7, geneB);
-  iChrom(page, 200, 190, 2.7, genea);
-  iChrom(page, 210, 190, 2.7, geneb);
+  // Bottom row Telophase II
+  circle(page, 97, 190, 16, 1);
+  circle(page, 207, 190, 16, 1);
+  circle(page, 90, 190, 5, 1);
+  circle(page, 100, 190, 5, 1);
+  circle(page, 200, 190, 5, 1);
+  circle(page, 210, 190, 5, 1);
+  iChrom(page, 90, 190, 2.8, geneA);
+  iChrom(page, 100, 190, 2.8, geneB);
+  iChrom(page, 200, 190, 2.8, genea);
+  iChrom(page, 210, 190, 2.8, geneb);
 
-  // Daughter cells 2x2 centered
-  iChrom(page, 582, 208, 3.8, geneA);
-  iChrom(page, 676, 208, 3.8, geneB);
-  iChrom(page, 582, 112, 3.8, genea);
-  iChrom(page, 676, 112, 3.8, geneb);
+  // Daughter cells 2x2 (centered in each blank circle)
+  drawFourI(page, 582, 208, 3.9);
+  drawFourI(page, 676, 208, 3.9);
+  drawFourI(page, 582, 112, 3.9);
+  drawFourI(page, 676, 112, 3.9);
 }
 
 function fillSummaryTable(page4, page5, page6, font) {
@@ -228,7 +217,7 @@ function fillSummaryTable(page4, page5, page6, font) {
   text(page5, font, "proper # for", 447, 136, 10);
   text(page5, font, "fertilization", 447, 124, 10);
 
-  // Page 6: fill BOTH boxes in that row
+  // Page 6: BOTH boxes filled
   text(page6, font, "Mitosis: body cells = 46", 220, 542, 10);
   text(page6, font, "Meiosis: sex cells = 23", 220, 530, 10);
 
@@ -250,16 +239,16 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v6.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v7.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const pages = pdf.getPages();
 
-  drawMitosisPage(pages[0], font);
+  drawMitosisPage(pages[0]);
   drawMeiosisLabelPage(pages[1], font);
-  drawMeiosisPhasesPage(pages[2], font);
+  drawMeiosisPhasesPage(pages[2]);
   fillSummaryTable(pages[3], pages[4], pages[5], font);
 
   const out = await pdf.save();
