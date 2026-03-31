@@ -7,6 +7,7 @@ const geneB = rgb(0.53, 0.25, 0.8);  // B purple
 const genea = rgb(0.87, 0.2, 0.2);   // a red
 const geneb = rgb(0.14, 0.62, 0.24); // b green
 const FONT_SCALE = 1.25;
+const DRAW_SCALE = 1.22;
 
 function line(page, x1, y1, x2, y2, w = 1.2, color = pen) {
   page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w, color, opacity: 0.98 });
@@ -21,28 +22,35 @@ function text(page, font, s, x, y, size = 10, color = pen) {
 }
 
 function drawX(page, cx, cy, size, color) {
-  line(page, cx - size, cy - size, cx + size, cy + size, 1.35, color);
-  line(page, cx - size, cy + size, cx + size, cy - size, 1.35, color);
+  const s = size * DRAW_SCALE;
+  line(page, cx - s, cy - s, cx + s, cy + s, 1.35, color);
+  line(page, cx - s, cy + s, cx + s, cy - s, 1.35, color);
 }
 
 function drawChromatid(page, cx, cy, size, color) {
-  line(page, cx, cy - size, cx, cy + size, 1.35, color);
-  line(page, cx - 1.2, cy - size, cx + 1.2, cy - size, 1.05, color);
-  line(page, cx - 1.2, cy + size, cx + 1.2, cy + size, 1.05, color);
+  const s = size * DRAW_SCALE;
+  const cap = 1.2 * DRAW_SCALE;
+  line(page, cx, cy - s, cx, cy + s, 1.35, color);
+  line(page, cx - cap, cy - s, cx + cap, cy - s, 1.05, color);
+  line(page, cx - cap, cy + s, cx + cap, cy + s, 1.05, color);
 }
 
 function drawFourXGrid(page, cx, cy, size = 6.5) {
-  drawX(page, cx - 8, cy + 7, size, geneA);
-  drawX(page, cx + 8, cy + 7, size, genea);
-  drawX(page, cx - 8, cy - 7, size, geneB);
-  drawX(page, cx + 8, cy - 7, size, geneb);
+  const dx = 8 * DRAW_SCALE;
+  const dy = 7 * DRAW_SCALE;
+  drawX(page, cx - dx, cy + dy, size, geneA);
+  drawX(page, cx + dx, cy + dy, size, genea);
+  drawX(page, cx - dx, cy - dy, size, geneB);
+  drawX(page, cx + dx, cy - dy, size, geneb);
 }
 
 function drawFourChromatidsRow(page, cx, cy, size = 5.5) {
-  drawChromatid(page, cx - 9, cy, size, geneA);
-  drawChromatid(page, cx - 3, cy, size, geneB);
-  drawChromatid(page, cx + 3, cy, size, genea);
-  drawChromatid(page, cx + 9, cy, size, geneb);
+  const dx1 = 9 * DRAW_SCALE;
+  const dx2 = 3 * DRAW_SCALE;
+  drawChromatid(page, cx - dx1, cy, size, geneA);
+  drawChromatid(page, cx - dx2, cy, size, geneB);
+  drawChromatid(page, cx + dx2, cy, size, genea);
+  drawChromatid(page, cx + dx1, cy, size, geneb);
 }
 
 function drawMitosisPage(page) {
@@ -228,7 +236,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v12.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v13.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
