@@ -6,6 +6,7 @@ const geneA = rgb(0.13, 0.36, 0.92); // A blue
 const geneB = rgb(0.53, 0.25, 0.8);  // B purple
 const genea = rgb(0.87, 0.2, 0.2);   // a red
 const geneb = rgb(0.14, 0.62, 0.24); // b green
+const FONT_SCALE = 1.25;
 
 function line(page, x1, y1, x2, y2, w = 1.2, color = pen) {
   page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w, color, opacity: 0.98 });
@@ -16,7 +17,7 @@ function circle(page, cx, cy, r, w = 1.0, color = pen) {
 }
 
 function text(page, font, s, x, y, size = 10, color = pen) {
-  page.drawText(s, { x, y, size, font, color });
+  page.drawText(s, { x, y, size: size * FONT_SCALE, font, color });
 }
 
 function drawX(page, cx, cy, size, color) {
@@ -227,7 +228,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v11.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v12.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
