@@ -82,22 +82,9 @@ function drawMitosisPage(page) {
   drawFourChromatidsRow(page, 261, 123, 4.3);
 }
 
-function drawMeiosisLabelPage(page, font) {
-  // Keep this page clean; add only a compact, non-overlapping demo in the open region.
-  circle(page, 210, 258, 36, 1.0);
-  drawX(page, 196, 270, 9, geneA);
-  drawX(page, 212, 270, 9, genea);
-  drawX(page, 228, 246, 9, geneB);
-  drawX(page, 244, 246, 9, geneb);
-  line(page, 202, 276, 208, 264, 1.0, pen);
-  line(page, 234, 252, 240, 240, 1.0, pen);
-
-  text(page, font, "homologous pair", 74, 265, 8.5);
-  line(page, 145, 264, 184, 268, 0.9, pen);
-  text(page, font, "sister chromatids", 76, 232, 8.5);
-  line(page, 145, 236, 174, 258, 0.9, pen);
-  text(page, font, "genes", 308, 255, 8.5);
-  line(page, 302, 250, 252, 244, 0.9, pen);
+function drawMeiosisLabelPage(_page, _font) {
+  // Intentionally left blank per user request:
+  // remove extra drawing from this page.
 }
 
 function drawMeiosisPhasesPage(page) {
@@ -153,11 +140,11 @@ function drawMeiosisPhasesPage(page) {
   drawFourXGrid(page, p2L.x, p2L.y, 5.2);
   drawFourXGrid(page, p2R.x, p2R.y, 5.2);
 
-  // Telophase II in bottom-left peanut (lowered to sit inside peanut interior)
-  circle(page, 95, 168, 12, 1.0);
-  circle(page, 210, 168, 12, 1.0);
-  drawFourChromatidsRow(page, 95, 168, 3.2);
-  drawFourChromatidsRow(page, 210, 168, 3.2);
+  // Telophase II in bottom-left peanut (move deeper inside peanut lobes)
+  circle(page, 118, 176, 11, 1.0);
+  circle(page, 258, 176, 11, 1.0);
+  drawFourChromatidsRow(page, 118, 176, 3.0);
+  drawFourChromatidsRow(page, 258, 176, 3.0);
 
   // Daughter Cells 2x2 circles (detected exact centers)
   const g1 = { x: 479, y: 199 }, g2 = { x: 587, y: 199 }, g3 = { x: 479, y: 112 }, g4 = { x: 587, y: 112 };
@@ -240,7 +227,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v9.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v10.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
