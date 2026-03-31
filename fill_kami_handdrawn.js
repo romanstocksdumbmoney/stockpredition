@@ -69,11 +69,11 @@ function drawMitosisPage(page) {
   drawChromatid(page, ana.x + 4, ana.y + 1, 6, genea);
   drawChromatid(page, ana.x + 11, ana.y + 1, 6, geneb);
 
-  // Telophase in peanut (two daughter nuclei INSIDE)
-  circle(page, 612, 143, 11, 1.0);
-  circle(page, 690, 143, 11, 1.0);
-  drawFourChromatidsRow(page, 612, 143, 3.1);
-  drawFourChromatidsRow(page, 690, 143, 3.1);
+  // Telophase in peanut (move both nuclei deeper inside the lobes)
+  circle(page, 586, 140, 11, 1.0);
+  circle(page, 654, 140, 11, 1.0);
+  drawFourChromatidsRow(page, 586, 140, 3.1);
+  drawFourChromatidsRow(page, 654, 140, 3.1);
 
   // Daughter cells (centered)
   circle(page, 114, 123, 17, 1.0);
@@ -105,8 +105,8 @@ function drawMeiosisPhasesPage(page) {
   const proI = { x: 182, y: 498 };
   const metaI = { x: 333, y: 498 };
   const anaI = { x: 473, y: 498 };
-  const teloILeft = { x: 608, y: 494 };
-  const teloIRight = { x: 695, y: 494 };
+  const teloILeft = { x: 596, y: 488 };
+  const teloIRight = { x: 666, y: 488 };
 
   // Top row
   circle(page, proI.x, proI.y, 18, 1.0);
@@ -153,11 +153,11 @@ function drawMeiosisPhasesPage(page) {
   drawFourXGrid(page, p2L.x, p2L.y, 5.2);
   drawFourXGrid(page, p2R.x, p2R.y, 5.2);
 
-  // Telophase II in bottom-left peanut
-  circle(page, 95, 190, 12, 1.0);
-  circle(page, 210, 190, 12, 1.0);
-  drawFourChromatidsRow(page, 95, 190, 3.2);
-  drawFourChromatidsRow(page, 210, 190, 3.2);
+  // Telophase II in bottom-left peanut (lowered to sit inside peanut interior)
+  circle(page, 95, 168, 12, 1.0);
+  circle(page, 210, 168, 12, 1.0);
+  drawFourChromatidsRow(page, 95, 168, 3.2);
+  drawFourChromatidsRow(page, 210, 168, 3.2);
 
   // Daughter Cells 2x2 circles (detected exact centers)
   const g1 = { x: 479, y: 199 }, g2 = { x: 587, y: 199 }, g3 = { x: 479, y: 112 }, g4 = { x: 587, y: 112 };
@@ -240,7 +240,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v8.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v9.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
