@@ -69,11 +69,11 @@ function drawMitosisPage(page) {
   drawChromatid(page, ana.x + 4, ana.y + 1, 6, genea);
   drawChromatid(page, ana.x + 11, ana.y + 1, 6, geneb);
 
-  // Telophase in peanut (move both nuclei deeper inside the lobes)
-  circle(page, 586, 140, 11, 1.0);
-  circle(page, 654, 140, 11, 1.0);
-  drawFourChromatidsRow(page, 586, 140, 3.1);
-  drawFourChromatidsRow(page, 654, 140, 3.1);
+  // Telophase in peanut (one nucleus centered per lobe)
+  circle(page, 548, 140, 11, 1.0);
+  circle(page, 612, 140, 11, 1.0);
+  drawFourChromatidsRow(page, 548, 140, 3.1);
+  drawFourChromatidsRow(page, 612, 140, 3.1);
 
   // Daughter cells (centered)
   circle(page, 114, 123, 17, 1.0);
@@ -227,7 +227,7 @@ function fillSummaryTable(page4, page5, page6, font) {
 
 async function main() {
   const input = "/workspace/source_worksheet.pdf";
-  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v10.pdf";
+  const output = "/workspace/Kami_Completed_Handdrawn_Worksheet_v11.pdf";
 
   const src = fs.readFileSync(input);
   const pdf = await PDFDocument.load(src);
