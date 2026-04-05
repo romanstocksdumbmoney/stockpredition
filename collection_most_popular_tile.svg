@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2b3444"/>
+      <stop offset="100%" stop-color="#374151"/>
+    </linearGradient>
+    <linearGradient id="bottle" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c7d2fe" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#93c5fd" stop-opacity="0.72"/>
+    </linearGradient>
+    <linearGradient id="juice" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#020617" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+  <rect x="120" y="130" width="960" height="760" rx="40" fill="url(#card)" opacity="0.95"/>
+
+  <circle cx="215" cy="230" r="62" fill="#f59e0b" opacity="0.95"/>
+  <text x="215" y="242" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="30" fill="#111827">#1</text>
+
+  <g filter="url(#shadow)">
+    <rect x="410" y="290" width="380" height="500" rx="46" fill="url(#bottle)"/>
+    <rect x="440" y="510" width="320" height="240" rx="24" fill="url(#juice)"/>
+    <rect x="505" y="220" width="190" height="85" rx="18" fill="#0f172a"/>
+    <rect x="545" y="172" width="110" height="60" rx="10" fill="#111827"/>
+    <rect x="460" y="332" width="26" height="398" rx="13" fill="#ffffff" opacity="0.30"/>
+  </g>
+
+  <g fill="#f8fafc" opacity="0.92">
+    <path d="M910 410l12 28 28 12-28 12-12 28-12-28-28-12 28-12z"/>
+    <path d="M300 520l8 20 20 8-20 8-8 20-8-20-20-8 20-8z"/>
+  </g>
+
+  <text x="600" y="980" text-anchor="middle" font-family="Georgia, serif" font-size="96" fill="#f8fafc">
+    Most Popular
+  </text>
+  <text x="600" y="1045" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" fill="#d1d5db">
+    Bestselling picks customers love
+  </text>
+</svg>
