@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6d8ff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#7aa7d9" stop-opacity="0.65"/>
+    </linearGradient>
+    <linearGradient id="juice" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7d089"/>
+      <stop offset="100%" stop-color="#d79a3b"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#020617" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+
+  <circle cx="980" cy="220" r="180" fill="#334155" opacity="0.35"/>
+  <circle cx="170" cy="290" r="120" fill="#475569" opacity="0.22"/>
+  <circle cx="1030" cy="1020" r="220" fill="#475569" opacity="0.18"/>
+
+  <ellipse cx="600" cy="850" rx="260" ry="54" fill="#0b1220" opacity="0.6"/>
+
+  <g filter="url(#shadow)">
+    <rect x="400" y="290" width="400" height="520" rx="48" fill="url(#glass)"/>
+    <rect x="430" y="510" width="340" height="250" rx="26" fill="url(#juice)"/>
+    <rect x="510" y="220" width="180" height="90" rx="20" fill="#0f172a"/>
+    <rect x="545" y="175" width="110" height="60" rx="12" fill="#111827"/>
+    <rect x="452" y="338" width="28" height="410" rx="14" fill="#ffffff" opacity="0.3"/>
+    <rect x="710" y="338" width="12" height="410" rx="6" fill="#ffffff" opacity="0.22"/>
+  </g>
+
+  <g fill="#e2e8f0" opacity="0.9">
+    <path d="M905 405l12 30 30 12-30 12-12 30-12-30-30-12 30-12z"/>
+    <path d="M305 485l8 20 20 8-20 8-8 20-8-20-20-8 20-8z"/>
+    <circle cx="270" cy="380" r="6"/>
+    <circle cx="930" cy="560" r="5"/>
+  </g>
+
+  <text x="600" y="980" text-anchor="middle" font-family="Georgia, serif" font-size="86" fill="#f8fafc">
+    Cologne Essentials
+  </text>
+  <text x="600" y="1040" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" fill="#cbd5e1">
+    Premium picks for everyday confidence
+  </text>
+</svg>
