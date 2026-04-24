@@ -102,7 +102,8 @@ const GAME = {
   particles: [],
   battedBall: null,
   pendingPlay: null,
-  flashTime: 0
+  flashTime: 0,
+  swingBuffer: 0
 };
 
 const batter = {
@@ -257,6 +258,7 @@ function startGame() {
   GAME.battedBall = null;
   GAME.pendingPlay = null;
   GAME.flashTime = 0;
+  GAME.swingBuffer = 0;
   clearBases();
   resetCount();
   resetPitchBall();
@@ -318,6 +320,7 @@ function switchSides() {
   resetPitchBall();
   GAME.battedBall = null;
   GAME.pendingPlay = null;
+  GAME.swingBuffer = 0;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = 0.8;
@@ -348,6 +351,7 @@ function addOut(reason) {
   resetPitchBall();
   GAME.battedBall = null;
   GAME.pendingPlay = null;
+  GAME.swingBuffer = 0;
   GAME.pitchReady = true;
   updateHud();
   setMessage(reason);
@@ -424,7 +428,8 @@ function pitchInStrikeZone(y) {
 function spawnPitch() {
   const fieldingTeam = GAME.teams[GAME.fieldingSide];
   const pitchRating = teamRating(fieldingTeam, "pitching");
-  const speed = 430 + pitchRating * 180 + Math.random() * 110;
+  // Slightly slower pitch speeds make batting feel fairer.
+  const speed = 335 + pitchRating * 135 + Math.random() * 85;
   const strikeChance = 0.47 + pitchRating * 0.28;
   const strikesPitch = Math.random() < strikeChance;
 
@@ -518,11 +523,12 @@ function resolveSwing(ballX, ballY) {
   const dx = Math.abs(ballX - (FIELD.home.x - 18));
   const dy = Math.abs(ballY - (batter.y + 24));
 
-  const perfectWindow = 10 + contact * 5;
-  const goodWindow = 26 + contact * 11;
+  // Wider windows improve responsiveness for arcade play.
+  const perfectWindow = 14 + contact * 7;
+  const goodWindow = 40 + contact * 18;
 
   // Small timing indicator near batter.
-  if (dx <= perfectWindow && dy <= 14 + contact * 6) {
+  if (dx <= perfectWindow && dy <= 20 + contact * 8) {
     const big = Math.random() < 0.52 + power * 0.35;
     launchBattedBall(big ? "homer" : "triple");
     registerHit(big ? "homer" : "triple");
@@ -531,7 +537,7 @@ function resolveSwing(ballX, ballY) {
     return;
   }
 
-  if (dx <= goodWindow && dy <= 30 + contact * 12) {
+  if (dx <= goodWindow && dy <= 42 + contact * 16) {
     const outcomeRoll = Math.random();
     if (outcomeRoll < 0.18 + power * 0.25) {
       launchBattedBall("double");
@@ -546,15 +552,15 @@ function resolveSwing(ballX, ballY) {
   }
 
   const weakRoll = Math.random();
-  if (weakRoll < 0.38) {
+  if (weakRoll < 0.55) {
     launchBattedBall("grounder");
-    GAME.pendingPlay.result = "grounderOut";
+    GAME.pendingPlay.result = Math.random() < (0.45 + contact * 0.25) ? "grounderSafe" : "grounderOut";
     setMessage("Weak grounder in play...");
     createBurst(ballX, ballY, "#eadfbe", 8);
     resetPitchBall();
     return;
   }
-  if (weakRoll < 0.68) {
+  if (weakRoll < 0.9) {
     foulBall();
     return;
   }
@@ -567,8 +573,15 @@ function handleSwingInput() {
   batter.activeSwing = true;
   batter.swingTime = batter.swingDuration;
   if (!pitchBall.active || pitchBall.judged) return;
-  pitchBall.judged = true;
-  resolveSwing(pitchBall.x, pitchBall.y);
+  const dx = Math.abs(pitchBall.x - (FIELD.home.x - 18));
+  if (dx <= 64) {
+    pitchBall.judged = true;
+    resolveSwing(pitchBall.x, pitchBall.y);
+    return;
+  }
+
+  // Buffered swing: early presses can still connect as ball arrives.
+  GAME.swingBuffer = 0.22;
 }
 
 function handlePitchInput() {
@@ -661,6 +674,12 @@ function resolveThrow(baseKey) {
   if (GAME.pendingPlay.result === "grounderOut") {
     GAME.pendingPlay.resolved = true;
     addOut(`Out at ${baseKey}!`);
+    return;
+  }
+
+  if (GAME.pendingPlay.result === "grounderSafe") {
+    GAME.pendingPlay.resolved = true;
+    setMessage(`Infield single. Throw to ${baseKey} is late.`);
     return;
   }
 
@@ -776,6 +795,9 @@ function update(dt) {
   }
   if (GAME.cameraShake > 0) GAME.cameraShake -= dt;
   if (GAME.flashTime > 0) GAME.flashTime -= dt;
+  if (GAME.swingBuffer > 0) {
+    GAME.swingBuffer -= dt;
+  }
 
   if (GAME.pitchReady && !GAME.battedBall) {
     GAME.pitchTimer += dt;
@@ -786,8 +808,17 @@ function update(dt) {
     pitchBall.y += pitchBall.vy * dt;
     pitchBall.vy += pitchBall.curve * dt;
 
+    if (GAME.swingBuffer > 0 && !pitchBall.judged) {
+      const dx = Math.abs(pitchBall.x - (FIELD.home.x - 18));
+      if (dx <= 18) {
+        pitchBall.judged = true;
+        GAME.swingBuffer = 0;
+        resolveSwing(pitchBall.x, pitchBall.y);
+      }
+    }
+
     // Ball reaches plate.
-    if (pitchBall.x >= FIELD.home.x - 12 && !pitchBall.judged) {
+    if (pitchBall.x >= FIELD.home.x + 8 && !pitchBall.judged) {
       resolveTakenPitch();
     }
 
