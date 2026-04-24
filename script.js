@@ -23,13 +23,13 @@ const finalScoreText = document.getElementById("finalScoreText");
 
 // Baseline camera layout: home plate on right, field opens to the left.
 const FIELD = {
-  home: { x: 790, y: 390 },
-  first: { x: 640, y: 285 },
-  second: { x: 500, y: 370 },
-  third: { x: 640, y: 475 },
-  mound: { x: 640, y: 380 },
-  foulTop: { x: 218, y: 32 },
-  foulBottom: { x: 218, y: 538 }
+  home: { x: 770, y: 350 },
+  first: { x: 560, y: 220 },
+  second: { x: 370, y: 350 },
+  third: { x: 560, y: 480 },
+  mound: { x: 560, y: 350 },
+  foulTop: { x: 150, y: 18 },
+  foulBottom: { x: 150, y: 522 }
 };
 
 const GAME = {
@@ -43,7 +43,7 @@ const GAME = {
   strikes: 0,
   pitchTimer: 0,
   nextPitchDelay: 0.9,
-  contactX: FIELD.home.x - 12,
+  contactX: FIELD.home.x - 20,
   gravity: 1200,
   keys: new Set(),
   particles: [],
@@ -53,7 +53,7 @@ const GAME = {
 };
 
 const batter = {
-  x: FIELD.home.x - 56,
+  x: FIELD.home.x - 66,
   y: FIELD.home.y - 44,
   width: 24,
   height: 48,
@@ -88,9 +88,9 @@ const fielders = [
   {
     role: "catcher",
     x: FIELD.home.x + 26,
-    y: FIELD.home.y - 24,
+    y: FIELD.home.y - 22,
     homeX: FIELD.home.x + 26,
-    homeY: FIELD.home.y - 24,
+    homeY: FIELD.home.y - 22,
     speed: 175,
     jersey: "#384f85"
   },
@@ -105,19 +105,19 @@ const fielders = [
   },
   {
     role: "second",
-    x: 568,
-    y: 322,
-    homeX: 568,
-    homeY: 322,
+    x: 500,
+    y: 280,
+    homeX: 500,
+    homeY: 280,
     speed: 198,
     jersey: "#8f5c34"
   },
   {
     role: "shortstop",
-    x: 566,
-    y: 426,
-    homeX: 566,
-    homeY: 426,
+    x: 500,
+    y: 400,
+    homeX: 500,
+    homeY: 400,
     speed: 198,
     jersey: "#8f5c34"
   },
@@ -132,28 +132,28 @@ const fielders = [
   },
   {
     role: "right",
-    x: 392,
-    y: 176,
-    homeX: 392,
-    homeY: 176,
+    x: 300,
+    y: 132,
+    homeX: 300,
+    homeY: 132,
     speed: 220,
     jersey: "#8b3d68"
   },
   {
     role: "center",
-    x: 262,
-    y: 314,
-    homeX: 262,
-    homeY: 314,
+    x: 212,
+    y: 336,
+    homeX: 212,
+    homeY: 336,
     speed: 224,
     jersey: "#8b3d68"
   },
   {
     role: "left",
-    x: 392,
-    y: 466,
-    homeX: 392,
-    homeY: 466,
+    x: 300,
+    y: 540 - 112,
+    homeX: 300,
+    homeY: 540 - 112,
     speed: 220,
     jersey: "#8b3d68"
   }
