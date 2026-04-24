@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Slugger</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="hud">
+        <h1>NEON SLUGGER</h1>
+        <div class="stats">
+          <span>Score: <strong id="scoreValue">0</strong></span>
+          <span>Outs: <strong id="outsValue">0</strong>/3</span>
+          <span>Inning: <strong id="inningValue">1</strong></span>
+        </div>
+      </header>
+
+      <section id="startScreen" class="overlay">
+        <h2>Arcade Baseball</h2>
+        <p>Time your swing to crush the pitch.</p>
+        <ul>
+          <li><strong>Space</strong>: Swing</li>
+          <li><strong>Arrow Keys / WASD</strong>: Move batter</li>
+          <li><strong>Enter</strong>: Start or restart</li>
+        </ul>
+        <p class="hint">Perfect timing = Home Run</p>
+        <button id="startButton" type="button">Start Game</button>
+      </section>
+
+      <section id="gameOverScreen" class="overlay hidden">
+        <h2>Inning Over</h2>
+        <p id="finalScoreText">Final Score: 0</p>
+        <p>Press Enter to play again.</p>
+        <button id="restartButton" type="button">Play Again</button>
+      </section>
+
+      <canvas id="gameCanvas" width="960" height="540"></canvas>
+      <p id="messageBar" class="message">Press Enter to begin.</p>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
