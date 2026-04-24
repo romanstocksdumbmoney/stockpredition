@@ -4,6 +4,11 @@
 // 2) Stateful inning + batting/fielding rules
 // 3) Input handling for batting, pitching, and fielding controls
 // 4) Isometric arcade rendering on Canvas
+// Field tuning constants (edit these to quickly rebalance layout/scale):
+// - FIELD_SCALE controls camera zoom and overall field size.
+// - BASE_SPACING_X / BASE_SPACING_Y control base spacing.
+// - MOUND_OFFSET_X / MOUND_OFFSET_Y set mound position relative to home->second line.
+// - MOUND_RADIUS_X / MOUND_RADIUS_Y control mound size.
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -27,14 +32,41 @@ const awayScoreValue = document.getElementById("awayScoreValue");
 const homeScoreValue = document.getElementById("homeScoreValue");
 const finalScoreText = document.getElementById("finalScoreText");
 
+// Core geometry controls for field proportion/camera tuning.
+const FIELD_TUNING = {
+  homeX: 842,
+  homeY: 408,
+  baseSpacingX: 272,
+  baseSpacingY: 178,
+  moundForwardOffsetX: 44,
+  moundForwardOffsetY: 10,
+  moundRadiusX: 92,
+  moundRadiusY: 40,
+  wallRadius: 610,
+  warningTrackWidth: 34,
+  cameraZoom: 1.08
+};
+
 const FIELD = {
-  home: { x: 834, y: 420 },
-  first: { x: 596, y: 246 },
-  second: { x: 350, y: 386 },
-  third: { x: 596, y: 570 },
-  mound: { x: 518, y: 400 },
-  foulTop: { x: 210, y: 28 },
-  foulBottom: { x: 210, y: 592 }
+  home: { x: FIELD_TUNING.homeX, y: FIELD_TUNING.homeY },
+  first: {
+    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX,
+    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY
+  },
+  second: {
+    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2,
+    y: FIELD_TUNING.homeY
+  },
+  third: {
+    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX,
+    y: FIELD_TUNING.homeY + FIELD_TUNING.baseSpacingY
+  },
+  mound: {
+    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX + FIELD_TUNING.moundForwardOffsetX,
+    y: FIELD_TUNING.homeY + FIELD_TUNING.moundForwardOffsetY
+  },
+  foulTop: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: 22 },
+  foulBottom: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: GAME?.height ?? 604 }
 };
 
 const BASE_KEYS = ["home", "first", "second", "third"];
