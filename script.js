@@ -28,13 +28,13 @@ const homeScoreValue = document.getElementById("homeScoreValue");
 const finalScoreText = document.getElementById("finalScoreText");
 
 const FIELD = {
-  home: { x: 822, y: 420 },
-  first: { x: 632, y: 274 },
-  second: { x: 440, y: 384 },
-  third: { x: 632, y: 528 },
-  mound: { x: 620, y: 400 },
-  foulTop: { x: 224, y: 30 },
-  foulBottom: { x: 224, y: 560 }
+  home: { x: 834, y: 420 },
+  first: { x: 596, y: 246 },
+  second: { x: 350, y: 386 },
+  third: { x: 596, y: 570 },
+  mound: { x: 518, y: 400 },
+  foulTop: { x: 210, y: 28 },
+  foulBottom: { x: 210, y: 592 }
 };
 
 const BASE_KEYS = ["home", "first", "second", "third"];
@@ -191,12 +191,12 @@ function setupDefense() {
   const spots = [
     { role: "catcher", x: FIELD.home.x + 28, y: FIELD.home.y - 22 },
     { role: "first", x: FIELD.first.x + 18, y: FIELD.first.y - 20 },
-    { role: "second", x: 536, y: 322 },
-    { role: "shortstop", x: 536, y: 456 },
+    { role: "second", x: 478, y: 330 },
+    { role: "shortstop", x: 478, y: 454 },
     { role: "third", x: FIELD.third.x - 8, y: FIELD.third.y + 12 },
-    { role: "left", x: 336, y: 500 },
-    { role: "center", x: 260, y: 316 },
-    { role: "right", x: 336, y: 140 }
+    { role: "left", x: 246, y: 540 },
+    { role: "center", x: 160, y: 318 },
+    { role: "right", x: 246, y: 96 }
   ];
 
   defensiveFielders.length = 0;
@@ -223,6 +223,8 @@ function resetPitchBall() {
   pitchBall.vy = 0;
   pitchBall.curve = 0;
   pitchBall.judged = false;
+  GAME.pitchTimer = 0;
+  GAME.nextPitchDelay = 0.45 + Math.random() * 0.5;
 }
 
 function updateHud() {
@@ -266,7 +268,7 @@ function startGame() {
   startScreen.classList.add("hidden");
   gameOverScreen.classList.add("hidden");
   updateHud();
-  setMessage("Top 1: Press SPACE to pitch.");
+  setMessage("Top 1: Auto-pitch enabled. Press SPACE to swing.");
 }
 
 function endGame() {
@@ -342,7 +344,7 @@ function switchSides() {
 
   setupDefense();
   updateHud();
-  setMessage(`${GAME.half.toUpperCase()} ${GAME.inning}: Press SPACE to pitch.`);
+  setMessage(`${GAME.half.toUpperCase()} ${GAME.inning}: Auto-pitch enabled. Press SPACE to swing.`);
 }
 
 function addOut(reason) {
@@ -455,6 +457,7 @@ function spawnPitch() {
   pitchBall.curve = (Math.random() * 30 - 15) + GAME.pitchAim * 60;
   pitchBall.judged = false;
   GAME.pitchReady = false;
+  GAME.pitchTimer = 0;
   pitcher.windup = 0.18;
 }
 
@@ -718,6 +721,8 @@ function updateBattedBall(dt) {
     createBurst(ballObj.targetX, ballObj.targetY, "#d8f3ff", 7);
     GAME.battedBall = null;
     GAME.pitchReady = true;
+    GAME.pitchTimer = 0;
+    GAME.nextPitchDelay = 0.6 + Math.random() * 0.45;
   }
 }
 
@@ -799,8 +804,11 @@ function update(dt) {
     GAME.swingBuffer -= dt;
   }
 
-  if (GAME.pitchReady && !GAME.battedBall) {
+  if (GAME.pitchReady && !GAME.battedBall && !pitchBall.active) {
     GAME.pitchTimer += dt;
+    if (GAME.pitchTimer >= GAME.nextPitchDelay) {
+      spawnPitch();
+    }
   }
 
   if (pitchBall.active) {
@@ -1227,11 +1235,10 @@ function handleKeyDown(event) {
 
   if (key === " ") {
     event.preventDefault();
-    if (GAME.pitchReady) {
-      handlePitchInput();
+    if (GAME.battedBall) {
+      throwToNearestBase();
     } else {
       handleSwingInput();
-      throwToNearestBase();
     }
   }
 
