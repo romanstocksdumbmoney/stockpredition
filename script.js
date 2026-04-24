@@ -1,9 +1,9 @@
-// Neon Slugger - original arcade baseball game.
-// Main systems:
-// 1) Screen state + UI flow (start, playing, game over)
-// 2) Keyboard input (movement + swing)
-// 3) Baseball count logic (balls, strikes, strikeouts, walks)
-// 4) Pseudo-3D baseline field + player layout + smooth animation
+// Neon Slugger Deluxe
+// Main architecture:
+// 1) Configurable teams/players/attributes
+// 2) Stateful inning + batting/fielding rules
+// 3) Input handling for batting, pitching, and fielding controls
+// 4) Isometric arcade rendering on Canvas
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -12,380 +12,489 @@ const startScreen = document.getElementById("startScreen");
 const gameOverScreen = document.getElementById("gameOverScreen");
 const startButton = document.getElementById("startButton");
 const restartButton = document.getElementById("restartButton");
+const teamSelectA = document.getElementById("teamSelectA");
+const teamSelectB = document.getElementById("teamSelectB");
 const messageBar = document.getElementById("messageBar");
 
-const scoreValue = document.getElementById("scoreValue");
-const outsValue = document.getElementById("outsValue");
+const inningValue = document.getElementById("inningValue");
+const halfValue = document.getElementById("halfValue");
 const ballsValue = document.getElementById("ballsValue");
 const strikesValue = document.getElementById("strikesValue");
-const inningValue = document.getElementById("inningValue");
+const outsValue = document.getElementById("outsValue");
+const awayTeamName = document.getElementById("awayTeamName");
+const homeTeamName = document.getElementById("homeTeamName");
+const awayScoreValue = document.getElementById("awayScoreValue");
+const homeScoreValue = document.getElementById("homeScoreValue");
 const finalScoreText = document.getElementById("finalScoreText");
 
-// Baseline camera layout: home plate on right, field opens to the left.
 const FIELD = {
-  home: { x: 770, y: 350 },
-  first: { x: 560, y: 220 },
-  second: { x: 370, y: 350 },
-  third: { x: 560, y: 480 },
-  mound: { x: 560, y: 350 },
-  foulTop: { x: 150, y: 18 },
-  foulBottom: { x: 150, y: 522 }
+  home: { x: 830, y: 420 },
+  first: { x: 680, y: 300 },
+  second: { x: 520, y: 388 },
+  third: { x: 680, y: 506 },
+  mound: { x: 670, y: 402 },
+  foulTop: { x: 215, y: 36 },
+  foulBottom: { x: 215, y: 540 }
 };
+
+const BASE_KEYS = ["home", "first", "second", "third"];
+
+const TEAMS = [
+  {
+    id: "comets",
+    name: "Comets",
+    colors: { jersey: "#3d69ff", cap: "#1e3eaa", trim: "#8eb5ff" },
+    players: {
+      power: 74,
+      contact: 76,
+      speed: 70,
+      fielding: 68,
+      pitching: 72
+    }
+  },
+  {
+    id: "foxes",
+    name: "Foxes",
+    colors: { jersey: "#f26a3f", cap: "#8f2e18", trim: "#ffc3a8" },
+    players: {
+      power: 79,
+      contact: 70,
+      speed: 66,
+      fielding: 74,
+      pitching: 75
+    }
+  },
+  {
+    id: "orbitals",
+    name: "Orbitals",
+    colors: { jersey: "#8f53dd", cap: "#4f2e8f", trim: "#d2b6ff" },
+    players: {
+      power: 68,
+      contact: 82,
+      speed: 77,
+      fielding: 80,
+      pitching: 66
+    }
+  }
+];
 
 const GAME = {
   width: canvas.width,
   height: canvas.height,
-  state: "start", // start | playing | over
-  score: 0,
-  outs: 0,
+  mode: "start", // start | play | over
   inning: 1,
+  half: "top", // top or bottom
   balls: 0,
   strikes: 0,
+  outs: 0,
+  scores: { away: 0, home: 0 },
+  teams: { away: TEAMS[0], home: TEAMS[1] },
+  battingSide: "away",
+  fieldingSide: "home",
+  runners: [false, false, false], // first, second, third
+  pitchReady: false,
   pitchTimer: 0,
-  nextPitchDelay: 0.9,
-  contactX: FIELD.home.x - 20,
-  gravity: 1200,
-  keys: new Set(),
+  nextPitchDelay: 0.75,
+  pitchAim: 0,
+  swingAim: 0,
+  controlledFielder: 1,
+  cameraShake: 0,
   particles: [],
-  flashTime: 0,
-  hitBall: null,
-  chasingFielder: -1
+  battedBall: null,
+  pendingPlay: null,
+  flashTime: 0
 };
 
 const batter = {
-  x: FIELD.home.x - 66,
-  y: FIELD.home.y - 44,
-  width: 24,
-  height: 48,
-  speed: 260,
+  x: FIELD.home.x - 58,
+  y: FIELD.home.y - 40,
   swingTime: 0,
-  swingDuration: 0.2,
-  activeSwing: false
+  swingDuration: 0.18,
+  activeSwing: false,
+  batColor: "#f4e2b2"
 };
 
 const pitcher = {
-  x: FIELD.mound.x - 10,
-  y: FIELD.mound.y - 48,
-  width: 24,
-  height: 50
+  x: FIELD.mound.x - 12,
+  y: FIELD.mound.y - 44,
+  windup: 0
 };
 
-const ball = {
+const pitchBall = {
   active: false,
-  x: pitcher.x + 14,
-  y: pitcher.y + 16,
+  x: pitcher.x + 16,
+  y: pitcher.y + 18,
   vx: 0,
   vy: 0,
   curve: 0,
-  radius: 7,
-  judged: false, // this pitch has been resolved
-  crossedPlate: false,
-  isStrikePitch: true
+  judged: false
 };
 
-// Defensive alignment follows a real baseline layout.
-const fielders = [
-  {
-    role: "catcher",
-    x: FIELD.home.x + 26,
-    y: FIELD.home.y - 22,
-    homeX: FIELD.home.x + 26,
-    homeY: FIELD.home.y - 22,
-    speed: 175,
-    jersey: "#384f85"
-  },
-  {
-    role: "first",
-    x: FIELD.first.x + 22,
-    y: FIELD.first.y - 24,
-    homeX: FIELD.first.x + 22,
-    homeY: FIELD.first.y - 24,
-    speed: 190,
-    jersey: "#8f5c34"
-  },
-  {
-    role: "second",
-    x: 500,
-    y: 280,
-    homeX: 500,
-    homeY: 280,
-    speed: 198,
-    jersey: "#8f5c34"
-  },
-  {
-    role: "shortstop",
-    x: 500,
-    y: 400,
-    homeX: 500,
-    homeY: 400,
-    speed: 198,
-    jersey: "#8f5c34"
-  },
-  {
-    role: "third",
-    x: FIELD.third.x - 6,
-    y: FIELD.third.y + 14,
-    homeX: FIELD.third.x - 6,
-    homeY: FIELD.third.y + 14,
-    speed: 190,
-    jersey: "#8f5c34"
-  },
-  {
-    role: "right",
-    x: 300,
-    y: 132,
-    homeX: 300,
-    homeY: 132,
-    speed: 220,
-    jersey: "#8b3d68"
-  },
-  {
-    role: "center",
-    x: 212,
-    y: 336,
-    homeX: 212,
-    homeY: 336,
-    speed: 224,
-    jersey: "#8b3d68"
-  },
-  {
-    role: "left",
-    x: 300,
-    y: 540 - 112,
-    homeX: 300,
-    homeY: 540 - 112,
-    speed: 220,
-    jersey: "#8b3d68"
-  }
-];
+const input = {
+  keys: new Set()
+};
 
-function resetCount() {
-  GAME.balls = 0;
-  GAME.strikes = 0;
-}
+const defensiveFielders = [];
 
-function resetGame() {
-  GAME.state = "playing";
-  GAME.score = 0;
-  GAME.outs = 0;
-  GAME.inning = 1;
-  resetCount();
-  GAME.pitchTimer = 0;
-  GAME.nextPitchDelay = 0.7;
-  GAME.flashTime = 0;
-  GAME.particles = [];
-  GAME.hitBall = null;
-  GAME.chasingFielder = -1;
+function buildSelectOptions() {
+  TEAMS.forEach((team, index) => {
+    const optionA = document.createElement("option");
+    optionA.value = team.id;
+    optionA.textContent = team.name;
+    if (index === 0) optionA.selected = true;
+    teamSelectA.append(optionA);
 
-  batter.y = FIELD.home.y - 44;
-  batter.swingTime = 0;
-  batter.activeSwing = false;
-
-  fielders.forEach((fielder) => {
-    fielder.x = fielder.homeX;
-    fielder.y = fielder.homeY;
+    const optionB = document.createElement("option");
+    optionB.value = team.id;
+    optionB.textContent = team.name;
+    if (index === 1) optionB.selected = true;
+    teamSelectB.append(optionB);
   });
-
-  resetBall();
-  updateHud();
-  setMessage("Pitch incoming...");
 }
 
-function resetBall() {
-  ball.active = false;
-  ball.x = pitcher.x + 14;
-  ball.y = pitcher.y + 16;
-  ball.vx = 0;
-  ball.vy = 0;
-  ball.curve = 0;
-  ball.judged = false;
-  ball.crossedPlate = false;
-  ball.isStrikePitch = true;
+function teamById(teamId) {
+  return TEAMS.find((team) => team.id === teamId) ?? TEAMS[0];
 }
 
-function advancePitchCycle() {
-  resetBall();
-  GAME.pitchTimer = 0;
-  GAME.nextPitchDelay = 0.55 + Math.random() * 0.9;
+function teamRating(team, key) {
+  return team.players[key] / 100;
 }
 
-function updateHud() {
-  scoreValue.textContent = String(GAME.score);
-  outsValue.textContent = String(GAME.outs);
-  ballsValue.textContent = String(GAME.balls);
-  strikesValue.textContent = String(GAME.strikes);
-  inningValue.textContent = String(GAME.inning);
+function configureTeams() {
+  const away = teamById(teamSelectA.value);
+  let home = teamById(teamSelectB.value);
+  if (away.id === home.id) {
+    home = TEAMS.find((team) => team.id !== away.id) ?? TEAMS[1];
+  }
+  GAME.teams.away = away;
+  GAME.teams.home = home;
 }
 
 function setMessage(text) {
   messageBar.textContent = text;
 }
 
+function resetCount() {
+  GAME.balls = 0;
+  GAME.strikes = 0;
+}
+
+function clearBases() {
+  GAME.runners = [false, false, false];
+}
+
+function setupDefense() {
+  const defenseTeam = GAME.teams[GAME.fieldingSide];
+  const skin = ["#f8d2ad", "#c58b62", "#8b5b3f"];
+  const hair = ["#1e1e1e", "#5d3414", "#704224"];
+  const spots = [
+    { role: "catcher", x: FIELD.home.x + 28, y: FIELD.home.y - 22 },
+    { role: "first", x: FIELD.first.x + 18, y: FIELD.first.y - 20 },
+    { role: "second", x: 592, y: 334 },
+    { role: "shortstop", x: 598, y: 438 },
+    { role: "third", x: FIELD.third.x - 8, y: FIELD.third.y + 12 },
+    { role: "left", x: 392, y: 472 },
+    { role: "center", x: 260, y: 316 },
+    { role: "right", x: 395, y: 168 }
+  ];
+
+  defensiveFielders.length = 0;
+  spots.forEach((spot, index) => {
+    defensiveFielders.push({
+      ...spot,
+      homeX: spot.x,
+      homeY: spot.y,
+      x: spot.x,
+      y: spot.y,
+      speed: 160 + teamRating(defenseTeam, "fielding") * 130,
+      skin: skin[index % skin.length],
+      hair: hair[index % hair.length]
+    });
+  });
+  GAME.controlledFielder = 1;
+}
+
+function resetPitchBall() {
+  pitchBall.active = false;
+  pitchBall.x = pitcher.x + 16;
+  pitchBall.y = pitcher.y + 18;
+  pitchBall.vx = 0;
+  pitchBall.vy = 0;
+  pitchBall.curve = 0;
+  pitchBall.judged = false;
+}
+
+function updateHud() {
+  inningValue.textContent = String(GAME.inning);
+  halfValue.textContent = GAME.half;
+  ballsValue.textContent = String(GAME.balls);
+  strikesValue.textContent = String(GAME.strikes);
+  outsValue.textContent = String(GAME.outs);
+
+  awayTeamName.textContent = GAME.teams.away.name;
+  homeTeamName.textContent = GAME.teams.home.name;
+  awayScoreValue.textContent = String(GAME.scores.away);
+  homeScoreValue.textContent = String(GAME.scores.home);
+}
+
 function startGame() {
+  configureTeams();
+  GAME.mode = "play";
+  GAME.inning = 1;
+  GAME.half = "top";
+  GAME.outs = 0;
+  GAME.scores.away = 0;
+  GAME.scores.home = 0;
+  GAME.battingSide = "away";
+  GAME.fieldingSide = "home";
+  GAME.pitchReady = true;
+  GAME.pitchTimer = 0;
+  GAME.nextPitchDelay = 0.75;
+  GAME.pitchAim = 0;
+  GAME.swingAim = 0;
+  GAME.cameraShake = 0;
+  GAME.particles = [];
+  GAME.battedBall = null;
+  GAME.pendingPlay = null;
+  GAME.flashTime = 0;
+  clearBases();
+  resetCount();
+  resetPitchBall();
+  setupDefense();
   startScreen.classList.add("hidden");
   gameOverScreen.classList.add("hidden");
-  resetGame();
+  updateHud();
+  setMessage("Top 1: Press SPACE to pitch.");
 }
 
 function endGame() {
-  GAME.state = "over";
-  finalScoreText.textContent = `Final Score: ${GAME.score}`;
+  GAME.mode = "over";
   gameOverScreen.classList.remove("hidden");
-  setMessage("Inning complete. Press Enter.");
+  finalScoreText.textContent = `${GAME.teams.away.name} ${GAME.scores.away} - ${GAME.teams.home.name} ${GAME.scores.home}`;
+  const winner = GAME.scores.away === GAME.scores.home
+    ? "Tie game!"
+    : (GAME.scores.away > GAME.scores.home ? `${GAME.teams.away.name} win!` : `${GAME.teams.home.name} win!`);
+  setMessage(winner);
 }
 
-function isPitchInZone(y) {
-  const zoneTop = batter.y - 4;
-  const zoneBottom = batter.y + 62;
-  return y >= zoneTop && y <= zoneBottom;
+function moveRunnerAdvance(basesToAdvance) {
+  // runners + batter move in one pass from third down to first.
+  let scored = 0;
+  for (let i = 2; i >= 0; i -= 1) {
+    if (!GAME.runners[i]) continue;
+    GAME.runners[i] = false;
+    const destination = i + basesToAdvance;
+    if (destination >= 3) {
+      scored += 1;
+    } else {
+      GAME.runners[destination] = true;
+    }
+  }
+
+  if (basesToAdvance >= 4) {
+    scored += 1;
+  } else {
+    GAME.runners[basesToAdvance - 1] = true;
+  }
+
+  GAME.scores[GAME.battingSide] += scored;
+  return scored;
+}
+
+function applyWalk() {
+  // Force runners when applicable.
+  if (GAME.runners[0] && GAME.runners[1] && GAME.runners[2]) {
+    GAME.scores[GAME.battingSide] += 1;
+  }
+  GAME.runners[2] = GAME.runners[2] || (GAME.runners[1] && GAME.runners[0]);
+  GAME.runners[1] = GAME.runners[1] || GAME.runners[0];
+  GAME.runners[0] = true;
+}
+
+function switchSides() {
+  GAME.outs = 0;
+  resetCount();
+  clearBases();
+  resetPitchBall();
+  GAME.battedBall = null;
+  GAME.pendingPlay = null;
+  GAME.pitchReady = true;
+  GAME.pitchTimer = 0;
+  GAME.nextPitchDelay = 0.8;
+
+  if (GAME.half === "top") {
+    GAME.half = "bottom";
+    GAME.battingSide = "home";
+    GAME.fieldingSide = "away";
+  } else {
+    GAME.half = "top";
+    GAME.inning += 1;
+    GAME.battingSide = "away";
+    GAME.fieldingSide = "home";
+    if (GAME.inning > 2) {
+      endGame();
+      return;
+    }
+  }
+
+  setupDefense();
+  updateHud();
+  setMessage(`${GAME.half.toUpperCase()} ${GAME.inning}: Press SPACE to pitch.`);
+}
+
+function addOut(reason) {
+  GAME.outs += 1;
+  resetCount();
+  resetPitchBall();
+  GAME.battedBall = null;
+  GAME.pendingPlay = null;
+  GAME.pitchReady = true;
+  updateHud();
+  setMessage(reason);
+  if (GAME.outs >= 3) {
+    switchSides();
+  }
+}
+
+function addStrike(reason) {
+  GAME.strikes += 1;
+  createBurst(FIELD.home.x - 8, FIELD.home.y - 12, "#ffd56a", 8);
+  if (GAME.strikes >= 3) {
+    addOut("Strike three. Batter out.");
+    return;
+  }
+  resetPitchBall();
+  GAME.pitchReady = true;
+  updateHud();
+  setMessage(`${reason} Count ${GAME.balls}-${GAME.strikes}`);
+}
+
+function addBall(reason) {
+  GAME.balls += 1;
+  createBurst(FIELD.home.x - 8, FIELD.home.y - 12, "#75d5ff", 8);
+  if (GAME.balls >= 4) {
+    applyWalk();
+    resetCount();
+    resetPitchBall();
+    GAME.pitchReady = true;
+    updateHud();
+    setMessage(`Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`);
+    return;
+  }
+  resetPitchBall();
+  GAME.pitchReady = true;
+  updateHud();
+  setMessage(`${reason} Count ${GAME.balls}-${GAME.strikes}`);
+}
+
+function foulBall() {
+  if (GAME.strikes < 2) {
+    GAME.strikes += 1;
+  }
+  createBurst(FIELD.home.x - 12, FIELD.home.y - 8, "#fff6a8", 7);
+  resetPitchBall();
+  GAME.pitchReady = true;
+  updateHud();
+  setMessage(`Foul ball. Count ${GAME.balls}-${GAME.strikes}`);
+}
+
+function registerHit(type) {
+  let advance = 1;
+  if (type === "double") advance = 2;
+  if (type === "triple") advance = 3;
+  if (type === "homer") advance = 4;
+  const scored = moveRunnerAdvance(advance);
+  resetCount();
+  updateHud();
+  const hitText = {
+    single: "Single",
+    double: "Double",
+    triple: "Triple",
+    homer: "Home run"
+  };
+  setMessage(`${hitText[type]}! ${scored > 0 ? `${scored} run${scored > 1 ? "s" : ""} scored.` : ""}`);
+}
+
+function pitchInStrikeZone(y) {
+  const top = batter.y - 4;
+  const bottom = batter.y + 52;
+  return y >= top && y <= bottom;
 }
 
 function spawnPitch() {
-  ball.active = true;
-  ball.judged = false;
-  ball.crossedPlate = false;
+  const fieldingTeam = GAME.teams[GAME.fieldingSide];
+  const pitchRating = teamRating(fieldingTeam, "pitching");
+  const speed = 430 + pitchRating * 180 + Math.random() * 110;
+  const strikeChance = 0.47 + pitchRating * 0.28;
+  const strikesPitch = Math.random() < strikeChance;
 
-  const speed = 410 + Math.random() * 260;
   const startX = pitcher.x + 14;
-  const startY = pitcher.y + 16 + (Math.random() * 8 - 4);
-  const strikePitch = Math.random() < 0.64;
-
+  const startY = pitcher.y + 16;
   const zoneTop = batter.y + 4;
-  const zoneBottom = batter.y + 56;
+  const zoneBottom = batter.y + 46;
   let targetY;
-
-  if (strikePitch) {
+  if (strikesPitch) {
     targetY = zoneTop + Math.random() * (zoneBottom - zoneTop);
   } else if (Math.random() < 0.5) {
-    targetY = zoneTop - (16 + Math.random() * 24);
+    targetY = zoneTop - (12 + Math.random() * 26);
   } else {
-    targetY = zoneBottom + (14 + Math.random() * 26);
+    targetY = zoneBottom + (12 + Math.random() * 26);
   }
 
-  const travelTime = (GAME.contactX - startX) / speed;
-  const vy = (targetY - startY) / travelTime;
-
-  ball.x = startX;
-  ball.y = startY;
-  ball.vx = speed;
-  ball.vy = vy;
-  ball.curve = Math.random() * 38 - 19;
-  ball.isStrikePitch = strikePitch;
+  const travelTime = Math.abs((FIELD.home.x - 16 - startX) / speed);
+  pitchBall.active = true;
+  pitchBall.x = startX;
+  pitchBall.y = startY;
+  pitchBall.vx = speed;
+  pitchBall.vy = (targetY - startY) / travelTime;
+  pitchBall.curve = (Math.random() * 30 - 15) + GAME.pitchAim * 60;
+  pitchBall.judged = false;
+  GAME.pitchReady = false;
+  pitcher.windup = 0.18;
 }
 
-function registerOut(text) {
-  GAME.outs += 1;
-  resetCount();
-  resetBall();
-  updateHud();
-  setMessage(text);
+function launchBattedBall(type) {
+  const startX = FIELD.home.x - 14;
+  const startY = batter.y + 22;
+  let targetX = 520;
+  let targetY = 290;
+  let arc = 110;
+  let time = 0.9;
 
-  if (GAME.outs >= 3) {
-    endGame();
-  } else {
-    advancePitchCycle();
-  }
-}
-
-function registerStrike(text, burstColor = "#ffd56a") {
-  GAME.strikes += 1;
-  createBurst(GAME.contactX, ball.y, burstColor, 7);
-
-  if (GAME.strikes >= 3) {
-    registerOut("Strike three! Batter out.");
-    return;
-  }
-
-  updateHud();
-  setMessage(`${text} Count: ${GAME.balls}-${GAME.strikes}`);
-  advancePitchCycle();
-}
-
-function registerBall(text) {
-  GAME.balls += 1;
-  createBurst(GAME.contactX, ball.y, "#7ad6ff", 6);
-
-  if (GAME.balls >= 4) {
-    // Arcade bonus on walk keeps the pace fun.
-    GAME.score += 20;
-    resetCount();
-    updateHud();
-    setMessage("Ball four! Walk drawn. +20");
-    advancePitchCycle();
-    return;
+  if (type === "homer") {
+    targetX = 190 + Math.random() * 170;
+    targetY = 85 + Math.random() * 390;
+    arc = 220;
+    time = 1.2;
+    GAME.cameraShake = 0.35;
+    GAME.flashTime = 0.1;
+  } else if (type === "triple") {
+    targetX = 280 + Math.random() * 200;
+    targetY = 120 + Math.random() * 320;
+    arc = 170;
+    time = 1.04;
+  } else if (type === "double") {
+    targetX = 370 + Math.random() * 180;
+    targetY = 170 + Math.random() * 260;
+    arc = 140;
+    time = 0.95;
+  } else if (type === "single") {
+    targetX = 460 + Math.random() * 170;
+    targetY = 220 + Math.random() * 200;
+    arc = 100;
+    time = 0.82;
+  } else if (type === "grounder") {
+    targetX = 560 + Math.random() * 130;
+    targetY = 260 + Math.random() * 220;
+    arc = 44;
+    time = 0.58;
   }
 
-  updateHud();
-  setMessage(`${text} Count: ${GAME.balls}-${GAME.strikes}`);
-  advancePitchCycle();
-}
+  // Batter aim can push trajectory up/down the foul lines.
+  targetY += GAME.swingAim * 160;
+  targetY = Math.max(56, Math.min(GAME.height - 20, targetY));
 
-function swingBat() {
-  if (GAME.state !== "playing") return;
-  if (batter.activeSwing) return;
-
-  batter.activeSwing = true;
-  batter.swingTime = batter.swingDuration;
-
-  if (!ball.active || ball.judged) return;
-
-  const dx = Math.abs(ball.x - GAME.contactX);
-  const dy = Math.abs(ball.y - (batter.y + 28));
-
-  // Timing/contact windows:
-  // very tight = perfect (home run), medium = okay hit, else swinging strike.
-  if (dx <= 15 && dy <= 18) {
-    ball.judged = true;
-    resolveHit("perfect");
-  } else if (dx <= 34 && dy <= 30) {
-    ball.judged = true;
-    resolveHit("okay");
-  } else {
-    ball.judged = true;
-    registerStrike("Swing and miss.", "#ff8c7b");
-  }
-}
-
-function resolveTakenPitch() {
-  ball.judged = true;
-  if (isPitchInZone(ball.y)) {
-    registerStrike("Called strike.");
-  } else {
-    registerBall("Ball.");
-  }
-}
-
-function resolveHit(result) {
-  if (result === "perfect") {
-    GAME.score += 100;
-    GAME.flashTime = 0.12;
-    setMessage("HOME RUN! +100");
-    launchHitBall("perfect");
-    createBurst(ball.x, ball.y, "#ffd56a", 14);
-  } else {
-    GAME.score += 35;
-    setMessage("Base hit! +35");
-    launchHitBall("okay");
-    createBurst(ball.x, ball.y, "#77ffb0", 10);
-  }
-
-  resetCount();
-  updateHud();
-  advancePitchCycle();
-}
-
-function launchHitBall(kind) {
-  const startX = GAME.contactX + 4;
-  const startY = batter.y + 28;
-
-  const targetX = kind === "perfect"
-    ? 140 + Math.random() * 180
-    : 290 + Math.random() * 250;
-  const targetY = kind === "perfect"
-    ? 75 + Math.random() * 120
-    : 190 + Math.random() * 220;
-
-  GAME.hitBall = {
+  GAME.battedBall = {
     x: startX,
     y: startY,
     startX,
@@ -393,145 +502,245 @@ function launchHitBall(kind) {
     targetX,
     targetY,
     elapsed: 0,
-    travelTime: kind === "perfect" ? 1.08 : 0.82,
-    arcHeight: kind === "perfect" ? 230 : 140
+    travelTime: time,
+    arcHeight: arc,
+    type
   };
 
-  GAME.chasingFielder = pickClosestFielder(targetX, targetY);
+  GAME.pendingPlay = { resolved: false, deadline: time + 0.45, elapsed: 0, result: type };
 }
 
-function pickClosestFielder(targetX, targetY) {
-  let bestIndex = 1; // keep catcher close to plate
-  let bestDistance = Number.POSITIVE_INFINITY;
+function resolveSwing(ballX, ballY) {
+  const battingTeam = GAME.teams[GAME.battingSide];
+  const contact = teamRating(battingTeam, "contact");
+  const power = teamRating(battingTeam, "power");
 
-  for (let i = 1; i < fielders.length; i += 1) {
-    const fielder = fielders[i];
-    const dx = fielder.x - targetX;
-    const dy = fielder.y - targetY;
-    const distSq = dx * dx + dy * dy;
-    if (distSq < bestDistance) {
-      bestDistance = distSq;
-      bestIndex = i;
+  const dx = Math.abs(ballX - (FIELD.home.x - 18));
+  const dy = Math.abs(ballY - (batter.y + 24));
+
+  const perfectWindow = 10 + contact * 5;
+  const goodWindow = 26 + contact * 11;
+
+  // Small timing indicator near batter.
+  if (dx <= perfectWindow && dy <= 14 + contact * 6) {
+    const big = Math.random() < 0.52 + power * 0.35;
+    launchBattedBall(big ? "homer" : "triple");
+    registerHit(big ? "homer" : "triple");
+    createBurst(ballX, ballY, "#ffe27a", 14);
+    resetPitchBall();
+    return;
+  }
+
+  if (dx <= goodWindow && dy <= 30 + contact * 12) {
+    const outcomeRoll = Math.random();
+    if (outcomeRoll < 0.18 + power * 0.25) {
+      launchBattedBall("double");
+      registerHit("double");
+    } else {
+      launchBattedBall("single");
+      registerHit("single");
+    }
+    createBurst(ballX, ballY, "#8fffc8", 10);
+    resetPitchBall();
+    return;
+  }
+
+  const weakRoll = Math.random();
+  if (weakRoll < 0.38) {
+    launchBattedBall("grounder");
+    GAME.pendingPlay.result = "grounderOut";
+    setMessage("Weak grounder in play...");
+    createBurst(ballX, ballY, "#eadfbe", 8);
+    resetPitchBall();
+    return;
+  }
+  if (weakRoll < 0.68) {
+    foulBall();
+    return;
+  }
+
+  addStrike("Swing and miss.");
+}
+
+function handleSwingInput() {
+  if (GAME.mode !== "play" || GAME.pitchReady || GAME.battedBall) return;
+  batter.activeSwing = true;
+  batter.swingTime = batter.swingDuration;
+  if (!pitchBall.active || pitchBall.judged) return;
+  pitchBall.judged = true;
+  resolveSwing(pitchBall.x, pitchBall.y);
+}
+
+function handlePitchInput() {
+  if (GAME.mode !== "play" || !GAME.pitchReady || GAME.battedBall) return;
+  spawnPitch();
+}
+
+function resolveTakenPitch() {
+  pitchBall.judged = true;
+  if (pitchInStrikeZone(pitchBall.y)) {
+    addStrike("Called strike.");
+  } else {
+    addBall("Ball.");
+  }
+}
+
+function updatePitchAim(dt) {
+  let aimInput = 0;
+  if (input.keys.has("ArrowLeft") || input.keys.has("a")) aimInput -= 1;
+  if (input.keys.has("ArrowRight") || input.keys.has("d")) aimInput += 1;
+  GAME.pitchAim += aimInput * dt * 1.6;
+  GAME.pitchAim = Math.max(-1, Math.min(1, GAME.pitchAim));
+  GAME.swingAim += aimInput * dt * 1.6;
+  GAME.swingAim = Math.max(-1, Math.min(1, GAME.swingAim));
+}
+
+function updateFieldingInput(dt) {
+  if (GAME.mode !== "play") return;
+  if (!GAME.battedBall) return;
+
+  const fielder = defensiveFielders[GAME.controlledFielder];
+  if (!fielder) return;
+
+  let dx = 0;
+  let dy = 0;
+  if (input.keys.has("ArrowUp") || input.keys.has("w")) dy -= 1;
+  if (input.keys.has("ArrowDown") || input.keys.has("s")) dy += 1;
+  if (input.keys.has("ArrowLeft") || input.keys.has("a")) dx -= 1;
+  if (input.keys.has("ArrowRight") || input.keys.has("d")) dx += 1;
+
+  const len = Math.hypot(dx, dy);
+  if (len > 0) {
+    const speed = fielder.speed * dt;
+    fielder.x += (dx / len) * speed;
+    fielder.y += (dy / len) * speed;
+  }
+}
+
+function chooseNearestFielder(x, y) {
+  let best = 1;
+  let dist = Number.POSITIVE_INFINITY;
+  for (let i = 1; i < defensiveFielders.length; i += 1) {
+    const f = defensiveFielders[i];
+    const d = (f.x - x) ** 2 + (f.y - y) ** 2;
+    if (d < dist) {
+      dist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+function nearestBaseKeyFromFielder(fielder) {
+  const keys = ["home", "first", "second", "third"];
+  let winner = "first";
+  let dist = Number.POSITIVE_INFINITY;
+  keys.forEach((key) => {
+    const b = FIELD[key];
+    const d = (b.x - fielder.x) ** 2 + (b.y - fielder.y) ** 2;
+    if (d < dist) {
+      dist = d;
+      winner = key;
+    }
+  });
+  return winner;
+}
+
+function resolveThrow(baseKey) {
+  if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
+  const defenseTeam = GAME.teams[GAME.fieldingSide];
+  const fieldQuality = teamRating(defenseTeam, "fielding");
+  const throwChance = 0.52 + fieldQuality * 0.35;
+  const success = Math.random() < throwChance;
+  if (!success) {
+    GAME.pendingPlay.resolved = true;
+    setMessage("Throw missed! Safe on the play.");
+    return;
+  }
+
+  if (GAME.pendingPlay.result === "grounderOut") {
+    GAME.pendingPlay.resolved = true;
+    addOut(`Out at ${baseKey}!`);
+    return;
+  }
+
+  // On other batted balls, throws can still cut off a runner occasionally.
+  if (Math.random() < 0.22 + fieldQuality * 0.18) {
+    GAME.pendingPlay.resolved = true;
+    addOut(`Runner tagged out at ${baseKey}!`);
+  } else {
+    GAME.pendingPlay.resolved = true;
+    setMessage(`Throw to ${baseKey}. Play continues safe.`);
+  }
+}
+
+function updateBattedBall(dt) {
+  if (!GAME.battedBall) return;
+  const ballObj = GAME.battedBall;
+  ballObj.elapsed += dt;
+  const t = Math.min(1, ballObj.elapsed / ballObj.travelTime);
+  ballObj.x = ballObj.startX + (ballObj.targetX - ballObj.startX) * t;
+  const baseY = ballObj.startY + (ballObj.targetY - ballObj.startY) * t;
+  ballObj.y = baseY - Math.sin(t * Math.PI) * ballObj.arcHeight;
+
+  if (GAME.pendingPlay && !GAME.pendingPlay.resolved) {
+    GAME.pendingPlay.elapsed += dt;
+    if (GAME.pendingPlay.elapsed >= GAME.pendingPlay.deadline) {
+      GAME.pendingPlay.resolved = true;
+      if (GAME.pendingPlay.result === "grounderOut") {
+        setMessage("Beats the throw. Infield single!");
+      }
     }
   }
 
-  return bestIndex;
-}
-
-function updateHitBall(dt) {
-  if (!GAME.hitBall) return;
-
-  GAME.hitBall.elapsed += dt;
-  const t = Math.min(1, GAME.hitBall.elapsed / GAME.hitBall.travelTime);
-
-  GAME.hitBall.x = GAME.hitBall.startX + (GAME.hitBall.targetX - GAME.hitBall.startX) * t;
-  const baseY = GAME.hitBall.startY + (GAME.hitBall.targetY - GAME.hitBall.startY) * t;
-  GAME.hitBall.y = baseY - Math.sin(t * Math.PI) * GAME.hitBall.arcHeight;
-
   if (t >= 1) {
-    createBurst(GAME.hitBall.targetX, GAME.hitBall.targetY, "#d8f3ff", 7);
-    GAME.hitBall = null;
-    GAME.chasingFielder = -1;
+    const nearest = chooseNearestFielder(ballObj.targetX, ballObj.targetY);
+    GAME.controlledFielder = nearest;
+    createBurst(ballObj.targetX, ballObj.targetY, "#d8f3ff", 7);
+    GAME.battedBall = null;
+    GAME.pitchReady = true;
   }
 }
 
 function updateFielders(dt) {
-  fielders.forEach((fielder, index) => {
-    let targetX = fielder.homeX;
-    let targetY = fielder.homeY;
-
-    if (GAME.hitBall && index === GAME.chasingFielder) {
-      targetX = GAME.hitBall.targetX - 8;
-      targetY = GAME.hitBall.targetY + 16;
+  const defenseTeam = GAME.teams[GAME.fieldingSide];
+  const fieldReaction = teamRating(defenseTeam, "fielding");
+  defensiveFielders.forEach((f, idx) => {
+    let tx = f.homeX;
+    let ty = f.homeY;
+    if (GAME.battedBall && idx !== GAME.controlledFielder) {
+      tx = GAME.battedBall.targetX - 8;
+      ty = GAME.battedBall.targetY + 16;
     }
-
-    const dx = targetX - fielder.x;
-    const dy = targetY - fielder.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.2) return;
-
-    const step = fielder.speed * dt;
-    if (dist <= step) {
-      fielder.x = targetX;
-      fielder.y = targetY;
+    const dx = tx - f.x;
+    const dy = ty - f.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.2) return;
+    const step = (f.speed * (0.62 + fieldReaction * 0.54)) * dt;
+    if (d <= step) {
+      f.x = tx;
+      f.y = ty;
       return;
     }
-
-    fielder.x += (dx / dist) * step;
-    fielder.y += (dy / dist) * step;
+    f.x += (dx / d) * step;
+    f.y += (dy / d) * step;
   });
 }
 
 function createBurst(x, y, color, count) {
   for (let i = 0; i < count; i += 1) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 70 + Math.random() * 220;
+    const speed = 60 + Math.random() * 230;
     GAME.particles.push({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      life: 0.4 + Math.random() * 0.35,
+      life: 0.35 + Math.random() * 0.35,
       color,
       size: 2 + Math.random() * 3
     });
   }
-}
-
-function update(dt) {
-  if (GAME.state !== "playing") {
-    updateHitBall(dt);
-    updateFielders(dt);
-    updateParticles(dt);
-    return;
-  }
-
-  // Batter movement with arrow keys or WASD.
-  let move = 0;
-  if (GAME.keys.has("ArrowUp") || GAME.keys.has("w")) move -= 1;
-  if (GAME.keys.has("ArrowDown") || GAME.keys.has("s")) move += 1;
-  batter.y += move * batter.speed * dt;
-  batter.y = Math.max(FIELD.home.y - 58, Math.min(FIELD.home.y + 14, batter.y));
-
-  if (!ball.active && !GAME.hitBall) {
-    GAME.pitchTimer += dt;
-    if (GAME.pitchTimer >= GAME.nextPitchDelay) {
-      spawnPitch();
-    }
-  } else if (ball.active) {
-    ball.x += ball.vx * dt;
-    ball.y += ball.vy * dt;
-    ball.vy += ball.curve * dt;
-
-    // Once ball reaches plate, call strike/ball if no swing contact happened.
-    if (!ball.crossedPlate && ball.x >= GAME.contactX) {
-      ball.crossedPlate = true;
-      if (!ball.judged) {
-        resolveTakenPitch();
-      }
-    }
-
-    // Safety reset if ball fully exits view.
-    if (ball.x > GAME.width + 40 || ball.y < -30 || ball.y > GAME.height + 30) {
-      advancePitchCycle();
-    }
-  }
-
-  if (batter.activeSwing) {
-    batter.swingTime -= dt;
-    if (batter.swingTime <= 0) {
-      batter.activeSwing = false;
-      batter.swingTime = 0;
-    }
-  }
-
-  if (GAME.flashTime > 0) {
-    GAME.flashTime -= dt;
-  }
-
-  updateHitBall(dt);
-  updateFielders(dt);
-  updateParticles(dt);
 }
 
 function updateParticles(dt) {
@@ -540,10 +749,51 @@ function updateParticles(dt) {
     p.life -= dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vy += GAME.gravity * dt * 0.16;
+    p.vy += 900 * dt * 0.2;
+    if (p.life <= 0) GAME.particles.splice(i, 1);
+  }
+}
 
-    if (p.life <= 0) {
-      GAME.particles.splice(i, 1);
+function update(dt) {
+  if (GAME.mode !== "play") {
+    updateParticles(dt);
+    return;
+  }
+
+  updatePitchAim(dt);
+  updateFieldingInput(dt);
+  updateFielders(dt);
+  updateBattedBall(dt);
+  updateParticles(dt);
+
+  if (pitcher.windup > 0) pitcher.windup -= dt;
+  if (batter.activeSwing) {
+    batter.swingTime -= dt;
+    if (batter.swingTime <= 0) {
+      batter.activeSwing = false;
+      batter.swingTime = 0;
+    }
+  }
+  if (GAME.cameraShake > 0) GAME.cameraShake -= dt;
+  if (GAME.flashTime > 0) GAME.flashTime -= dt;
+
+  if (GAME.pitchReady && !GAME.battedBall) {
+    GAME.pitchTimer += dt;
+  }
+
+  if (pitchBall.active) {
+    pitchBall.x += pitchBall.vx * dt;
+    pitchBall.y += pitchBall.vy * dt;
+    pitchBall.vy += pitchBall.curve * dt;
+
+    // Ball reaches plate.
+    if (pitchBall.x >= FIELD.home.x - 12 && !pitchBall.judged) {
+      resolveTakenPitch();
+    }
+
+    if (pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
+      resetPitchBall();
+      GAME.pitchReady = true;
     }
   }
 }
@@ -552,69 +802,61 @@ function drawFairTerritoryMask() {
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
-  ctx.arc(FIELD.home.x, FIELD.home.y, 575, -2.58, 2.58);
-  ctx.lineTo(FIELD.home.x, FIELD.home.y);
+  ctx.arc(FIELD.home.x, FIELD.home.y, 620, -2.6, 2.6);
   ctx.closePath();
 }
 
 function drawField() {
-  // Sky
   const sky = ctx.createLinearGradient(0, 0, 0, 220);
-  sky.addColorStop(0, "#7ec2ff");
-  sky.addColorStop(1, "#4a87d3");
+  sky.addColorStop(0, "#86caff");
+  sky.addColorStop(1, "#5b92dc");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, GAME.width, 220);
 
-  // Stadium wall + crowd strip
-  ctx.fillStyle = "#183f7c";
-  ctx.fillRect(0, 88, GAME.width, 26);
-  ctx.fillStyle = "#263456";
-  ctx.fillRect(0, 114, GAME.width, 62);
-  for (let i = 0; i < GAME.width; i += 9) {
-    const tone = i % 18 === 0 ? "#50d2ff" : "#ffb7ff";
-    ctx.fillStyle = tone;
-    ctx.fillRect(i, 122 + ((i / 9) % 4), 4, 6);
+  ctx.fillStyle = "#1a4280";
+  ctx.fillRect(0, 84, GAME.width, 24);
+  ctx.fillStyle = "#25345b";
+  ctx.fillRect(0, 108, GAME.width, 68);
+  for (let i = 0; i < GAME.width; i += 8) {
+    ctx.fillStyle = i % 16 === 0 ? "#51d4ff" : "#ffb9f9";
+    ctx.fillRect(i, 116 + ((i / 8) % 4), 4, 6);
   }
 
-  // Dirt base under everything
-  ctx.fillStyle = "#be8a54";
+  ctx.fillStyle = "#c18c57";
   ctx.fillRect(0, 176, GAME.width, GAME.height - 176);
 
-  // Clip and paint fair territory with striped grass.
   ctx.save();
   drawFairTerritoryMask();
   ctx.clip();
 
-  const grass = ctx.createLinearGradient(0, 180, 0, GAME.height);
-  grass.addColorStop(0, "#2f8d59");
-  grass.addColorStop(1, "#1f6d45");
+  const grass = ctx.createLinearGradient(0, 176, 0, GAME.height);
+  grass.addColorStop(0, "#35a66a");
+  grass.addColorStop(1, "#1f7a4a");
   ctx.fillStyle = grass;
   ctx.fillRect(0, 176, GAME.width, GAME.height - 176);
 
-  for (let i = -220; i < GAME.width + 320; i += 34) {
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
+  for (let i = -240; i < GAME.width + 330; i += 34) {
+    ctx.fillStyle = "rgba(255,255,255,0.09)";
     ctx.beginPath();
-    ctx.moveTo(i, 166);
-    ctx.lineTo(i + 24, 166);
-    ctx.lineTo(i + 190, GAME.height);
-    ctx.lineTo(i + 166, GAME.height);
+    ctx.moveTo(i, 164);
+    ctx.lineTo(i + 26, 164);
+    ctx.lineTo(i + 194, GAME.height);
+    ctx.lineTo(i + 168, GAME.height);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 
-  // Outfield fence in perspective.
-  ctx.strokeStyle = "#0d2d55";
-  ctx.lineWidth = 12;
+  ctx.strokeStyle = "#103360";
+  ctx.lineWidth = 13;
   ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, 575, -2.58, 2.58);
+  ctx.arc(FIELD.home.x, FIELD.home.y, 620, -2.6, 2.6);
   ctx.stroke();
 
-  // Baseline dirt paths.
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.strokeStyle = "#c89a64";
-  ctx.lineWidth = 52;
+  ctx.strokeStyle = "#ca9862";
+  ctx.lineWidth = 55;
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.first.x, FIELD.first.y);
@@ -623,8 +865,7 @@ function drawField() {
   ctx.lineTo(FIELD.home.x, FIELD.home.y);
   ctx.stroke();
 
-  // Chalk baselines and foul lines.
-  ctx.strokeStyle = "rgba(255, 248, 228, 0.96)";
+  ctx.strokeStyle = "rgba(255,249,232,0.98)";
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
@@ -641,31 +882,23 @@ function drawField() {
   ctx.lineTo(FIELD.foulBottom.x, FIELD.foulBottom.y);
   ctx.stroke();
 
-  // Mound with shadow/highlight for pseudo-3D depth.
   ctx.fillStyle = "rgba(0,0,0,0.2)";
   ctx.beginPath();
-  ctx.ellipse(FIELD.mound.x + 2, FIELD.mound.y + 40, 66, 28, 0, 0, Math.PI * 2);
+  ctx.ellipse(FIELD.mound.x + 3, FIELD.mound.y + 38, 64, 27, 0, 0, Math.PI * 2);
   ctx.fill();
-
-  const mound = ctx.createLinearGradient(FIELD.mound.x, FIELD.mound.y + 12, FIELD.mound.x, FIELD.mound.y + 60);
-  mound.addColorStop(0, "#d2a36f");
-  mound.addColorStop(1, "#b4814d");
+  const mound = ctx.createLinearGradient(FIELD.mound.x, FIELD.mound.y + 8, FIELD.mound.x, FIELD.mound.y + 60);
+  mound.addColorStop(0, "#d7a672");
+  mound.addColorStop(1, "#b7814c");
   ctx.fillStyle = mound;
   ctx.beginPath();
-  ctx.ellipse(FIELD.mound.x, FIELD.mound.y + 36, 64, 26, 0, 0, Math.PI * 2);
+  ctx.ellipse(FIELD.mound.x, FIELD.mound.y + 34, 64, 26, 0, 0, Math.PI * 2);
   ctx.fill();
 
   drawBase(FIELD.first.x, FIELD.first.y);
   drawBase(FIELD.second.x, FIELD.second.y);
   drawBase(FIELD.third.x, FIELD.third.y);
   drawHomePlate(FIELD.home.x, FIELD.home.y);
-
-  // Batter box + strike tunnel marker.
-  ctx.strokeStyle = "rgba(255,255,255,0.8)";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(FIELD.home.x - 84, FIELD.home.y - 38, 70, 64);
-  ctx.strokeStyle = "rgba(54,225,255,0.5)";
-  ctx.strokeRect(GAME.contactX - 8, FIELD.home.y - 40, 16, 72);
+  drawBatterBox();
 }
 
 function drawBase(x, y) {
@@ -676,7 +909,7 @@ function drawBase(x, y) {
   ctx.fillRect(-8, -6, 16, 16);
   ctx.fillStyle = "#fef9e5";
   ctx.fillRect(-8, -8, 16, 16);
-  ctx.strokeStyle = "#d8cfac";
+  ctx.strokeStyle = "#d7cdad";
   ctx.lineWidth = 2;
   ctx.strokeRect(-8, -8, 16, 16);
   ctx.restore();
@@ -685,179 +918,297 @@ function drawBase(x, y) {
 function drawHomePlate(x, y) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
   ctx.beginPath();
   ctx.moveTo(2, 2);
-  ctx.lineTo(12, -6);
-  ctx.lineTo(12, 8);
-  ctx.lineTo(2, 16);
-  ctx.lineTo(-8, 8);
-  ctx.lineTo(-8, -6);
+  ctx.lineTo(11, -7);
+  ctx.lineTo(11, 6);
+  ctx.lineTo(2, 15);
+  ctx.lineTo(-8, 7);
+  ctx.lineTo(-8, -7);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#fdf7e3";
+  ctx.fillStyle = "#fff8e6";
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(10, -8);
-  ctx.lineTo(10, 6);
+  ctx.lineTo(10, 5);
   ctx.lineTo(0, 14);
-  ctx.lineTo(-10, 6);
+  ctx.lineTo(-10, 5);
   ctx.lineTo(-10, -8);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 }
 
-function drawSpritePlayer(x, y, jersey, direction = -1, isBobbing = true) {
-  const bob = isBobbing ? Math.sin(performance.now() * 0.007 + x * 0.03) * 1.5 : 0;
-  const bodyY = y + bob;
+function drawBatterBox() {
+  ctx.strokeStyle = "rgba(255,255,255,0.84)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(FIELD.home.x - 86, FIELD.home.y - 38, 72, 66);
+}
 
-  // Ground shadow
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.fillRect(x + 2, bodyY + 26, 16, 5);
+function drawRunnerDots() {
+  const basePoints = [FIELD.first, FIELD.second, FIELD.third];
+  basePoints.forEach((point, idx) => {
+    if (!GAME.runners[idx]) return;
+    ctx.fillStyle = "#fffad2";
+    ctx.beginPath();
+    ctx.arc(point.x, point.y - 22, 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = false) {
+  const headSize = bigHead ? 13 : 11;
+  ctx.fillStyle = "rgba(0,0,0,0.24)";
+  ctx.fillRect(x + 2, y + 27, 16, 5);
 
   // head
-  ctx.fillStyle = "#ffd8b0";
-  ctx.fillRect(x + 4, bodyY - 7, 12, 9);
+  ctx.fillStyle = look.skin;
+  ctx.fillRect(x + 3, y - 7, headSize, 11);
+
+  // hair + cap
+  ctx.fillStyle = look.hair;
+  ctx.fillRect(x + 3, y - 9, headSize, 3);
+  ctx.fillStyle = team.colors.cap;
+  ctx.fillRect(x + 3, y - 12, headSize, 4);
+
+  // face
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(x + 6, y - 2, 2, 2);
+  ctx.fillRect(x + 11, y - 2, 2, 2);
+  ctx.fillRect(x + 8, y + 1, 3, 1);
 
   // body
-  ctx.fillStyle = jersey;
-  ctx.fillRect(x + 2, bodyY + 1, 16, 18);
+  ctx.fillStyle = team.colors.jersey;
+  ctx.fillRect(x + 2, y + 2, 16, 17);
+  ctx.fillStyle = team.colors.trim;
+  ctx.fillRect(x + 2, y + 2, 16, 3);
 
   // legs
-  ctx.fillStyle = "#172037";
-  ctx.fillRect(x + 3, bodyY + 19, 5, 9);
-  ctx.fillRect(x + 12, bodyY + 19, 5, 9);
+  ctx.fillStyle = "#18203a";
+  ctx.fillRect(x + 3, y + 19, 5, 9);
+  ctx.fillRect(x + 12, y + 19, 5, 9);
 
-  // glove/arm indicates facing direction.
-  ctx.fillStyle = "#c8a083";
+  // arm/glove
+  ctx.fillStyle = look.skin;
   if (direction > 0) {
-    ctx.fillRect(x + 17, bodyY + 8, 5, 4);
+    ctx.fillRect(x + 17, y + 9, 5, 4);
   } else {
-    ctx.fillRect(x - 3, bodyY + 8, 5, 4);
+    ctx.fillRect(x - 2, y + 9, 5, 4);
+  }
+
+  if (selected) {
+    ctx.strokeStyle = "#ffe46f";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 2, y - 14, 24, 44);
   }
 }
 
-function drawBatter() {
-  drawSpritePlayer(batter.x, batter.y, "#2c6dd8", -1, false);
-  ctx.fillStyle = "#36e1ff";
-  ctx.fillRect(batter.x + 1, batter.y - 10, batter.width + 4, 10);
+function drawPitcher() {
+  const team = GAME.teams[GAME.fieldingSide];
+  const wobble = Math.sin(performance.now() * 0.015) * (pitcher.windup > 0 ? 4 : 1.5);
+  drawPlayer(
+    pitcher.x + wobble,
+    pitcher.y,
+    team,
+    { skin: "#dca37f", hair: "#3d2414" },
+    1,
+    true,
+    false
+  );
+}
 
-  // Bat swings in a quick arc when space is pressed.
+function drawBatter() {
+  const team = GAME.teams[GAME.battingSide];
+  drawPlayer(
+    batter.x,
+    batter.y,
+    team,
+    { skin: "#f2c7a3", hair: "#2f1c13" },
+    -1,
+    true,
+    false
+  );
+
   const swingProgress = batter.activeSwing
     ? 1 - batter.swingTime / batter.swingDuration
     : 0;
   const angle = batter.activeSwing
-    ? (-2.3 + swingProgress * 2.1)
-    : -2;
+    ? (-2.3 + swingProgress * 1.95)
+    : -2.05;
 
   ctx.save();
-  ctx.translate(batter.x + 6, batter.y + 16);
+  ctx.translate(batter.x + 6, batter.y + 17);
   ctx.rotate(angle);
-  ctx.fillStyle = "#f3e6c8";
-  ctx.fillRect(-46, -3, 48, 6);
+  ctx.fillStyle = batter.batColor;
+  ctx.fillRect(-44, -3, 46, 6);
   ctx.restore();
 }
 
-function drawPitcher() {
-  drawSpritePlayer(pitcher.x, pitcher.y, "#7141b8", 1);
-}
-
 function drawFielders() {
-  const sorted = [...fielders].sort((a, b) => a.y - b.y);
+  const team = GAME.teams[GAME.fieldingSide];
+  const sorted = [...defensiveFielders].sort((a, b) => a.y - b.y);
   sorted.forEach((fielder) => {
-    drawSpritePlayer(fielder.x, fielder.y, fielder.jersey, 1);
+    const index = defensiveFielders.indexOf(fielder);
+    drawPlayer(
+      fielder.x,
+      fielder.y,
+      team,
+      { skin: fielder.skin, hair: fielder.hair },
+      1,
+      true,
+      GAME.battedBall && index === GAME.controlledFielder
+    );
   });
 }
 
-function drawHitBall() {
-  if (!GAME.hitBall) return;
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.fillRect(GAME.hitBall.x - 4, GAME.hitBall.y + 8, 9, 4);
-
-  ctx.fillStyle = "#fff6cc";
-  ctx.beginPath();
-  ctx.arc(GAME.hitBall.x, GAME.hitBall.y, 6, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(255, 246, 204, 0.45)";
-  ctx.fillRect(GAME.hitBall.x + 10, GAME.hitBall.y + 1, 8, 3);
-  ctx.fillRect(GAME.hitBall.x + 20, GAME.hitBall.y + 4, 8, 3);
+function drawBallTrail(ballObj) {
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  for (let i = 1; i <= 3; i += 1) {
+    ctx.fillRect(ballObj.x + i * 10, ballObj.y + i * 3, 7, 3);
+  }
 }
 
-function drawBall() {
-  if (!ball.active) return;
-
+function drawBattedBall() {
+  if (!GAME.battedBall) return;
+  const ballObj = GAME.battedBall;
   ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.fillRect(ball.x - 4, ball.y + 8, 9, 4);
+  ctx.fillRect(ballObj.x - 4, ballObj.y + 8, 8, 4);
+  ctx.fillStyle = "#fff9db";
+  ctx.beginPath();
+  ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  drawBallTrail(ballObj);
+}
 
+function drawPitchBall() {
+  if (!pitchBall.active) return;
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillRect(pitchBall.x - 3, pitchBall.y + 8, 8, 4);
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+  ctx.arc(pitchBall.x, pitchBall.y, 6, 0, Math.PI * 2);
   ctx.fill();
-
-  ctx.strokeStyle = "#ff5f5f";
+  ctx.strokeStyle = "#ff6868";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.radius - 2, 0.4, 2.6);
+  ctx.arc(pitchBall.x, pitchBall.y, 4, 0.4, 2.6);
   ctx.stroke();
 }
 
 function drawParticles() {
   GAME.particles.forEach((p) => {
-    ctx.globalAlpha = Math.max(0, p.life / 0.75);
+    ctx.globalAlpha = Math.max(0, p.life / 0.7);
     ctx.fillStyle = p.color;
     ctx.fillRect(p.x, p.y, p.size, p.size);
     ctx.globalAlpha = 1;
   });
 }
 
+function drawAimMeters() {
+  // Pitch meter (when fielding)
+  const meterX = 16;
+  const meterY = 488;
+  ctx.fillStyle = "rgba(10,20,40,0.7)";
+  ctx.fillRect(meterX, meterY, 190, 36);
+  ctx.strokeStyle = "#67d7ff";
+  ctx.strokeRect(meterX, meterY, 190, 36);
+  ctx.fillStyle = "#dff7ff";
+  ctx.font = "12px 'Trebuchet MS', sans-serif";
+  ctx.fillText("Aim (A/D):", meterX + 8, meterY + 15);
+  ctx.fillText(`Pitch ${Math.round(GAME.pitchAim * 100)}`, meterX + 8, meterY + 30);
+  ctx.fillStyle = "#7de1ff";
+  ctx.fillRect(meterX + 98, meterY + 20, (GAME.pitchAim + 1) * 42, 8);
+
+  // Contact timing zone near batter.
+  const bx = FIELD.home.x - 132;
+  const by = FIELD.home.y - 62;
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(bx, by, 76, 16);
+  ctx.fillStyle = "#ffa85e";
+  ctx.fillRect(bx + 2, by + 2, 72, 12);
+  ctx.fillStyle = "#7bffb4";
+  ctx.fillRect(bx + 26, by + 2, 22, 12);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(bx + 38 + GAME.swingAim * 22, by + 1, 2, 14);
+}
+
 function render() {
+  const shake = GAME.cameraShake > 0 ? Math.sin(performance.now() * 0.1) * 6 : 0;
+  ctx.save();
   ctx.clearRect(0, 0, GAME.width, GAME.height);
+  ctx.translate(shake, 0);
   drawField();
+  drawRunnerDots();
   drawFielders();
   drawPitcher();
-  drawHitBall();
+  drawBattedBall();
   drawBatter();
-  drawBall();
+  drawPitchBall();
   drawParticles();
+  drawAimMeters();
+  ctx.restore();
 
   if (GAME.flashTime > 0) {
-    ctx.fillStyle = "rgba(255, 230, 120, 0.28)";
+    ctx.fillStyle = "rgba(255,232,120,0.28)";
     ctx.fillRect(0, 0, GAME.width, GAME.height);
   }
+}
+
+function throwToNearestBase() {
+  const fielder = defensiveFielders[GAME.controlledFielder];
+  if (!fielder) return;
+  const nearest = nearestBaseKeyFromFielder(fielder);
+  resolveThrow(nearest);
+}
+
+function throwToNumber(key) {
+  const map = { "1": "home", "2": "first", "3": "second", "4": "third" };
+  const base = map[key];
+  if (base) resolveThrow(base);
+}
+
+function handleKeyDown(event) {
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  input.keys.add(key);
+
+  if (key === "Enter" && (GAME.mode === "start" || GAME.mode === "over")) {
+    startGame();
+    return;
+  }
+
+  if (key === " ") {
+    event.preventDefault();
+    if (GAME.pitchReady) {
+      handlePitchInput();
+    } else {
+      handleSwingInput();
+      throwToNearestBase();
+    }
+  }
+
+  if (["1", "2", "3", "4"].includes(key)) {
+    throwToNumber(key);
+  }
+}
+
+function handleKeyUp(event) {
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  input.keys.delete(key);
 }
 
 let lastTime = 0;
 function gameLoop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 0.033);
   lastTime = timestamp;
-
   update(dt);
   render();
   requestAnimationFrame(gameLoop);
 }
 
-function handleKeyDown(event) {
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  GAME.keys.add(key);
-
-  if (key === " ") {
-    event.preventDefault();
-    swingBat();
-  }
-
-  if (key === "Enter" && (GAME.state === "start" || GAME.state === "over")) {
-    startGame();
-  }
-}
-
-function handleKeyUp(event) {
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  GAME.keys.delete(key);
-}
-
+buildSelectOptions();
 startButton.addEventListener("click", startGame);
 restartButton.addEventListener("click", startGame);
 window.addEventListener("keydown", handleKeyDown);

@@ -9,37 +9,57 @@
   <body>
     <main class="game-shell">
       <header class="hud">
-        <h1>NEON SLUGGER</h1>
-        <div class="stats">
-          <span>Score: <strong id="scoreValue">0</strong></span>
-          <span>Outs: <strong id="outsValue">0</strong>/3</span>
-          <span>Balls: <strong id="ballsValue">0</strong>/4</span>
-          <span>Strikes: <strong id="strikesValue">0</strong>/3</span>
-          <span>Inning: <strong id="inningValue">1</strong></span>
+        <h1>NEON SLUGGER DELUXE</h1>
+        <div class="score-block">
+          <div class="score-line">
+            <span class="away" id="awayTeamName">Away</span>
+            <strong id="awayScoreValue">0</strong>
+            <span class="sep">|</span>
+            <span class="home" id="homeTeamName">Home</span>
+            <strong id="homeScoreValue">0</strong>
+          </div>
+          <div class="stats">
+            <span>Inning: <strong id="inningValue">1</strong></span>
+            <span>Half: <strong id="halfValue">top</strong></span>
+            <span>B: <strong id="ballsValue">0</strong></span>
+            <span>S: <strong id="strikesValue">0</strong></span>
+            <span>O: <strong id="outsValue">0</strong></span>
+          </div>
         </div>
       </header>
 
       <section id="startScreen" class="overlay">
-        <h2>Arcade Baseball</h2>
-        <p>Time your swing to crush the pitch.</p>
+        <h2>Pick Your Matchup</h2>
+        <p>Choose away and home teams, then start the game.</p>
+        <div class="team-select">
+          <label>
+            Away Team
+            <select id="teamSelectA"></select>
+          </label>
+          <label>
+            Home Team
+            <select id="teamSelectB"></select>
+          </label>
+        </div>
         <ul>
-          <li><strong>Space</strong>: Swing</li>
-          <li><strong>Arrow Keys / WASD</strong>: Move batter</li>
-          <li><strong>Enter</strong>: Start or restart</li>
+          <li><strong>SPACE</strong>: Pitch (fielding) / Swing (batting) / Throw nearest base</li>
+          <li><strong>A / D</strong> or <strong>Left / Right</strong>: Pitch aim and hit direction</li>
+          <li><strong>WASD / Arrows</strong>: Move selected fielder on balls in play</li>
+          <li><strong>1,2,3,4</strong>: Throw to Home, 1st, 2nd, 3rd base</li>
         </ul>
-        <p class="hint">Perfect timing = Home Run</p>
+        <p class="hint">Original art + code only. No copyrighted assets used.</p>
         <button id="startButton" type="button">Start Game</button>
       </section>
 
       <section id="gameOverScreen" class="overlay hidden">
-        <h2>Inning Over</h2>
-        <p id="finalScoreText">Final Score: 0</p>
+        <h2>Game Over</h2>
+        <p id="finalScoreText">Away 0 - Home 0</p>
         <p>Press Enter to play again.</p>
         <button id="restartButton" type="button">Play Again</button>
       </section>
 
-      <canvas id="gameCanvas" width="960" height="540"></canvas>
-      <p id="messageBar" class="message">Press Enter to begin.</p>
+      <canvas id="gameCanvas" width="1080" height="620"></canvas>
+      <p id="messageBar" class="message">Select teams and press Start.</p>
     </main>
 
     <script src="script.js"></script>
