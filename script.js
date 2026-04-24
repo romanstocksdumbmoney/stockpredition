@@ -28,13 +28,13 @@ const homeScoreValue = document.getElementById("homeScoreValue");
 const finalScoreText = document.getElementById("finalScoreText");
 
 const FIELD = {
-  home: { x: 830, y: 420 },
-  first: { x: 680, y: 300 },
-  second: { x: 520, y: 388 },
-  third: { x: 680, y: 506 },
-  mound: { x: 670, y: 402 },
-  foulTop: { x: 215, y: 36 },
-  foulBottom: { x: 215, y: 540 }
+  home: { x: 822, y: 420 },
+  first: { x: 632, y: 274 },
+  second: { x: 440, y: 384 },
+  third: { x: 632, y: 528 },
+  mound: { x: 620, y: 400 },
+  foulTop: { x: 224, y: 30 },
+  foulBottom: { x: 224, y: 560 }
 };
 
 const BASE_KEYS = ["home", "first", "second", "third"];
@@ -190,12 +190,12 @@ function setupDefense() {
   const spots = [
     { role: "catcher", x: FIELD.home.x + 28, y: FIELD.home.y - 22 },
     { role: "first", x: FIELD.first.x + 18, y: FIELD.first.y - 20 },
-    { role: "second", x: 592, y: 334 },
-    { role: "shortstop", x: 598, y: 438 },
+    { role: "second", x: 536, y: 322 },
+    { role: "shortstop", x: 536, y: 456 },
     { role: "third", x: FIELD.third.x - 8, y: FIELD.third.y + 12 },
-    { role: "left", x: 392, y: 472 },
+    { role: "left", x: 336, y: 500 },
     { role: "center", x: 260, y: 316 },
-    { role: "right", x: 395, y: 168 }
+    { role: "right", x: 336, y: 140 }
   ];
 
   defensiveFielders.length = 0;
@@ -456,36 +456,36 @@ function spawnPitch() {
 function launchBattedBall(type) {
   const startX = FIELD.home.x - 14;
   const startY = batter.y + 22;
-  let targetX = 520;
+  let targetX = 500;
   let targetY = 290;
   let arc = 110;
   let time = 0.9;
 
   if (type === "homer") {
-    targetX = 190 + Math.random() * 170;
-    targetY = 85 + Math.random() * 390;
+    targetX = 200 + Math.random() * 180;
+    targetY = 90 + Math.random() * 420;
     arc = 220;
     time = 1.2;
     GAME.cameraShake = 0.35;
     GAME.flashTime = 0.1;
   } else if (type === "triple") {
-    targetX = 280 + Math.random() * 200;
-    targetY = 120 + Math.random() * 320;
+    targetX = 260 + Math.random() * 220;
+    targetY = 130 + Math.random() * 340;
     arc = 170;
     time = 1.04;
   } else if (type === "double") {
-    targetX = 370 + Math.random() * 180;
-    targetY = 170 + Math.random() * 260;
+    targetX = 340 + Math.random() * 220;
+    targetY = 160 + Math.random() * 300;
     arc = 140;
     time = 0.95;
   } else if (type === "single") {
-    targetX = 460 + Math.random() * 170;
-    targetY = 220 + Math.random() * 200;
+    targetX = 430 + Math.random() * 190;
+    targetY = 215 + Math.random() * 230;
     arc = 100;
     time = 0.82;
   } else if (type === "grounder") {
-    targetX = 560 + Math.random() * 130;
-    targetY = 260 + Math.random() * 220;
+    targetX = 530 + Math.random() * 130;
+    targetY = 250 + Math.random() * 240;
     arc = 44;
     time = 0.58;
   }
@@ -802,7 +802,7 @@ function drawFairTerritoryMask() {
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
-  ctx.arc(FIELD.home.x, FIELD.home.y, 620, -2.6, 2.6);
+  ctx.arc(FIELD.home.x, FIELD.home.y, 520, -2.6, 2.6);
   ctx.closePath();
 }
 
@@ -847,16 +847,26 @@ function drawField() {
   }
   ctx.restore();
 
-  ctx.strokeStyle = "#103360";
+  ctx.strokeStyle = "#0f2f56";
   ctx.lineWidth = 13;
   ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, 620, -2.6, 2.6);
+  ctx.arc(FIELD.home.x, FIELD.home.y, 520, -2.6, 2.6);
   ctx.stroke();
+
+  // Larger infield dirt cutout to emphasize arcade infield action.
+  ctx.fillStyle = "#cd9a67";
+  ctx.beginPath();
+  ctx.moveTo(FIELD.home.x + 6, FIELD.home.y + 28);
+  ctx.lineTo(FIELD.third.x - 94, FIELD.third.y + 16);
+  ctx.lineTo(FIELD.second.x - 54, FIELD.second.y - 118);
+  ctx.lineTo(FIELD.first.x + 98, FIELD.first.y - 12);
+  ctx.closePath();
+  ctx.fill();
 
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.strokeStyle = "#ca9862";
-  ctx.lineWidth = 55;
+  ctx.strokeStyle = "#d3a16e";
+  ctx.lineWidth = 66;
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.first.x, FIELD.first.y);
@@ -967,6 +977,9 @@ function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = 
   // head
   ctx.fillStyle = look.skin;
   ctx.fillRect(x + 3, y - 7, headSize, 11);
+  ctx.strokeStyle = "rgba(22, 22, 32, 0.82)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 3, y - 7, headSize, 11);
 
   // hair + cap
   ctx.fillStyle = look.hair;
@@ -985,6 +998,8 @@ function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = 
   ctx.fillRect(x + 2, y + 2, 16, 17);
   ctx.fillStyle = team.colors.trim;
   ctx.fillRect(x + 2, y + 2, 16, 3);
+  ctx.strokeStyle = "rgba(20, 24, 34, 0.9)";
+  ctx.strokeRect(x + 2, y + 2, 16, 17);
 
   // legs
   ctx.fillStyle = "#18203a";
