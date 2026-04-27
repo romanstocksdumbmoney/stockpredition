@@ -202,14 +202,15 @@ function syncRenderLayout() {
   FIELD.foulTop = { ...RENDER_LAYOUT.foulLeft };
   FIELD.foulBottom = { ...RENDER_LAYOUT.foulRight };
 
-  batter.x = FIELD.home.x + 30;
+  // Keep batter to the side of the strike zone/home-plate channel.
+  batter.x = FIELD.home.x + 46;
   batter.y = FIELD.home.y - 46;
   pitcher.x = FIELD.mound.x - 10;
   pitcher.y = FIELD.mound.y - 46;
   const zoneWidth = 70;
   const zoneHeight = 90;
-  const zoneX = FIELD.home.x + 30;
-  const zoneY = FIELD.home.y - 95;
+  const zoneX = FIELD.home.x - 35;
+  const zoneY = FIELD.home.y - 110;
   GAME.strikeZone = {
     x: zoneX,
     y: zoneY,
@@ -223,18 +224,20 @@ function syncRenderLayout() {
     pitchBall.y = pitcher.y + 16;
     pitchBall.targetX = GAME.strikeZone.cx;
     pitchBall.targetY = GAME.strikeZone.cy;
+    pitchBall.catcherX = FIELD.home.x - 2;
+    pitchBall.catcherY = FIELD.home.y + 8;
   }
 }
 
 function getStrikeZoneBounds() {
   if (GAME.strikeZone) return GAME.strikeZone;
   return {
-    x: FIELD.home.x + 30,
-    y: FIELD.home.y - 95,
+    x: FIELD.home.x - 35,
+    y: FIELD.home.y - 110,
     w: 70,
     h: 90,
-    cx: FIELD.home.x + 65,
-    cy: FIELD.home.y - 50
+    cx: FIELD.home.x,
+    cy: FIELD.home.y - 65
   };
 }
 
@@ -343,6 +346,7 @@ const pitchBall = {
   visible: false,
   state: "idle",
   swingAttempted: false,
+  crossedZone: false,
   x: pitcher.x + 16,
   y: pitcher.y + 18,
   startX: pitcher.x + 16,
@@ -355,6 +359,10 @@ const pitchBall = {
   judged: false,
   targetX: pitcher.x + 16,
   targetY: pitcher.y + 18,
+  plateX: pitcher.x + 16,
+  plateY: pitcher.y + 18,
+  catcherX: FIELD.home.x - 2,
+  catcherY: FIELD.home.y + 8,
   elapsed: 0,
   travelTime: 0.55,
   height: 0,
@@ -514,6 +522,7 @@ function resetPitchBall() {
   pitchBall.visible = false;
   pitchBall.state = "idle";
   pitchBall.swingAttempted = false;
+  pitchBall.crossedZone = false;
   pitchBall.x = pitcher.x + 16;
   pitchBall.y = pitcher.y + 18;
   pitchBall.vx = 0;
@@ -523,6 +532,10 @@ function resetPitchBall() {
   const zone = getStrikeZoneBounds();
   pitchBall.targetX = zone.cx;
   pitchBall.targetY = zone.cy;
+  pitchBall.plateX = zone.cx;
+  pitchBall.plateY = zone.cy;
+  pitchBall.catcherX = FIELD.home.x - 2;
+  pitchBall.catcherY = FIELD.home.y + 8;
   pitchBall.elapsed = 0;
   pitchBall.travelTime = 0.6;
   pitchBall.trail.length = 0;
@@ -823,9 +836,9 @@ function calculateHitPhysics({ ballX, ballY }) {
   };
 }
 
-function pitchInStrikeZone(y) {
+function pitchInStrikeZone(x, y) {
   const zone = getStrikeZoneBounds();
-  return y >= zone.y && y <= (zone.y + zone.h);
+  return x >= zone.x && x <= (zone.x + zone.w) && y >= zone.y && y <= (zone.y + zone.h);
 }
 
 function spawnPitch() {
@@ -866,6 +879,7 @@ function spawnPitch() {
   pitchBall.visible = true;
   pitchBall.state = "pitch";
   pitchBall.swingAttempted = false;
+  pitchBall.crossedZone = false;
   pitchBall.x = startX;
   pitchBall.y = startY;
   pitchBall.vx = dx / travelTime;
@@ -874,6 +888,10 @@ function spawnPitch() {
   pitchBall.judged = false;
   pitchBall.targetX = targetX;
   pitchBall.targetY = targetY;
+  pitchBall.plateX = targetX;
+  pitchBall.plateY = targetY;
+  pitchBall.catcherX = FIELD.home.x - 2;
+  pitchBall.catcherY = FIELD.home.y + 8;
   pitchBall.controlX = midControlX;
   pitchBall.controlY = midControlY;
   pitchBall.elapsed = 0;
@@ -1073,13 +1091,13 @@ function handlePitchInput() {
   spawnPitch();
 }
 
-function resolveTakenPitch() {
+function resolveTakenPitch(sampleX = pitchBall.plateX, sampleY = pitchBall.plateY) {
   pitchBall.judged = true;
   if (pitchBall.swingAttempted) {
     addStrike("Swing and miss.");
     return;
   }
-  if (pitchInStrikeZone(pitchBall.y)) {
+  if (pitchInStrikeZone(sampleX, sampleY)) {
     addStrike("Called strike.");
   } else {
     addBall("Ball.");
@@ -1217,6 +1235,7 @@ function updateDebugState(dt) {
     if (DEBUG_STATE.lastConsoleLog >= DEBUG_STATE.consoleInterval) {
       DEBUG_STATE.lastConsoleLog = 0;
       console.log("[debug]", {
+        home: `${Math.round(FIELD.home.x)}, ${Math.round(FIELD.home.y)}`,
         pitchTarget: GAME.debugInfo.pitchTarget,
         strikeZone: GAME.debugInfo.strikeZone,
         ball: GAME.debugInfo.ball,
@@ -1428,9 +1447,21 @@ function update(dt) {
     }
     pitchBall.elapsed += dt;
     const t = Math.min(1, pitchBall.elapsed / Math.max(0.001, pitchBall.travelTime));
-    const inv = 1 - t;
-    pitchBall.x = inv * inv * (pitcher.x + 14) + 2 * inv * t * pitchBall.controlX + t * t * pitchBall.targetX;
-    pitchBall.y = inv * inv * (pitcher.y + 16) + 2 * inv * t * pitchBall.controlY + t * t * pitchBall.targetY;
+    const zoneCrossT = 0.76;
+    if (t <= zoneCrossT) {
+      const localT = t / zoneCrossT;
+      const inv = 1 - localT;
+      pitchBall.x = inv * inv * (pitcher.x + 14)
+        + 2 * inv * localT * pitchBall.controlX
+        + localT * localT * pitchBall.plateX;
+      pitchBall.y = inv * inv * (pitcher.y + 16)
+        + 2 * inv * localT * pitchBall.controlY
+        + localT * localT * pitchBall.plateY;
+    } else {
+      const catcherT = (t - zoneCrossT) / (1 - zoneCrossT);
+      pitchBall.x = lerp(pitchBall.plateX, pitchBall.catcherX, catcherT);
+      pitchBall.y = lerp(pitchBall.plateY, pitchBall.catcherY, catcherT);
+    }
     pitchBall.shadowY = pitchBall.y + 16;
     pitchBall.height = Math.sin(t * Math.PI) * 16;
     pitchBall.trailClock += dt;
@@ -1444,11 +1475,14 @@ function update(dt) {
     GAME.debugInfo.ball = `${Math.round(pitchBall.x)}, ${Math.round(pitchBall.y)}`;
     GAME.debugInfo.ballHeight = `${Math.round(pitchBall.height)}`;
 
-    if ((t >= 0.98 || pitchBall.x >= pitchBall.targetX - 1) && !pitchBall.judged) {
-      resolveTakenPitch();
+    if (!pitchBall.crossedZone && t >= zoneCrossT) {
+      pitchBall.crossedZone = true;
+      if (!pitchBall.judged) {
+        resolveTakenPitch(pitchBall.plateX, pitchBall.plateY);
+      }
     }
 
-    if (t >= 1.08 || pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
+    if (t >= 1.02 || pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
       resetPitchBall();
       GAME.pitchReady = true;
     }
@@ -1878,13 +1912,15 @@ function drawPitchBall() {
 }
 
 function drawDebugOverlay() {
+  const zone = getStrikeZoneBounds();
   const lines = [
+    `Home: ${Math.round(FIELD.home.x)}, ${Math.round(FIELD.home.y)}`,
     `Pitch active: ${GAME.debugInfo.pitchActive}`,
     `Swing active: ${GAME.debugInfo.swingActive}`,
     `Hit detected: ${GAME.debugInfo.hitDetected}`,
     `Ball state: ${GAME.debugInfo.ballState}`,
     `Pitch target: ${GAME.debugInfo.pitchTarget}`,
-    `Strike zone: ${GAME.debugInfo.strikeZone}`,
+    `Strike zone: ${GAME.debugInfo.strikeZone} (cx ${Math.round(zone.cx)}, cy ${Math.round(zone.cy)})`,
     `Ball: ${GAME.debugInfo.ball}`,
     `Ball h: ${GAME.debugInfo.ballHeight}`,
     `Hit type: ${GAME.debugInfo.hitType}`,
@@ -1911,20 +1947,37 @@ function drawDebugOverlay() {
 }
 
 function drawPitchTargetDebug() {
-  if (!DEBUG_STATE.enabled || !pitchBall.active) return;
+  if (!DEBUG_STATE.enabled) return;
+  const zone = getStrikeZoneBounds();
   ctx.save();
+  ctx.strokeStyle = "rgba(240, 240, 255, 0.62)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
+  ctx.fillStyle = "rgba(255, 214, 120, 0.95)";
+  ctx.beginPath();
+  ctx.arc(FIELD.home.x, FIELD.home.y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (!pitchBall.active) {
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = "rgba(173, 227, 255, 0.68)";
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(pitcher.x + 14, pitcher.y + 16);
-  ctx.lineTo(pitchBall.targetX, pitchBall.targetY);
+  ctx.lineTo(pitchBall.plateX, pitchBall.plateY);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.strokeStyle = "rgba(173, 227, 255, 0.88)";
   ctx.beginPath();
-  ctx.arc(pitchBall.targetX, pitchBall.targetY, 4, 0, Math.PI * 2);
+  ctx.arc(pitchBall.plateX, pitchBall.plateY, 4, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.fillStyle = "rgba(131, 255, 187, 0.95)";
+  ctx.beginPath();
+  ctx.arc(pitchBall.x, pitchBall.y, 3, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
