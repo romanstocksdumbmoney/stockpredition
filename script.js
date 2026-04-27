@@ -66,7 +66,7 @@ const FIELD = {
     y: FIELD_TUNING.homeY + FIELD_TUNING.moundForwardOffsetY
   },
   foulTop: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: 22 },
-  foulBottom: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: GAME?.height ?? 604 }
+  foulBottom: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: canvas.height - 18 }
 };
 
 const BASE_KEYS = ["home", "first", "second", "third"];
@@ -170,6 +170,11 @@ const input = {
 const defensiveFielders = [];
 
 function buildSelectOptions() {
+  if (!teamSelectA || !teamSelectB) return;
+
+  teamSelectA.innerHTML = "";
+  teamSelectB.innerHTML = "";
+
   TEAMS.forEach((team, index) => {
     const optionA = document.createElement("option");
     optionA.value = team.id;
