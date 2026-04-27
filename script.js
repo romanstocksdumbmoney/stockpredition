@@ -34,17 +34,27 @@ const finalScoreText = document.getElementById("finalScoreText");
 
 // Core geometry controls for field proportion/camera tuning.
 const FIELD_TUNING = {
-  homeX: 842,
+  homeX: 852,
   homeY: 408,
-  baseSpacingX: 272,
-  baseSpacingY: 178,
-  moundForwardOffsetX: 44,
-  moundForwardOffsetY: 10,
+  baseSpacingX: 300,
+  baseSpacingY: 196,
+  moundForwardOffsetX: -36,
+  moundForwardOffsetY: -6,
   moundRadiusX: 92,
   moundRadiusY: 40,
   wallRadius: 610,
   warningTrackWidth: 34,
   cameraZoom: 1.08
+};
+
+// Controls "time between pitches" so at-bats are not rapid fire.
+const PITCH_DELAY_TUNING = {
+  initial: 1.25,
+  resetMin: 1.1,
+  resetRange: 0.85,
+  afterPlayMin: 1.3,
+  afterPlayRange: 0.9,
+  sideSwitch: 1.35
 };
 
 const FIELD = {
@@ -225,15 +235,17 @@ function setupDefense() {
   const defenseTeam = GAME.teams[GAME.fieldingSide];
   const skin = ["#f8d2ad", "#c58b62", "#8b5b3f"];
   const hair = ["#1e1e1e", "#5d3414", "#704224"];
+  const rightInfieldX = (FIELD.first.x + FIELD.second.x) / 2 + 24;
+  const leftInfieldX = (FIELD.third.x + FIELD.second.x) / 2 + 24;
   const spots = [
     { role: "catcher", x: FIELD.home.x + 28, y: FIELD.home.y - 22 },
     { role: "first", x: FIELD.first.x + 18, y: FIELD.first.y - 20 },
-    { role: "second", x: 478, y: 330 },
-    { role: "shortstop", x: 478, y: 454 },
+    { role: "second", x: rightInfieldX, y: (FIELD.first.y + FIELD.second.y) / 2 - 18 },
+    { role: "shortstop", x: leftInfieldX, y: (FIELD.third.y + FIELD.second.y) / 2 + 18 },
     { role: "third", x: FIELD.third.x - 8, y: FIELD.third.y + 12 },
-    { role: "left", x: 246, y: 540 },
-    { role: "center", x: 160, y: 318 },
-    { role: "right", x: 246, y: 96 }
+    { role: "left", x: FIELD.second.x - 124, y: FIELD.third.y - 44 },
+    { role: "center", x: FIELD.second.x - 188, y: FIELD.second.y + 4 },
+    { role: "right", x: FIELD.second.x - 124, y: FIELD.first.y + 44 }
   ];
 
   defensiveFielders.length = 0;
@@ -261,7 +273,7 @@ function resetPitchBall() {
   pitchBall.curve = 0;
   pitchBall.judged = false;
   GAME.pitchTimer = 0;
-  GAME.nextPitchDelay = 0.45 + Math.random() * 0.5;
+  GAME.nextPitchDelay = PITCH_DELAY_TUNING.resetMin + Math.random() * PITCH_DELAY_TUNING.resetRange;
 }
 
 function updateHud() {
@@ -289,7 +301,7 @@ function startGame() {
   GAME.fieldingSide = "home";
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
-  GAME.nextPitchDelay = 0.75;
+  GAME.nextPitchDelay = PITCH_DELAY_TUNING.initial;
   GAME.pitchAim = 0;
   GAME.swingAim = 0;
   GAME.cameraShake = 0;
@@ -362,7 +374,7 @@ function switchSides() {
   GAME.swingBuffer = 0;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
-  GAME.nextPitchDelay = 0.8;
+  GAME.nextPitchDelay = PITCH_DELAY_TUNING.sideSwitch;
 
   if (GAME.half === "top") {
     GAME.half = "bottom";
@@ -759,7 +771,7 @@ function updateBattedBall(dt) {
     GAME.battedBall = null;
     GAME.pitchReady = true;
     GAME.pitchTimer = 0;
-    GAME.nextPitchDelay = 0.6 + Math.random() * 0.45;
+    GAME.nextPitchDelay = PITCH_DELAY_TUNING.afterPlayMin + Math.random() * PITCH_DELAY_TUNING.afterPlayRange;
   }
 }
 
