@@ -145,7 +145,8 @@ const GAME = {
   battedBall: null,
   pendingPlay: null,
   flashTime: 0,
-  swingBuffer: 0
+  swingBuffer: 0,
+  lastContactOffset: 0
 };
 
 const batter = {
@@ -518,37 +519,43 @@ function launchBattedBall(type) {
   let arc = 110;
   let time = 0.9;
 
+  // Spray angle makes batted balls land in varied field zones.
+  const sprayLanes = [110, 185, 270, 355, 445, 525];
+  const laneCenter = sprayLanes[Math.floor(Math.random() * sprayLanes.length)];
+  const timingBias = Math.max(-1, Math.min(1, GAME.lastContactOffset / 34)) * 130;
+  const aimBias = GAME.swingAim * 170;
+  const laneBias = laneCenter + timingBias + aimBias + (Math.random() * 64 - 32);
+
   if (type === "homer") {
-    targetX = 200 + Math.random() * 180;
-    targetY = 90 + Math.random() * 420;
-    arc = 220;
-    time = 1.2;
+    targetX = 120 + Math.random() * 180;
+    targetY = laneBias;
+    arc = 220 + Math.random() * 28;
+    time = 1.18 + Math.random() * 0.12;
     GAME.cameraShake = 0.35;
     GAME.flashTime = 0.1;
   } else if (type === "triple") {
-    targetX = 260 + Math.random() * 220;
-    targetY = 130 + Math.random() * 340;
-    arc = 170;
-    time = 1.04;
+    targetX = 190 + Math.random() * 220;
+    targetY = laneBias;
+    arc = 170 + Math.random() * 22;
+    time = 1 + Math.random() * 0.12;
   } else if (type === "double") {
-    targetX = 340 + Math.random() * 220;
-    targetY = 160 + Math.random() * 300;
-    arc = 140;
-    time = 0.95;
+    targetX = 270 + Math.random() * 250;
+    targetY = laneBias;
+    arc = 140 + Math.random() * 16;
+    time = 0.9 + Math.random() * 0.12;
   } else if (type === "single") {
-    targetX = 430 + Math.random() * 190;
-    targetY = 215 + Math.random() * 230;
-    arc = 100;
-    time = 0.82;
+    targetX = 350 + Math.random() * 250;
+    targetY = laneBias;
+    arc = 96 + Math.random() * 14;
+    time = 0.8 + Math.random() * 0.1;
   } else if (type === "grounder") {
-    targetX = 530 + Math.random() * 130;
-    targetY = 250 + Math.random() * 240;
-    arc = 44;
-    time = 0.58;
+    targetX = 450 + Math.random() * 210;
+    targetY = laneBias;
+    arc = 40 + Math.random() * 10;
+    time = 0.56 + Math.random() * 0.09;
   }
 
   // Batter aim can push trajectory up/down the foul lines.
-  targetY += GAME.swingAim * 160;
   targetY = Math.max(56, Math.min(GAME.height - 20, targetY));
 
   GAME.battedBall = {
@@ -572,18 +579,21 @@ function resolveSwing(ballX, ballY) {
   const contact = teamRating(battingTeam, "contact");
   const power = teamRating(battingTeam, "power");
 
-  const dx = Math.abs(ballX - (FIELD.home.x - 18));
+  const contactPoint = FIELD.home.x - 18;
+  const dx = Math.abs(ballX - contactPoint);
   const dy = Math.abs(ballY - (batter.y + 24));
+  GAME.lastContactOffset = ballX - contactPoint;
 
   // Wider windows improve responsiveness for arcade play.
-  const perfectWindow = 14 + contact * 7;
-  const goodWindow = 40 + contact * 18;
+  const perfectWindow = 16 + contact * 8;
+  const goodWindow = 48 + contact * 22;
 
   // Small timing indicator near batter.
   if (dx <= perfectWindow && dy <= 20 + contact * 8) {
-    const big = Math.random() < 0.52 + power * 0.35;
-    launchBattedBall(big ? "homer" : "triple");
-    registerHit(big ? "homer" : "triple");
+    const big = Math.random() < 0.68 + power * 0.25;
+    const hitType = big ? "homer" : (Math.random() < 0.45 ? "triple" : "double");
+    launchBattedBall(hitType);
+    registerHit(hitType);
     createBurst(ballX, ballY, "#ffe27a", 14);
     resetPitchBall();
     return;
@@ -591,7 +601,13 @@ function resolveSwing(ballX, ballY) {
 
   if (dx <= goodWindow && dy <= 42 + contact * 16) {
     const outcomeRoll = Math.random();
-    if (outcomeRoll < 0.18 + power * 0.25) {
+    if (outcomeRoll < 0.08 + power * 0.18) {
+      launchBattedBall("homer");
+      registerHit("homer");
+    } else if (outcomeRoll < 0.22 + power * 0.3) {
+      launchBattedBall("triple");
+      registerHit("triple");
+    } else if (outcomeRoll < 0.54 + power * 0.24) {
       launchBattedBall("double");
       registerHit("double");
     } else {
@@ -604,7 +620,7 @@ function resolveSwing(ballX, ballY) {
   }
 
   const weakRoll = Math.random();
-  if (weakRoll < 0.55) {
+  if (weakRoll < 0.4) {
     launchBattedBall("grounder");
     GAME.pendingPlay.result = Math.random() < (0.45 + contact * 0.25) ? "grounderSafe" : "grounderOut";
     setMessage("Weak grounder in play...");
@@ -612,7 +628,14 @@ function resolveSwing(ballX, ballY) {
     resetPitchBall();
     return;
   }
-  if (weakRoll < 0.9) {
+  if (weakRoll < 0.7) {
+    launchBattedBall("single");
+    registerHit("single");
+    createBurst(ballX, ballY, "#c6ffd8", 8);
+    resetPitchBall();
+    return;
+  }
+  if (weakRoll < 0.92) {
     foulBall();
     return;
   }
@@ -735,8 +758,15 @@ function resolveThrow(baseKey) {
     return;
   }
 
+  // Deep hits are almost always safe by the time the throw arrives.
+  if (GAME.pendingPlay.result === "homer" || GAME.pendingPlay.result === "triple") {
+    GAME.pendingPlay.resolved = true;
+    setMessage(`${GAME.pendingPlay.result === "homer" ? "Home run" : "Triple"} stands. Too deep for a play.`);
+    return;
+  }
+
   // On other batted balls, throws can still cut off a runner occasionally.
-  if (Math.random() < 0.22 + fieldQuality * 0.18) {
+  if (Math.random() < 0.08 + fieldQuality * 0.1) {
     GAME.pendingPlay.resolved = true;
     addOut(`Runner tagged out at ${baseKey}!`);
   } else {
@@ -759,7 +789,7 @@ function updateBattedBall(dt) {
     if (GAME.pendingPlay.elapsed >= GAME.pendingPlay.deadline) {
       GAME.pendingPlay.resolved = true;
       if (GAME.pendingPlay.result === "grounderOut") {
-        setMessage("Beats the throw. Infield single!");
+        setMessage("No throw made. Infield single!");
       }
     }
   }
