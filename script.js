@@ -146,7 +146,8 @@ const GAME = {
   pendingPlay: null,
   flashTime: 0,
   swingBuffer: 0,
-  lastContactOffset: 0
+  lastContactOffset: 0,
+  playCallout: null
 };
 
 const batter = {
@@ -221,6 +222,14 @@ function configureTeams() {
 
 function setMessage(text) {
   messageBar.textContent = text;
+}
+
+function showPlayCallout(text, kind = "neutral") {
+  GAME.playCallout = { text, kind, life: 1.35 };
+}
+
+function showPlayCallout(text, kind = "info") {
+  GAME.playCallout = { text, kind, timer: 1.05 };
 }
 
 function resetCount() {
@@ -311,6 +320,7 @@ function startGame() {
   GAME.pendingPlay = null;
   GAME.flashTime = 0;
   GAME.swingBuffer = 0;
+  GAME.playCallout = null;
   clearBases();
   resetCount();
   resetPitchBall();
@@ -373,6 +383,7 @@ function switchSides() {
   GAME.battedBall = null;
   GAME.pendingPlay = null;
   GAME.swingBuffer = 0;
+  GAME.playCallout = null;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.sideSwitch;
@@ -404,6 +415,7 @@ function addOut(reason) {
   GAME.battedBall = null;
   GAME.pendingPlay = null;
   GAME.swingBuffer = 0;
+  GAME.playCallout = null;
   GAME.pitchReady = true;
   updateHud();
   setMessage(reason);
@@ -1207,6 +1219,31 @@ function drawBallTrail(ballObj) {
 function drawBattedBall() {
   if (!GAME.battedBall) return;
   const ballObj = GAME.battedBall;
+  const shape = ballObj.shape ?? "fly";
+
+  if (shape === "grounder") {
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(ballObj.x - 6, ballObj.y + 4, 12, 4);
+    ctx.fillStyle = "#fff8d9";
+    ctx.beginPath();
+    ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (shape === "line") {
+    ctx.fillStyle = "rgba(0,0,0,0.24)";
+    ctx.fillRect(ballObj.x - 5, ballObj.y + 7, 10, 4);
+    ctx.fillStyle = "#fff8d9";
+    ctx.beginPath();
+    ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillRect(ballObj.x + 8, ballObj.y + 1, 10, 3);
+    ctx.fillRect(ballObj.x + 18, ballObj.y + 4, 8, 3);
+    return;
+  }
+
   ctx.fillStyle = "rgba(0,0,0,0.22)";
   ctx.fillRect(ballObj.x - 4, ballObj.y + 8, 8, 4);
   ctx.fillStyle = "#fff9db";
@@ -1214,6 +1251,45 @@ function drawBattedBall() {
   ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
   ctx.fill();
   drawBallTrail(ballObj);
+}
+
+function drawPlayCallout() {
+  if (!GAME.playCallout || GAME.playCallout.time <= 0) return;
+  const pulse = 1 + Math.sin(performance.now() * 0.02) * 0.04;
+  const alpha = Math.min(1, GAME.playCallout.time / 0.9 + 0.25);
+  ctx.save();
+  ctx.translate(GAME.width * 0.52, 96);
+  ctx.scale(pulse, pulse);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(7, 15, 30, 0.86)";
+  ctx.fillRect(-112, -28, 224, 52);
+  ctx.strokeStyle = GAME.playCallout.outcome === "out" ? "#ff7f8f" : "#7fffb8";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-112, -28, 224, 52);
+  ctx.fillStyle = GAME.playCallout.outcome === "out" ? "#ffd9dd" : "#d8ffea";
+  ctx.font = "bold 28px 'Trebuchet MS', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(GAME.playCallout.text, 0, -2);
+  ctx.restore();
+}
+
+function drawPlayCallout() {
+  if (!GAME.playCallout) return;
+  const life = GAME.playCallout.life;
+  const alpha = Math.min(1, Math.max(0, life / 1.1));
+  const yFloat = (1 - alpha) * 20;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = "bold 32px 'Trebuchet MS', sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(16, 24, 40, 0.8)";
+  ctx.strokeText(GAME.playCallout.text, GAME.width / 2, 86 - yFloat);
+  ctx.fillStyle = GAME.playCallout.color;
+  ctx.fillText(GAME.playCallout.text, GAME.width / 2, 86 - yFloat);
+  ctx.restore();
 }
 
 function drawPitchBall() {
