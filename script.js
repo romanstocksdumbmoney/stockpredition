@@ -224,12 +224,18 @@ function setMessage(text) {
   messageBar.textContent = text;
 }
 
-function showPlayCallout(text, kind = "neutral") {
-  GAME.playCallout = { text, kind, life: 1.35 };
-}
-
 function showPlayCallout(text, kind = "info") {
-  GAME.playCallout = { text, kind, timer: 1.05 };
+  const colors = {
+    out: "#ff8d9a",
+    safe: "#7fffb8",
+    warn: "#ffd56a",
+    info: "#9ed7ff"
+  };
+  GAME.playCallout = {
+    text,
+    color: colors[kind] ?? colors.info,
+    life: 1.1
+  };
 }
 
 function resetCount() {
@@ -481,6 +487,15 @@ function registerHit(type) {
     homer: "Home run"
   };
   setMessage(`${hitText[type]}! ${scored > 0 ? `${scored} run${scored > 1 ? "s" : ""} scored.` : ""}`);
+
+  const calloutMap = {
+    single: { text: "BASE HIT", outcome: "safe" },
+    double: { text: "DOUBLE", outcome: "safe" },
+    triple: { text: "TRIPLE", outcome: "safe" },
+    homer: { text: "HOME RUN", outcome: "homer" }
+  };
+  const call = calloutMap[type];
+  if (call) showPlayCallout(call.text, call.outcome);
 }
 
 function pitchInStrikeZone(y) {
@@ -523,7 +538,7 @@ function spawnPitch() {
   pitcher.windup = 0.18;
 }
 
-function launchBattedBall(type) {
+function launchBattedBall(type, flightTypeOverride) {
   const startX = FIELD.home.x - 14;
   const startY = batter.y + 22;
   let targetX = 500;
@@ -538,11 +553,14 @@ function launchBattedBall(type) {
   const aimBias = GAME.swingAim * 170;
   const laneBias = laneCenter + timingBias + aimBias + (Math.random() * 64 - 32);
 
+  let flightType = flightTypeOverride ?? "fly";
+
   if (type === "homer") {
     targetX = 120 + Math.random() * 180;
     targetY = laneBias;
     arc = 220 + Math.random() * 28;
     time = 1.18 + Math.random() * 0.12;
+    flightType = "homer";
     GAME.cameraShake = 0.35;
     GAME.flashTime = 0.1;
   } else if (type === "triple") {
@@ -550,21 +568,25 @@ function launchBattedBall(type) {
     targetY = laneBias;
     arc = 170 + Math.random() * 22;
     time = 1 + Math.random() * 0.12;
+    flightType = "fly";
   } else if (type === "double") {
     targetX = 270 + Math.random() * 250;
     targetY = laneBias;
     arc = 140 + Math.random() * 16;
     time = 0.9 + Math.random() * 0.12;
+    flightType = "line";
   } else if (type === "single") {
     targetX = 350 + Math.random() * 250;
     targetY = laneBias;
     arc = 96 + Math.random() * 14;
     time = 0.8 + Math.random() * 0.1;
+    flightType = "line";
   } else if (type === "grounder") {
     targetX = 450 + Math.random() * 210;
     targetY = laneBias;
-    arc = 40 + Math.random() * 10;
+    arc = 0;
     time = 0.56 + Math.random() * 0.09;
+    flightType = "grounder";
   }
 
   // Batter aim can push trajectory up/down the foul lines.
@@ -580,7 +602,8 @@ function launchBattedBall(type) {
     elapsed: 0,
     travelTime: time,
     arcHeight: arc,
-    type
+    type,
+    flightType
   };
 
   GAME.pendingPlay = { resolved: false, deadline: time + 0.45, elapsed: 0, result: type };
@@ -1251,27 +1274,6 @@ function drawBattedBall() {
   ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
   ctx.fill();
   drawBallTrail(ballObj);
-}
-
-function drawPlayCallout() {
-  if (!GAME.playCallout || GAME.playCallout.time <= 0) return;
-  const pulse = 1 + Math.sin(performance.now() * 0.02) * 0.04;
-  const alpha = Math.min(1, GAME.playCallout.time / 0.9 + 0.25);
-  ctx.save();
-  ctx.translate(GAME.width * 0.52, 96);
-  ctx.scale(pulse, pulse);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = "rgba(7, 15, 30, 0.86)";
-  ctx.fillRect(-112, -28, 224, 52);
-  ctx.strokeStyle = GAME.playCallout.outcome === "out" ? "#ff7f8f" : "#7fffb8";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(-112, -28, 224, 52);
-  ctx.fillStyle = GAME.playCallout.outcome === "out" ? "#ffd9dd" : "#d8ffea";
-  ctx.font = "bold 28px 'Trebuchet MS', sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(GAME.playCallout.text, 0, -2);
-  ctx.restore();
 }
 
 function drawPlayCallout() {
