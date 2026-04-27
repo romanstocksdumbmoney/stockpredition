@@ -98,6 +98,22 @@ const DEBUG_STATE = {
   consoleInterval: 0.75
 };
 
+function scaleByY(y) {
+  const fieldTop = RENDER_LAYOUT.fieldRect.top;
+  const fieldBottom = RENDER_LAYOUT.fieldRect.bottom;
+  const minScale = 0.65;
+  const maxScale = 1.25;
+  const t = clampValue((y - fieldTop) / Math.max(1, fieldBottom - fieldTop), 0, 1);
+  return minScale + t * (maxScale - minScale);
+}
+
+function worldToScreen(x, y, z = 0) {
+  return {
+    x,
+    y: y - z
+  };
+}
+
 function clampValue(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -311,6 +327,10 @@ const GAME = {
   lastContactOffset: 0,
   playCallout: null,
   strikeZone: null,
+  cameraX: 0,
+  cameraY: 0,
+  cameraTargetX: 0,
+  cameraTargetY: 0,
   debugInfo: {
     pitchTarget: "-",
     strikeZone: "-",
@@ -586,6 +606,10 @@ function startGame() {
   GAME.flashTime = 0;
   GAME.swingBuffer = 0;
   GAME.playCallout = null;
+  GAME.cameraX = 0;
+  GAME.cameraY = 0;
+  GAME.cameraTargetX = 0;
+  GAME.cameraTargetY = 0;
   clearBases();
   resetCount();
   resetPitchBall();
@@ -650,6 +674,10 @@ function switchSides() {
   GAME.pendingPlay = null;
   GAME.swingBuffer = 0;
   GAME.playCallout = null;
+  GAME.cameraX = 0;
+  GAME.cameraY = 0;
+  GAME.cameraTargetX = 0;
+  GAME.cameraTargetY = 0;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.sideSwitch;
@@ -726,6 +754,7 @@ function foulBall() {
     GAME.strikes += 1;
   }
   createBurst(FIELD.home.x - 12, FIELD.home.y - 8, "#fff6a8", 7);
+  showPlayCallout("FOUL BALL", "warn");
   resetPitchBall();
   GAME.pitchReady = true;
   updateHud();
@@ -831,7 +860,7 @@ function calculateHitPhysics({ ballX, ballY }) {
     contactQuality,
     quality: rawQuality,
     category,
-    flightType: category === "pop" ? "fly" : category,
+    flightType: category,
     launchAngle: launchAngleDeg,
     exitVelocity,
     directionVector
@@ -940,6 +969,12 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
   const horizontalSpeed = lerp(260, 640, speedScale) * Math.cos(launchRad);
   const verticalSpeed = lerp(220, 700, speedScale) * Math.sin(launchRad);
   const flightType = flightTypeOverride ?? physics.flightType ?? (physics.launchAngle > 48 ? "pop" : "fly");
+  const normalizedType = ({
+    grounder: "grounder",
+    line: "lineDrive",
+    fly: "flyBall",
+    pop: "popFly"
+  })[flightType] ?? (type === "homer" ? "homeRun" : "flyBall");
 
   const launchDefaults = {
     grounder: { vx: 6 * 60, vy: -3 * 60, vz: 0 },
@@ -947,9 +982,19 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
     fly: { vx: 5 * 60, vy: -7 * 60, vz: 6 * 60 }
   };
   const defaultVel = launchDefaults[flightType] ?? launchDefaults.line;
-  const vx = Number.isFinite(physics.directionVector.x * horizontalSpeed) ? physics.directionVector.x * horizontalSpeed : defaultVel.vx;
-  const vy = Number.isFinite(physics.directionVector.y * horizontalSpeed) ? physics.directionVector.y * horizontalSpeed : defaultVel.vy;
-  const vz = Number.isFinite(verticalSpeed) ? verticalSpeed : defaultVel.vz;
+  let vx = Number.isFinite(physics.directionVector.x * horizontalSpeed) ? physics.directionVector.x * horizontalSpeed : defaultVel.vx;
+  let vy = Number.isFinite(physics.directionVector.y * horizontalSpeed) ? physics.directionVector.y * horizontalSpeed : defaultVel.vy;
+  let vz = Number.isFinite(verticalSpeed) ? verticalSpeed : defaultVel.vz;
+
+  if (normalizedType === "popFly") {
+    vx *= 0.58;
+    vy *= 0.58;
+    vz *= 1.18;
+  } else if (normalizedType === "homeRun") {
+    vx *= 1.08;
+    vy *= 1.08;
+    vz *= 1.06;
+  }
 
   GAME.battedBall = {
     x: startX,
@@ -970,6 +1015,7 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
     launchAngle: physics.launchAngle,
     exitVelocity: physics.exitVelocity,
     flightType,
+    hitType: normalizedType,
     type,
     state: "hit",
     visible: true,
@@ -989,7 +1035,14 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
     catchAttempted: false
   };
   createBurst(startX, startY, "#ffffff", 10);
-  showPlayCallout(type === "homer" ? "CRACK!" : "IN PLAY", "info");
+  const inPlayText = {
+    grounder: "GROUND BALL",
+    lineDrive: "LINE DRIVE",
+    flyBall: "FLY BALL",
+    popFly: "POP FLY",
+    homeRun: "CRACK!"
+  };
+  showPlayCallout(inPlayText[normalizedType] ?? "IN PLAY", "info");
   GAME.debugInfo.hitType = `${type}/${flightType}`;
 }
 
@@ -1198,8 +1251,8 @@ function executeFieldedBallResult(fieldingRole, ballObj) {
   const isAirCatch = !ballObj.landed && ballObj.height > 8;
   if (isAirCatch) {
     GAME.pendingPlay.resolved = true;
-    showPlayCallout("OUT", "out");
-    addOut(`${role.toUpperCase()} made the catch.`);
+    showPlayCallout("FLY OUT", "out");
+    addOut(`${role.toUpperCase()} made the catch. FLY OUT.`);
     GAME.battedBall = null;
     return;
   }
@@ -1209,7 +1262,7 @@ function executeFieldedBallResult(fieldingRole, ballObj) {
   GAME.pendingPlay.throwTimer = FIELDING_AI_TUNING.throwDelay;
   GAME.pendingPlay.result = infieldRole ? "grounderOut" : "single";
   GAME.pendingPlay.resolved = true;
-  const throwText = infieldRole ? "Throw to first..." : "Relay throw to second...";
+  const throwText = infieldRole ? "GROUND BALL fielded. Throw to first..." : "BASE HIT. Relay throw to second...";
   showPlayCallout("FIELD", "warn");
   setMessage(`${role.toUpperCase()} fielded it. ${throwText}`);
   GAME.battedBall = null;
@@ -1288,8 +1341,8 @@ function resolveThrow(baseKey) {
 
   if (result === "grounderOut") {
     GAME.pendingPlay.resolved = true;
-    showPlayCallout("OUT", "out");
-    addOut(`Out at ${baseKey}!`);
+    showPlayCallout("GROUND OUT", "out");
+    addOut(`GROUND OUT at ${baseKey}!`);
     return;
   }
 
@@ -1328,6 +1381,7 @@ function updateBattedBall(dt) {
     if (ballObj.height <= 0) {
       ballObj.height = 0;
       ballObj.landed = true;
+      createBurst(ballObj.x, ballObj.groundY, "#cfa56f", 6);
       if (ballObj.flightType === "grounder") {
         ballObj.vx *= 0.92;
         ballObj.vy *= 0.92;
@@ -1372,8 +1426,8 @@ function updateBattedBall(dt) {
   if (!ballObj.fielded && ballObj.landed && movingSpeed < 18) {
     if (GAME.pendingPlay && !GAME.pendingPlay.resolved) {
       GAME.pendingPlay.resolved = true;
-      showPlayCallout("SAFE", "safe");
-      setMessage("Ball gets through for a hit.");
+      showPlayCallout("BASE HIT", "safe");
+      setMessage("BASE HIT. Ball gets through.");
     }
     GAME.battedBall = null;
     GAME.pitchReady = true;
@@ -1417,6 +1471,19 @@ function update(dt) {
   if (GAME.mode !== "play") {
     updateParticles(dt);
     return;
+  }
+
+  if (GAME.battedBall) {
+    const followStrength = 0.08;
+    GAME.cameraTargetX = clampValue(GAME.battedBall.x - FIELD.home.x, -90, 90);
+    GAME.cameraTargetY = clampValue((GAME.battedBall.groundY ?? GAME.battedBall.y) - FIELD.home.y, -70, 60);
+    GAME.cameraX += (GAME.cameraTargetX - GAME.cameraX) * followStrength;
+    GAME.cameraY += (GAME.cameraTargetY - GAME.cameraY) * followStrength;
+  } else {
+    GAME.cameraTargetX = 0;
+    GAME.cameraTargetY = 0;
+    GAME.cameraX += (GAME.cameraTargetX - GAME.cameraX) * 0.14;
+    GAME.cameraY += (GAME.cameraTargetY - GAME.cameraY) * 0.14;
   }
 
   updatePitchAim(dt);
@@ -1530,6 +1597,12 @@ function drawBackground() {
   ctx.fillStyle = "#263f68";
   ctx.fillRect(0, top + 4, GAME.width, 20);
 
+  // Distant stadium wall for depth.
+  ctx.fillStyle = "rgba(22,44,72,0.88)";
+  ctx.fillRect(0, top + 22, GAME.width, 18);
+  ctx.fillStyle = "rgba(95,172,212,0.3)";
+  ctx.fillRect(0, top + 22, GAME.width, 2);
+
   for (let x = 0; x < GAME.width; x += 10) {
     ctx.fillStyle = x % 20 === 0 ? "#53d0ff" : "#f2b0ff";
     ctx.fillRect(x, top + 8 + ((x / 10) % 2), 4, 5);
@@ -1564,9 +1637,9 @@ function drawField() {
     ctx.fillStyle = "rgba(255,255,255,0.065)";
     ctx.beginPath();
     ctx.moveTo(x, bounds.top - 10);
-    ctx.lineTo(x + 16, bounds.top - 10);
-    ctx.lineTo(x + 200, GAME.height + 10);
-    ctx.lineTo(x + 184, GAME.height + 10);
+    ctx.lineTo(x + 12, bounds.top - 10);
+    ctx.lineTo(x + 228, GAME.height + 14);
+    ctx.lineTo(x + 196, GAME.height + 14);
     ctx.closePath();
     ctx.fill();
   }
@@ -1635,8 +1708,10 @@ function drawBasesAndLines() {
 }
 
 function drawBase(x, y) {
+  const s = scaleByY(y) * 0.9;
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(s, s);
   ctx.rotate(Math.PI / 4);
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.fillRect(-9, -7, 18, 18);
@@ -1671,14 +1746,7 @@ function drawBatterBox(homeX, homeY) {
 }
 
 function drawStrikeZone() {
-  const zone = getStrikeZoneBounds();
-  ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.9)";
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 2;
-  ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
-  ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
-  ctx.restore();
+  // Intentionally hidden in normal gameplay.
 }
 
 function drawRunnerDots() {
@@ -1700,49 +1768,55 @@ function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = 
   const skin = look?.skin ?? "#d8b08c";
   const hair = look?.hair ?? "#2d1e16";
   const headSize = bigHead ? 13 : 11;
+  const scale = scaleByY(y);
+  const screen = worldToScreen(x, y, 0);
 
-  ctx.fillStyle = "rgba(0,0,0,0.24)";
-  ctx.fillRect(x + 2, y + 27, 16, 5);
+  ctx.save();
+  ctx.translate(screen.x, screen.y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.fillRect(2, 27, 16, 5);
 
   ctx.fillStyle = skin;
-  ctx.fillRect(x + 3, y - 7, headSize, 11);
+  ctx.fillRect(3, -7, headSize, 11);
   ctx.strokeStyle = "rgba(22, 22, 32, 0.82)";
   ctx.lineWidth = 1;
-  ctx.strokeRect(x + 3, y - 7, headSize, 11);
+  ctx.strokeRect(3, -7, headSize, 11);
 
   ctx.fillStyle = hair;
-  ctx.fillRect(x + 3, y - 9, headSize, 3);
+  ctx.fillRect(3, -9, headSize, 3);
   ctx.fillStyle = palette.cap;
-  ctx.fillRect(x + 3, y - 12, headSize, 4);
+  ctx.fillRect(3, -12, headSize, 4);
 
   ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(x + 6, y - 2, 2, 2);
-  ctx.fillRect(x + 11, y - 2, 2, 2);
-  ctx.fillRect(x + 8, y + 1, 3, 1);
+  ctx.fillRect(6, -2, 2, 2);
+  ctx.fillRect(11, -2, 2, 2);
+  ctx.fillRect(8, 1, 3, 1);
 
   ctx.fillStyle = palette.jersey;
-  ctx.fillRect(x + 2, y + 2, 16, 17);
+  ctx.fillRect(2, 2, 16, 17);
   ctx.fillStyle = palette.trim;
-  ctx.fillRect(x + 2, y + 2, 16, 3);
+  ctx.fillRect(2, 2, 16, 3);
   ctx.strokeStyle = "rgba(20, 24, 34, 0.9)";
-  ctx.strokeRect(x + 2, y + 2, 16, 17);
+  ctx.strokeRect(2, 2, 16, 17);
 
   ctx.fillStyle = "#18203a";
-  ctx.fillRect(x + 3, y + 19, 5, 9);
-  ctx.fillRect(x + 12, y + 19, 5, 9);
+  ctx.fillRect(3, 19, 5, 9);
+  ctx.fillRect(12, 19, 5, 9);
 
   ctx.fillStyle = skin;
   if (direction > 0) {
-    ctx.fillRect(x + 17, y + 9, 5, 4);
+    ctx.fillRect(17, 9, 5, 4);
   } else {
-    ctx.fillRect(x - 2, y + 9, 5, 4);
+    ctx.fillRect(-2, 9, 5, 4);
   }
 
   if (selected) {
     ctx.strokeStyle = "#ffe46f";
     ctx.lineWidth = 2;
-    ctx.strokeRect(x - 2, y - 14, 24, 44);
+    ctx.strokeRect(-2, -14, 24, 44);
   }
+  ctx.restore();
 }
 
 function drawPitcher() {
@@ -1779,11 +1853,13 @@ function drawBat() {
   const angle = batter.activeSwing
     ? degreesToRadians(-40 + swingProgress * 110)
     : degreesToRadians(-40);
-  const handX = batter.x + 14;
-  const handY = batter.y + 13;
+  const handX = batter.x + 14 - (GAME.cameraX ?? 0);
+  const handY = batter.y + 13 - (GAME.cameraY ?? 0);
+  const batScale = scaleByY(batter.y);
 
   ctx.save();
   ctx.translate(handX, handY);
+  ctx.scale(batScale, batScale);
   ctx.rotate(angle);
   ctx.fillStyle = batter.batColor;
   // Small local bat: 40x6, never leaves batter zone.
@@ -1828,16 +1904,19 @@ function drawBattedBall() {
     }
   }
   const flight = ballObj.flightType ?? "fly";
-  const radius = BALL_VISUAL_TUNING.battedRadius;
-  const shadowAlpha = clampValue(0.34 - (ballObj.height / 260), 0.08, 0.34);
+  const depthScale = scaleByY(ballObj.groundY ?? ballObj.y);
+  const radius = BALL_VISUAL_TUNING.battedRadius * clampValue(depthScale * 0.95, 0.7, 1.28);
+  const shadowAlpha = clampValue(0.36 - (ballObj.height / 280), 0.07, 0.36);
+  const screen = worldToScreen(ballObj.x, ballObj.groundY ?? ballObj.y, ballObj.height);
+  const shadow = worldToScreen(ballObj.x, ballObj.groundY ?? ballObj.y, 0);
 
   ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
   ctx.beginPath();
   ctx.ellipse(
-    ballObj.x,
-    ballObj.groundY + 5,
-    Math.max(4, radius + 1 - ballObj.height * 0.012),
-    Math.max(2, radius - 2 - ballObj.height * 0.016),
+    shadow.x,
+    shadow.y + 5,
+    Math.max(3, (radius + 1 - ballObj.height * 0.012) * depthScale),
+    Math.max(2, (radius - 2 - ballObj.height * 0.016) * depthScale * 0.8),
     0,
     0,
     Math.PI * 2
@@ -1847,9 +1926,10 @@ function drawBattedBall() {
   if (Array.isArray(ballObj.trail) && ballObj.trail.length > 0) {
     ballObj.trail.forEach((tp, index) => {
       const fade = (index + 1) / ballObj.trail.length;
+      const tpScreen = worldToScreen(tp.x, tp.y, 0);
       ctx.fillStyle = `rgba(255,255,255,${0.16 * fade})`;
       ctx.beginPath();
-      ctx.arc(tp.x, tp.y, radius * (0.6 * fade), 0, Math.PI * 2);
+      ctx.arc(tpScreen.x, tpScreen.y, radius * (0.6 * fade), 0, Math.PI * 2);
       ctx.fill();
     });
   }
@@ -1859,7 +1939,7 @@ function drawBattedBall() {
     ctx.lineWidth = 2;
     ctx.fillStyle = "#fffef2";
     ctx.beginPath();
-    ctx.arc(ballObj.x, ballObj.y, radius, 0, Math.PI * 2);
+    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     return;
@@ -1870,7 +1950,7 @@ function drawBattedBall() {
     ctx.lineWidth = 2;
     ctx.fillStyle = "#fffef2";
     ctx.beginPath();
-    ctx.arc(ballObj.x, ballObj.y, radius, 0, Math.PI * 2);
+    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     return;
@@ -1880,7 +1960,7 @@ function drawBattedBall() {
   ctx.lineWidth = 2;
   ctx.fillStyle = "#fffef2";
   ctx.beginPath();
-  ctx.arc(ballObj.x, ballObj.y, radius, 0, Math.PI * 2);
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 }
@@ -1895,24 +1975,17 @@ function drawPitchBall() {
       BALL_WARNINGS.add("pitch-draw");
     }
   }
-  const r = BALL_VISUAL_TUNING.pitchRadius;
-
-  if (Array.isArray(pitchBall.trail) && pitchBall.trail.length > 0) {
-    pitchBall.trail.forEach((tp, index) => {
-      const fade = (index + 1) / pitchBall.trail.length;
-      ctx.fillStyle = `rgba(180,230,255,${0.22 * fade})`;
-      ctx.beginPath();
-      ctx.arc(tp.x, tp.y, Math.max(2, r * 0.58 * fade), 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
+  const depthScale = scaleByY(pitchBall.y);
+  const r = BALL_VISUAL_TUNING.pitchRadius * clampValue(depthScale * 0.9, 0.72, 1.2);
+  const screen = worldToScreen(pitchBall.x, pitchBall.y, pitchBall.height * 0.35);
+  const shadow = worldToScreen(pitchBall.x, pitchBall.shadowY, 0);
 
   const shadowAlpha = clampValue(0.32 - (pitchBall.height / 180), 0.09, 0.32);
   ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
   ctx.beginPath();
   ctx.ellipse(
-    pitchBall.x,
-    pitchBall.shadowY + 4,
+    shadow.x,
+    shadow.y + 4,
     Math.max(4, r + 1 - pitchBall.height * 0.014),
     Math.max(2, r - 2 - pitchBall.height * 0.018),
     0,
@@ -1923,14 +1996,14 @@ function drawPitchBall() {
 
   ctx.fillStyle = "rgba(167, 232, 255, 0.32)";
   ctx.beginPath();
-  ctx.arc(pitchBall.x, pitchBall.y, r + 5, 0, Math.PI * 2);
+  ctx.arc(screen.x, screen.y, r + 5, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = "#23304a";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(pitchBall.x, pitchBall.y, r, 0, Math.PI * 2);
+  ctx.arc(screen.x, screen.y, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 }
@@ -1976,32 +2049,34 @@ function drawPitchTargetDebug() {
   ctx.save();
   ctx.strokeStyle = "rgba(240, 240, 255, 0.62)";
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
+  const zoneScreen = worldToScreen(zone.x, zone.y, 0);
+  ctx.strokeRect(zoneScreen.x, zoneScreen.y, zone.w, zone.h);
   ctx.fillStyle = "rgba(255, 214, 120, 0.95)";
   ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, 3.5, 0, Math.PI * 2);
+  const homeScreen = worldToScreen(FIELD.home.x, FIELD.home.y, 0);
+  ctx.arc(homeScreen.x, homeScreen.y, 3.5, 0, Math.PI * 2);
   ctx.fill();
-
-  if (!pitchBall.active) {
-    ctx.restore();
-    return;
+  if (pitchBall.active) {
+    ctx.strokeStyle = "rgba(173, 227, 255, 0.68)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    const pitchStart = worldToScreen(pitcher.x + 14, pitcher.y + 16, 0);
+    const plate = worldToScreen(pitchBall.plateX, pitchBall.plateY, 0);
+    const ballNow = worldToScreen(pitchBall.x, pitchBall.y, 0);
+    ctx.moveTo(pitchStart.x, pitchStart.y);
+    ctx.lineTo(plate.x, plate.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(173, 227, 255, 0.88)";
+    ctx.beginPath();
+    ctx.arc(plate.x, plate.y, 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(131, 255, 187, 0.95)";
+    ctx.beginPath();
+    ctx.arc(ballNow.x, ballNow.y, 3, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.strokeStyle = "rgba(173, 227, 255, 0.68)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(pitcher.x + 14, pitcher.y + 16);
-  ctx.lineTo(pitchBall.plateX, pitchBall.plateY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.strokeStyle = "rgba(173, 227, 255, 0.88)";
-  ctx.beginPath();
-  ctx.arc(pitchBall.plateX, pitchBall.plateY, 4, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = "rgba(131, 255, 187, 0.95)";
-  ctx.beginPath();
-  ctx.arc(pitchBall.x, pitchBall.y, 3, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
 
@@ -2022,21 +2097,7 @@ function drawBall() {
 
 function drawHitTrajectory() {
   if (!GAME.battedBall) return;
-  const ballObj = GAME.battedBall;
-  const life = Math.max(0, 1 - (ballObj.elapsed / 1.2));
-  const alpha = 0.32 * life;
-  ctx.save();
-  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-  ctx.lineWidth = 1.25;
-  ctx.beginPath();
-  const startX = ballObj.startX ?? ballObj.x;
-  const startY = ballObj.startY ?? ballObj.groundY ?? ballObj.y;
-  ctx.moveTo(startX, startY);
-  const shortX = startX + (ballObj.x - startX) * 0.3;
-  const shortY = startY + ((ballObj.groundY ?? ballObj.y) - startY) * 0.3;
-  ctx.lineTo(shortX, shortY);
-  ctx.stroke();
-  ctx.restore();
+  // Remove visible debug trajectory lines in clean gameplay mode.
 }
 
 function drawPlayCallout() {
@@ -2118,19 +2179,19 @@ function render() {
   const shake = GAME.cameraShake > 0 ? Math.sin(performance.now() * 0.1) * 6 : 0;
   ctx.save();
   clearCanvas();
-  ctx.translate(shake, 0);
+  ctx.translate(shake - (GAME.cameraX ?? 0), -(GAME.cameraY ?? 0));
 
   drawBackground();
   drawField();
   drawBasesAndLines();
-  drawStrikeZone();
+  // Hidden during gameplay by request (logic is still active).
   drawPitchTargetDebug();
   drawPlayers();
   drawBat();
   drawHitTrajectory();
   drawBall();
-  drawUI();
   ctx.restore();
+  drawUI();
 
   if (GAME.flashTime > 0) {
     ctx.fillStyle = "rgba(255,232,120,0.28)";
