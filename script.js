@@ -34,10 +34,10 @@ const finalScoreText = document.getElementById("finalScoreText");
 
 // Core geometry controls for field proportion/camera tuning.
 const FIELD_TUNING = {
-  homeX: 828,
-  homeY: 404,
-  baseSpacingX: 288,
-  baseSpacingY: 186,
+  homeX: 780,
+  homeY: 396,
+  baseSpacingX: 240,
+  baseSpacingY: 146,
   moundForwardOffsetX: -36,
   moundForwardOffsetY: -6,
   moundRadiusX: 92,
@@ -1466,6 +1466,21 @@ function drawPlayCallout() {
   ctx.restore();
 }
 
+function drawTrajectoryGuide() {
+  if (!GAME.battedBall) return;
+  const ballObj = GAME.battedBall;
+  const alpha = 0.2;
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 9]);
+  ctx.beginPath();
+  ctx.moveTo(ballObj.startX, ballObj.startY);
+  ctx.lineTo(ballObj.targetX, ballObj.targetY);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawPitchBall() {
   if (!pitchBall.active) return;
   ctx.fillStyle = "rgba(0,0,0,0.2)";
@@ -1540,12 +1555,14 @@ function render() {
   ctx.translate(shake, 0);
   drawField();
   drawRunnerDots();
-  drawFielders();
   drawPitcher();
+  drawFielders();
   drawBattedBall();
   drawBatter();
+  drawHitTrajectory();
   drawPitchBall();
   drawParticles();
+  drawPlayCallout();
   drawAimMeters();
   ctx.restore();
 
