@@ -1263,7 +1263,7 @@ function executeFieldedBallResult(fieldingRole, ballObj) {
   GAME.pendingPlay.result = infieldRole ? "grounderOut" : "single";
   GAME.pendingPlay.resolved = true;
   const throwText = infieldRole ? "GROUND BALL fielded. Throw to first..." : "BASE HIT. Relay throw to second...";
-  showPlayCallout("FIELD", "warn");
+  showPlayCallout(infieldRole ? "GROUND BALL" : "BASE HIT", infieldRole ? "warn" : "safe");
   setMessage(`${role.toUpperCase()} fielded it. ${throwText}`);
   GAME.battedBall = null;
   GAME.pitchReady = true;
