@@ -35,24 +35,22 @@ const finalScoreText = document.getElementById("finalScoreText");
 // Core geometry controls for field proportion/camera tuning.
 const FIELD_TUNING = {
   homeX: canvas.width * 0.5,
-  homeY: 476,
-  baseSpacingX: 196,
-  baseSpacingY: 122,
+  homeY: canvas.height * 0.82,
+  baseSpacingX: canvas.width * 0.22,
+  baseSpacingY: canvas.height * 0.20,
   moundForwardOffsetX: 0,
-  moundForwardOffsetY: -10,
-  moundRadiusX: 92,
-  moundRadiusY: 40,
-  wallRadius: 520,
-  warningTrackWidth: 28,
-  cameraZoom: 1.08
+  moundForwardOffsetY: 10,
+  moundRadiusX: 72,
+  moundRadiusY: 26,
+  wallRadius: canvas.height * 0.56,
+  warningTrackWidth: 20,
+  cameraZoom: 1
 };
 
 const LAYOUT = {
-  fieldOffsetX: 0,
-  fieldOffsetY: 0,
   fieldInsetTop: 52,
-  fieldInsetBottom: 78,
-  fieldInsetSide: 32
+  fieldInsetBottom: 76,
+  fieldInsetSide: 20
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -110,6 +108,20 @@ const FIELD = {
   foulTop: { x: canvas.width - 82, y: 84 },
   foulBottom: { x: 82, y: 84 }
 };
+
+function getFieldLayout() {
+  const width = GAME.width;
+  const height = GAME.height;
+  return {
+    home: { x: width * 0.5, y: height * 0.82 },
+    first: { x: width * 0.72, y: height * 0.62 },
+    second: { x: width * 0.5, y: height * 0.42 },
+    third: { x: width * 0.28, y: height * 0.62 },
+    mound: { x: width * 0.5, y: height * 0.64 },
+    foulTop: { x: width * 0.5 + (width * 0.72 - width * 0.5) * 1.55, y: height * 0.30 },
+    foulBottom: { x: width * 0.5 - (width * 0.5 - width * 0.28) * 1.55, y: height * 0.30 }
+  };
+}
 
 const BASE_KEYS = ["home", "first", "second", "third"];
 
@@ -283,17 +295,17 @@ function setupDefense() {
   const defenseTeam = GAME.teams[GAME.fieldingSide];
   const skin = ["#f8d2ad", "#c58b62", "#8b5b3f"];
   const hair = ["#1e1e1e", "#5d3414", "#704224"];
-  const rightInfieldX = (FIELD.first.x + FIELD.second.x) / 2 + 16;
-  const leftInfieldX = (FIELD.third.x + FIELD.second.x) / 2 + 16;
+  const rightInfieldX = (FIELD.first.x + FIELD.second.x) / 2 + 14;
+  const leftInfieldX = (FIELD.third.x + FIELD.second.x) / 2 - 14;
   const spots = [
-    { role: "catcher", x: FIELD.home.x + 16, y: FIELD.home.y - 24 },
-    { role: "first", x: FIELD.first.x + 16, y: FIELD.first.y - 20 },
-    { role: "second", x: rightInfieldX, y: (FIELD.first.y + FIELD.second.y) / 2 - 12 },
-    { role: "shortstop", x: leftInfieldX, y: (FIELD.third.y + FIELD.second.y) / 2 + 14 },
-    { role: "third", x: FIELD.third.x - 6, y: FIELD.third.y + 12 },
-    { role: "left", x: FIELD.second.x - 108, y: FIELD.third.y - 36 },
-    { role: "center", x: FIELD.second.x - 178, y: FIELD.second.y + 2 },
-    { role: "right", x: FIELD.second.x - 108, y: FIELD.first.y + 36 }
+    { role: "catcher", x: FIELD.home.x - 12, y: FIELD.home.y + 8 },
+    { role: "first", x: FIELD.first.x + 16, y: FIELD.first.y - 12 },
+    { role: "second", x: rightInfieldX, y: (FIELD.first.y + FIELD.second.y) / 2 - 6 },
+    { role: "shortstop", x: leftInfieldX, y: (FIELD.third.y + FIELD.second.y) / 2 - 2 },
+    { role: "third", x: FIELD.third.x - 24, y: FIELD.third.y - 10 },
+    { role: "left", x: FIELD.third.x - 76, y: FIELD.third.y - 132 },
+    { role: "center", x: FIELD.second.x - 16, y: FIELD.second.y - 146 },
+    { role: "right", x: FIELD.first.x + 76, y: FIELD.first.y - 132 }
   ];
 
   defensiveFielders.length = 0;
@@ -1106,14 +1118,6 @@ function update(dt) {
   }
 }
 
-function drawFairTerritoryMask() {
-  ctx.beginPath();
-  ctx.moveTo(FIELD.home.x, FIELD.home.y);
-  ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
-  ctx.arc(FIELD.home.x, FIELD.home.y, FIELD_TUNING.wallRadius - FIELD_TUNING.warningTrackWidth - 10, -2.58, 2.58);
-  ctx.closePath();
-}
-
 function drawField() {
   const left = LAYOUT.fieldInsetSide;
   const right = GAME.width - LAYOUT.fieldInsetSide;
@@ -1362,14 +1366,16 @@ function drawBatter() {
     ? 1 - batter.swingTime / batter.swingDuration
     : 0;
   const angle = batter.activeSwing
-    ? (-2.3 + swingProgress * 1.95)
-    : -2.05;
+    ? (-0.95 + swingProgress * 1.2)
+    : -0.62;
 
   ctx.save();
-  ctx.translate(batter.x + 6, batter.y + 17);
+  const handX = batter.x + 14;
+  const handY = batter.y + 13;
+  ctx.translate(handX, handY);
   ctx.rotate(angle);
   ctx.fillStyle = batter.batColor;
-  ctx.fillRect(-44, -3, 46, 6);
+  ctx.fillRect(-38, -3, 42, 6);
   ctx.restore();
 }
 
@@ -1452,17 +1458,20 @@ function drawPlayCallout() {
   ctx.restore();
 }
 
-function drawTrajectoryGuide() {
+function drawHitTrajectory() {
   if (!GAME.battedBall) return;
   const ballObj = GAME.battedBall;
-  const alpha = 0.2;
+  const life = Math.max(0, 1 - (ballObj.elapsed / ballObj.travelTime));
+  const alpha = 0.18 * life;
   ctx.save();
   ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([7, 9]);
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
   ctx.beginPath();
   ctx.moveTo(ballObj.startX, ballObj.startY);
-  ctx.lineTo(ballObj.targetX, ballObj.targetY);
+  const shortX = ballObj.startX + (ballObj.targetX - ballObj.startX) * 0.24;
+  const shortY = ballObj.startY + (ballObj.targetY - ballObj.startY) * 0.24;
+  ctx.lineTo(shortX, shortY);
   ctx.stroke();
   ctx.restore();
 }
@@ -1534,7 +1543,36 @@ function drawAimMeters() {
   ctx.fillRect(bx + 74 + GAME.swingAim * 34, by + 17, 3, 12);
 }
 
+function applyRenderGridLayout() {
+  const width = GAME.width;
+  const height = GAME.height;
+  FIELD.home.x = width * 0.5;
+  FIELD.home.y = height * 0.82;
+  FIELD.first.x = width * 0.72;
+  FIELD.first.y = height * 0.62;
+  FIELD.second.x = width * 0.5;
+  FIELD.second.y = height * 0.42;
+  FIELD.third.x = width * 0.28;
+  FIELD.third.y = height * 0.62;
+  FIELD.mound.x = width * 0.5;
+  FIELD.mound.y = height * 0.64;
+  FIELD.foulTop.x = width * 0.18;
+  FIELD.foulTop.y = height * 0.08;
+  FIELD.foulBottom.x = width * 0.82;
+  FIELD.foulBottom.y = height * 0.08;
+
+  batter.x = FIELD.home.x + 30;
+  batter.y = FIELD.home.y - 46;
+  pitcher.x = FIELD.mound.x - 10;
+  pitcher.y = FIELD.mound.y - 46;
+  if (!pitchBall.active) {
+    pitchBall.x = pitcher.x + 14;
+    pitchBall.y = pitcher.y + 16;
+  }
+}
+
 function render() {
+  applyRenderGridLayout();
   const shake = GAME.cameraShake > 0 ? Math.sin(performance.now() * 0.1) * 6 : 0;
   ctx.save();
   ctx.clearRect(0, 0, GAME.width, GAME.height);
