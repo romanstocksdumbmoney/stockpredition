@@ -347,6 +347,7 @@ const pitchBall = {
   state: "idle",
   swingAttempted: false,
   crossedZone: false,
+  pendingCall: null,
   x: pitcher.x + 16,
   y: pitcher.y + 18,
   startX: pitcher.x + 16,
@@ -523,6 +524,7 @@ function resetPitchBall() {
   pitchBall.state = "idle";
   pitchBall.swingAttempted = false;
   pitchBall.crossedZone = false;
+  pitchBall.pendingCall = null;
   pitchBall.x = pitcher.x + 16;
   pitchBall.y = pitcher.y + 18;
   pitchBall.vx = 0;
@@ -880,6 +882,7 @@ function spawnPitch() {
   pitchBall.state = "pitch";
   pitchBall.swingAttempted = false;
   pitchBall.crossedZone = false;
+  pitchBall.pendingCall = null;
   pitchBall.x = startX;
   pitchBall.y = startY;
   pitchBall.vx = dx / travelTime;
@@ -1091,15 +1094,28 @@ function handlePitchInput() {
   spawnPitch();
 }
 
-function resolveTakenPitch(sampleX = pitchBall.plateX, sampleY = pitchBall.plateY) {
+function queueTakenPitchCall(sampleX = pitchBall.plateX, sampleY = pitchBall.plateY) {
+  if (pitchBall.judged) return;
   pitchBall.judged = true;
   if (pitchBall.swingAttempted) {
+    pitchBall.pendingCall = "swing-miss";
+    return;
+  }
+  pitchBall.pendingCall = pitchInStrikeZone(sampleX, sampleY) ? "called-strike" : "ball";
+}
+
+function applyPendingPitchCall() {
+  const call = pitchBall.pendingCall;
+  pitchBall.pendingCall = null;
+  if (call === "swing-miss") {
     addStrike("Swing and miss.");
     return;
   }
-  if (pitchInStrikeZone(sampleX, sampleY)) {
+  if (call === "called-strike") {
     addStrike("Called strike.");
-  } else {
+    return;
+  }
+  if (call === "ball") {
     addBall("Ball.");
   }
 }
@@ -1446,7 +1462,8 @@ function update(dt) {
       }
     }
     pitchBall.elapsed += dt;
-    const t = Math.min(1, pitchBall.elapsed / Math.max(0.001, pitchBall.travelTime));
+    const rawT = pitchBall.elapsed / Math.max(0.001, pitchBall.travelTime);
+    const t = Math.min(1, rawT);
     const zoneCrossT = 0.76;
     if (t <= zoneCrossT) {
       const localT = t / zoneCrossT;
@@ -1475,16 +1492,23 @@ function update(dt) {
     GAME.debugInfo.ball = `${Math.round(pitchBall.x)}, ${Math.round(pitchBall.y)}`;
     GAME.debugInfo.ballHeight = `${Math.round(pitchBall.height)}`;
 
-    if (!pitchBall.crossedZone && t >= zoneCrossT) {
+    if (!pitchBall.crossedZone && rawT >= zoneCrossT) {
       pitchBall.crossedZone = true;
       if (!pitchBall.judged) {
-        resolveTakenPitch(pitchBall.plateX, pitchBall.plateY);
+        queueTakenPitchCall(pitchBall.plateX, pitchBall.plateY);
       }
     }
 
-    if (t >= 1.02 || pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
-      resetPitchBall();
-      GAME.pitchReady = true;
+    if (rawT >= 1.02 || pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
+      if (pitchBall.pendingCall) {
+        applyPendingPitchCall();
+      } else if (!pitchBall.judged) {
+        queueTakenPitchCall(pitchBall.plateX, pitchBall.plateY);
+        applyPendingPitchCall();
+      } else {
+        resetPitchBall();
+        GAME.pitchReady = true;
+      }
     }
   }
 
