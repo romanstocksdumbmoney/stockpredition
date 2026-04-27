@@ -57,6 +57,30 @@ const PITCH_DELAY_TUNING = {
   sideSwitch: 1.35
 };
 
+// Arcade-but-believable batted-ball physics tuning.
+const HIT_PHYSICS_TUNING = {
+  timingWindowPx: 78,
+  contactWindowPx: 56,
+  minExitVelocity: 300,
+  maxExitVelocity: 980,
+  gravity: 1750,
+  airDrag: 0.16,
+  groundFriction: 0.86
+};
+
+function clampValue(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function randomRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function normalizeVector(x, y) {
+  const len = Math.hypot(x, y) || 1;
+  return { x: x / len, y: y / len };
+}
+
 const FIELD = {
   home: { x: FIELD_TUNING.homeX, y: FIELD_TUNING.homeY },
   first: {
@@ -498,6 +522,84 @@ function registerHit(type) {
   if (call) showPlayCallout(call.text, call.outcome);
 }
 
+function calculateHitPhysics({ ballX, ballY }) {
+  const contactPointX = FIELD.home.x - 18;
+  const contactPointY = batter.y + 24;
+
+  // Timing quality: early > 0 (pulled/high), late < 0 (oppo/lower).
+  const timingOffset = ballX - contactPointX;
+  const timingNorm = clamp(timingOffset / HIT_PHYSICS_TUNING.timingWindow, -1, 1);
+  const timingQuality = 1 - Math.min(1, Math.abs(timingNorm));
+
+  // Contact point quality from where the bat meets the ball vertically.
+  // Top half contact => grounder tendency, bottom half => pop tendency.
+  const contactOffsetY = ballY - contactPointY;
+  const contactNorm = clamp(contactOffsetY / HIT_PHYSICS_TUNING.contactWindow, -1, 1);
+
+  let category = "line";
+  if (contactNorm <= -0.38) category = "grounder";
+  else if (contactNorm >= 0.62) category = "pop";
+  else if (Math.abs(contactNorm) <= 0.22 && timingQuality > 0.42) category = "line";
+  else if (contactNorm > 0.22) category = "fly";
+  else if (contactNorm < -0.22) category = "grounder";
+
+  // Launch angle ranges (arcade-believable by request).
+  let launchRange = HIT_PHYSICS_TUNING.launchAngles.line;
+  if (category === "grounder") launchRange = HIT_PHYSICS_TUNING.launchAngles.grounder;
+  if (category === "fly") launchRange = HIT_PHYSICS_TUNING.launchAngles.fly;
+  if (category === "pop") launchRange = HIT_PHYSICS_TUNING.launchAngles.pop;
+  let launchAngleDeg = randomRange(launchRange.min, launchRange.max);
+
+  // Timing nudges launch: early = slightly higher, late = slightly lower.
+  launchAngleDeg += timingNorm * 7 + randomRange(-2.2, 2.2);
+  launchAngleDeg = clamp(launchAngleDeg, -14, 72);
+
+  // Direction yaw controls pull/opposite spread.
+  const pullBase = -18;
+  const oppoBase = 18;
+  const timingYaw = timingNorm >= 0
+    ? pullBase * Math.abs(timingNorm)
+    : oppoBase * Math.abs(timingNorm);
+  const aimYaw = GAME.swingAim * 16;
+  const sprayYaw = randomRange(-8, 8);
+  const yawDeg = timingYaw + aimYaw + sprayYaw;
+
+  // Exit velocity from timing + contact quality.
+  const contactQuality = 1 - Math.min(1, Math.abs(contactNorm));
+  const rawQuality = clamp(
+    0.58 * timingQuality + 0.42 * contactQuality + randomRange(-0.08, 0.08),
+    0,
+    1
+  );
+  const exitVelocity = lerp(
+    HIT_PHYSICS_TUNING.exitVelocity.min,
+    HIT_PHYSICS_TUNING.exitVelocity.max,
+    rawQuality
+  );
+
+  // Build final direction vector in field plane.
+  const homeToSecondX = FIELD.second.x - FIELD.home.x;
+  const homeToSecondY = FIELD.second.y - FIELD.home.y;
+  const forward = normalize2D(homeToSecondX, homeToSecondY);
+  const yawRad = degToRad(yawDeg);
+  const directionVector = {
+    x: forward.x * Math.cos(yawRad) - forward.y * Math.sin(yawRad),
+    y: forward.x * Math.sin(yawRad) + forward.y * Math.cos(yawRad)
+  };
+
+  return {
+    timingNorm,
+    timingQuality,
+    contactNorm,
+    contactQuality,
+    quality: rawQuality,
+    category,
+    launchAngle: launchAngleDeg,
+    exitVelocity,
+    directionVector
+  };
+}
+
 function pitchInStrikeZone(y) {
   const top = batter.y - 4;
   const bottom = batter.y + 52;
@@ -538,7 +640,7 @@ function spawnPitch() {
   pitcher.windup = 0.18;
 }
 
-function launchBattedBall(type, flightTypeOverride) {
+function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
   const startX = FIELD.home.x - 14;
   const startY = batter.y + 22;
   let targetX = 500;
@@ -589,7 +691,29 @@ function launchBattedBall(type, flightTypeOverride) {
     flightType = "grounder";
   }
 
-  // Batter aim can push trajectory up/down the foul lines.
+  // If custom hit physics were provided, apply launch-angle / exit-velocity driven targets.
+  if (hitPhysics) {
+    const speedScale = normalizeInRange(hitPhysics.exitVelocity, HIT_PHYSICS_TUNING.minExitVelocity, HIT_PHYSICS_TUNING.maxExitVelocity);
+    const airFactor = Math.max(0, Math.sin(degreesToRadians(hitPhysics.launchAngle)));
+    const distance = lerp(170, 710, speedScale) + airFactor * 190;
+    const signedY = hitPhysics.directionVector.y * distance * 0.72;
+    const forwardX = distance * (0.62 + airFactor * 0.34);
+
+    targetX = startX - forwardX;
+    targetY = startY + signedY;
+    arc = Math.max(0, airFactor * distance * 0.32);
+    time = lerp(0.58, 1.26, speedScale) + airFactor * 0.14;
+    flightType = hitPhysics.flightType;
+
+    // Boost presentation on truly crushed high-angle balls.
+    if (hitPhysics.launchAngle >= 45 && speedScale > 0.72) {
+      GAME.cameraShake = 0.25;
+      GAME.flashTime = 0.08;
+    }
+  }
+
+  // Keep within visible/fair playable range.
+  targetX = Math.max(92, Math.min(GAME.width - 120, targetX));
   targetY = Math.max(56, Math.min(GAME.height - 20, targetY));
 
   GAME.battedBall = {
