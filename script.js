@@ -68,6 +68,34 @@ const HIT_PHYSICS_TUNING = {
   groundFriction: 0.86
 };
 
+const BALL_VISUAL_TUNING = {
+  pitchRadius: 7,
+  battedRadius: 7,
+  pitchTrailMax: 10,
+  battedTrailMax: 8
+};
+
+const PITCH_TUNING = {
+  speedMin: 255,
+  speedMax: 345,
+  curveStrength: 80
+};
+
+const FIELDING_AI_TUNING = {
+  gravity: 920,
+  grounderFriction: 0.89,
+  flyFriction: 0.93,
+  pickupRadius: 18,
+  airCatchRadius: 22,
+  throwDelay: 0.6
+};
+
+const DEBUG_STATE = {
+  enabled: false,
+  lastConsoleLog: 0,
+  consoleInterval: 0.75
+};
+
 function clampValue(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -175,10 +203,36 @@ function syncRenderLayout() {
   batter.y = FIELD.home.y - 46;
   pitcher.x = FIELD.mound.x - 10;
   pitcher.y = FIELD.mound.y - 46;
+  const zoneWidth = 52;
+  const zoneHeight = 70;
+  const zoneX = batter.x - 18;
+  const zoneY = batter.y - 10;
+  GAME.strikeZone = {
+    x: zoneX,
+    y: zoneY,
+    w: zoneWidth,
+    h: zoneHeight,
+    cx: zoneX + zoneWidth / 2,
+    cy: zoneY + zoneHeight / 2
+  };
   if (!pitchBall.active) {
     pitchBall.x = pitcher.x + 14;
     pitchBall.y = pitcher.y + 16;
+    pitchBall.targetX = GAME.strikeZone.cx;
+    pitchBall.targetY = GAME.strikeZone.cy;
   }
+}
+
+function getStrikeZoneBounds() {
+  if (GAME.strikeZone) return GAME.strikeZone;
+  return {
+    x: FIELD.home.x - 16,
+    y: FIELD.home.y - 54,
+    w: 52,
+    h: 70,
+    cx: FIELD.home.x + 10,
+    cy: FIELD.home.y - 19
+  };
 }
 
 const BASE_KEYS = ["home", "first", "second", "third"];
@@ -249,7 +303,17 @@ const GAME = {
   flashTime: 0,
   swingBuffer: 0,
   lastContactOffset: 0,
-  playCallout: null
+  playCallout: null,
+  strikeZone: null,
+  debugInfo: {
+    pitchTarget: "-",
+    strikeZone: "-",
+    ball: "-",
+    ballHeight: "-",
+    hitType: "-",
+    assignedFielder: "-",
+    fielderTarget: "-"
+  }
 };
 
 const batter = {
@@ -271,10 +335,22 @@ const pitchBall = {
   active: false,
   x: pitcher.x + 16,
   y: pitcher.y + 18,
+  startX: pitcher.x + 16,
+  startY: pitcher.y + 18,
+  controlX: pitcher.x + 16,
+  controlY: pitcher.y + 18,
   vx: 0,
   vy: 0,
   curve: 0,
-  judged: false
+  judged: false,
+  targetX: pitcher.x + 16,
+  targetY: pitcher.y + 18,
+  elapsed: 0,
+  travelTime: 0.55,
+  height: 0,
+  shadowY: pitcher.y + 18,
+  trail: [],
+  trailClock: 0
 };
 
 const input = {
@@ -378,6 +454,9 @@ function setupDefense() {
       homeY: spot.y,
       x: spot.x,
       y: spot.y,
+      targetX: spot.x,
+      targetY: spot.y,
+      state: "idle",
       speed: 160 + teamRating(defenseTeam, "fielding") * 130,
       skin: skin[index % skin.length],
       hair: hair[index % hair.length]
@@ -394,6 +473,13 @@ function resetPitchBall() {
   pitchBall.vy = 0;
   pitchBall.curve = 0;
   pitchBall.judged = false;
+  const zone = getStrikeZoneBounds();
+  pitchBall.targetX = zone.cx;
+  pitchBall.targetY = zone.cy;
+  pitchBall.elapsed = 0;
+  pitchBall.travelTime = 0.6;
+  pitchBall.trail.length = 0;
+  pitchBall.trailClock = 0;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.resetMin + Math.random() * PITCH_DELAY_TUNING.resetRange;
 }
@@ -607,8 +693,9 @@ function registerHit(type) {
 }
 
 function calculateHitPhysics({ ballX, ballY }) {
-  const contactPointX = FIELD.home.x - 18;
-  const contactPointY = batter.y + 24;
+  const zone = getStrikeZoneBounds();
+  const contactPointX = zone.cx;
+  const contactPointY = zone.cy;
 
   // Timing quality: early > 0 (pulled/high), late < 0 (oppo/lower).
   const timingOffset = ballX - contactPointX;
@@ -686,136 +773,132 @@ function calculateHitPhysics({ ballX, ballY }) {
 }
 
 function pitchInStrikeZone(y) {
-  const top = batter.y - 4;
-  const bottom = batter.y + 52;
-  return y >= top && y <= bottom;
+  const zone = getStrikeZoneBounds();
+  return y >= zone.y && y <= (zone.y + zone.h);
 }
 
 function spawnPitch() {
   const fieldingTeam = GAME.teams[GAME.fieldingSide];
   const pitchRating = teamRating(fieldingTeam, "pitching");
-  // Slightly slower pitch speeds make batting feel fairer.
-  const speed = 335 + pitchRating * 135 + Math.random() * 85;
+  const speed = lerp(PITCH_TUNING.speedMin, PITCH_TUNING.speedMax, pitchRating) + randomRange(-18, 30);
+  const zone = getStrikeZoneBounds();
   const strikeChance = 0.47 + pitchRating * 0.28;
   const strikesPitch = Math.random() < strikeChance;
 
   const startX = pitcher.x + 14;
   const startY = pitcher.y + 16;
-  const zoneTop = batter.y + 4;
-  const zoneBottom = batter.y + 46;
+  const zoneTop = zone.y + 4;
+  const zoneBottom = zone.y + zone.h - 4;
+  const zoneLeft = zone.x + 8;
+  const zoneRight = zone.x + zone.w - 8;
+  let targetX = zone.cx;
   let targetY;
   if (strikesPitch) {
+    targetX = randomRange(zoneLeft, zoneRight);
     targetY = zoneTop + Math.random() * (zoneBottom - zoneTop);
   } else if (Math.random() < 0.5) {
+    targetX = randomRange(zoneLeft - 18, zoneRight + 18);
     targetY = zoneTop - (12 + Math.random() * 26);
   } else {
+    targetX = randomRange(zoneLeft - 18, zoneRight + 18);
     targetY = zoneBottom + (12 + Math.random() * 26);
   }
+  const dx = targetX - startX;
+  const dy = targetY - startY;
+  const distance = Math.hypot(dx, dy);
+  const travelTime = Math.max(0.52, Math.min(0.95, distance / Math.max(220, speed)));
+  const curveAmount = randomRange(-PITCH_TUNING.curveStrength, PITCH_TUNING.curveStrength) + GAME.pitchAim * 40;
+  const midControlX = startX + dx * 0.52 + curveAmount;
+  const midControlY = startY + dy * 0.47 + randomRange(-18, 18);
 
-  const travelTime = Math.abs((FIELD.home.x - 16 - startX) / speed);
   pitchBall.active = true;
   pitchBall.x = startX;
   pitchBall.y = startY;
-  pitchBall.vx = speed;
-  pitchBall.vy = (targetY - startY) / travelTime;
-  pitchBall.curve = (Math.random() * 30 - 15) + GAME.pitchAim * 60;
+  pitchBall.vx = dx / travelTime;
+  pitchBall.vy = dy / travelTime;
+  pitchBall.curve = curveAmount;
   pitchBall.judged = false;
+  pitchBall.targetX = targetX;
+  pitchBall.targetY = targetY;
+  pitchBall.controlX = midControlX;
+  pitchBall.controlY = midControlY;
+  pitchBall.elapsed = 0;
+  pitchBall.travelTime = travelTime;
+  pitchBall.trail.length = 0;
+  pitchBall.trailClock = 0;
   GAME.pitchReady = false;
   GAME.pitchTimer = 0;
+  GAME.debugInfo.pitchTarget = `${Math.round(targetX)}, ${Math.round(targetY)}`;
+  GAME.debugInfo.strikeZone = `${Math.round(zone.x)},${Math.round(zone.y)} ${Math.round(zone.w)}x${Math.round(zone.h)}`;
   pitcher.windup = 0.18;
 }
 
 function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
-  const startX = FIELD.home.x - 14;
-  const startY = batter.y + 22;
-  let targetX = 500;
-  let targetY = 290;
-  let arc = 110;
-  let time = 0.9;
-
-  // Spray angle makes batted balls land in varied field zones.
-  const sprayLanes = [110, 185, 270, 355, 445, 525];
-  const laneCenter = sprayLanes[Math.floor(Math.random() * sprayLanes.length)];
-  const timingBias = Math.max(-1, Math.min(1, GAME.lastContactOffset / 34)) * 130;
-  const aimBias = GAME.swingAim * 170;
-  const laneBias = laneCenter + timingBias + aimBias + (Math.random() * 64 - 32);
-
-  let flightType = flightTypeOverride ?? "fly";
-
-  if (type === "homer") {
-    targetX = 120 + Math.random() * 180;
-    targetY = laneBias;
-    arc = 220 + Math.random() * 28;
-    time = 1.18 + Math.random() * 0.12;
-    flightType = "homer";
-    GAME.cameraShake = 0.35;
-    GAME.flashTime = 0.1;
-  } else if (type === "triple") {
-    targetX = 190 + Math.random() * 220;
-    targetY = laneBias;
-    arc = 170 + Math.random() * 22;
-    time = 1 + Math.random() * 0.12;
-    flightType = "fly";
-  } else if (type === "double") {
-    targetX = 270 + Math.random() * 250;
-    targetY = laneBias;
-    arc = 54 + Math.random() * 12;
-    time = 0.78 + Math.random() * 0.1;
-    flightType = "line";
-  } else if (type === "single") {
-    targetX = 350 + Math.random() * 250;
-    targetY = laneBias;
-    arc = 28 + Math.random() * 10;
-    time = 0.68 + Math.random() * 0.08;
-    flightType = "line";
-  } else if (type === "grounder") {
-    targetX = 450 + Math.random() * 210;
-    targetY = laneBias;
-    arc = 0;
-    time = 0.56 + Math.random() * 0.09;
-    flightType = "grounder";
+  const startX = FIELD.home.x - 12;
+  const startY = batter.y + 20;
+  let physics = hitPhysics;
+  if (!physics) {
+    const launchConfig = {
+      grounder: { angle: randomRange(-6, 8), exit: randomRange(320, 480), flightType: "grounder" },
+      single: { angle: randomRange(9, 20), exit: randomRange(420, 650), flightType: "line" },
+      double: { angle: randomRange(18, 30), exit: randomRange(560, 760), flightType: "line" },
+      triple: { angle: randomRange(28, 38), exit: randomRange(650, 850), flightType: "fly" },
+      homer: { angle: randomRange(34, 48), exit: randomRange(760, 980), flightType: "fly" }
+    };
+    const cfg = launchConfig[type] ?? launchConfig.single;
+    const forward = normalize2D(FIELD.second.x - FIELD.home.x, FIELD.second.y - FIELD.home.y);
+    const yaw = degreesToRadians(GAME.swingAim * 18 + randomRange(-10, 10));
+    physics = {
+      launchAngle: cfg.angle,
+      exitVelocity: cfg.exit,
+      directionVector: {
+        x: forward.x * Math.cos(yaw) - forward.y * Math.sin(yaw),
+        y: forward.x * Math.sin(yaw) + forward.y * Math.cos(yaw)
+      },
+      flightType: cfg.flightType
+    };
   }
-
-  // If custom hit physics were provided, apply launch-angle / exit-velocity driven targets.
-  if (hitPhysics) {
-    const speedScale = normalizeInRange(hitPhysics.exitVelocity, HIT_PHYSICS_TUNING.minExitVelocity, HIT_PHYSICS_TUNING.maxExitVelocity);
-    const airFactor = Math.max(0, Math.sin(degreesToRadians(hitPhysics.launchAngle)));
-    const distance = lerp(170, 710, speedScale) + airFactor * 190;
-    const signedY = hitPhysics.directionVector.y * distance * 0.72;
-    const forwardX = distance * (0.62 + airFactor * 0.34);
-
-    targetX = startX - forwardX;
-    targetY = startY + signedY;
-    arc = Math.max(0, airFactor * distance * 0.32);
-    time = lerp(0.58, 1.26, speedScale) + airFactor * 0.14;
-    flightType = hitPhysics.flightType;
-
-    // Boost presentation on truly crushed high-angle balls.
-    if (hitPhysics.launchAngle >= 45 && speedScale > 0.72) {
-      GAME.cameraShake = 0.25;
-      GAME.flashTime = 0.08;
-    }
-  }
-
-  // Keep within visible/fair playable range.
-  targetX = Math.max(92, Math.min(GAME.width - 120, targetX));
-  targetY = Math.max(56, Math.min(GAME.height - 20, targetY));
+  const speedScale = normalizeInRange(physics.exitVelocity, HIT_PHYSICS_TUNING.minExitVelocity, HIT_PHYSICS_TUNING.maxExitVelocity);
+  const launchRad = degreesToRadians(physics.launchAngle);
+  const horizontalSpeed = lerp(260, 640, speedScale) * Math.cos(launchRad);
+  const verticalSpeed = lerp(220, 700, speedScale) * Math.sin(launchRad);
+  const flightType = flightTypeOverride ?? physics.flightType ?? (physics.launchAngle > 48 ? "pop" : "fly");
 
   GAME.battedBall = {
     x: startX,
     y: startY,
     startX,
     startY,
-    targetX,
-    targetY,
+    z: 4,
+    groundY: startY,
+    height: 4,
+    vx: physics.directionVector.x * horizontalSpeed,
+    vy: physics.directionVector.y * horizontalSpeed,
+    vz: verticalSpeed,
     elapsed: 0,
-    travelTime: time,
-    arcHeight: arc,
+    travelTime: 1.55,
+    launchAngle: physics.launchAngle,
+    exitVelocity: physics.exitVelocity,
+    flightType,
     type,
-    flightType
+    landed: false,
+    fielded: false,
+    fieldedBy: null,
+    trail: []
   };
 
-  GAME.pendingPlay = { resolved: false, deadline: time + 0.45, elapsed: 0, result: type };
+  GAME.pendingPlay = {
+    resolved: false,
+    elapsed: 0,
+    result: type,
+    assignedFielder: -1,
+    targetBase: null,
+    throwTimer: 0,
+    catchAttempted: false
+  };
+  createBurst(startX, startY, "#ffffff", 10);
+  showPlayCallout(type === "homer" ? "CRACK!" : "IN PLAY", "info");
+  GAME.debugInfo.hitType = `${type}/${flightType}`;
 }
 
 function resolveSwing(ballX, ballY) {
@@ -823,7 +906,7 @@ function resolveSwing(ballX, ballY) {
   const contact = teamRating(battingTeam, "contact");
   const power = teamRating(battingTeam, "power");
 
-  const contactPoint = FIELD.home.x - 18;
+  const contactPoint = getStrikeZoneBounds().cx;
   const dx = Math.abs(ballX - contactPoint);
   const dy = Math.abs(ballY - (batter.y + 24));
   GAME.lastContactOffset = ballX - contactPoint;
@@ -836,7 +919,8 @@ function resolveSwing(ballX, ballY) {
   if (dx <= perfectWindow && dy <= 20 + contact * 8) {
     const big = Math.random() < 0.68 + power * 0.25;
     const hitType = big ? "homer" : (Math.random() < 0.45 ? "triple" : "double");
-    launchBattedBall(hitType);
+    const hitPhysics = calculateHitPhysics({ ballX, ballY });
+    launchBattedBall(hitType, hitPhysics);
     registerHit(hitType);
     createBurst(ballX, ballY, "#ffe27a", 14);
     resetPitchBall();
@@ -844,18 +928,19 @@ function resolveSwing(ballX, ballY) {
   }
 
   if (dx <= goodWindow && dy <= 42 + contact * 16) {
+    const hitPhysics = calculateHitPhysics({ ballX, ballY });
     const outcomeRoll = Math.random();
     if (outcomeRoll < 0.08 + power * 0.18) {
-      launchBattedBall("homer");
+      launchBattedBall("homer", hitPhysics);
       registerHit("homer");
     } else if (outcomeRoll < 0.22 + power * 0.3) {
-      launchBattedBall("triple");
+      launchBattedBall("triple", hitPhysics);
       registerHit("triple");
     } else if (outcomeRoll < 0.54 + power * 0.24) {
-      launchBattedBall("double");
+      launchBattedBall("double", hitPhysics);
       registerHit("double");
     } else {
-      launchBattedBall("single");
+      launchBattedBall("single", hitPhysics);
       registerHit("single");
     }
     createBurst(ballX, ballY, "#8fffc8", 10);
@@ -865,15 +950,19 @@ function resolveSwing(ballX, ballY) {
 
   const weakRoll = Math.random();
   if (weakRoll < 0.4) {
-    launchBattedBall("grounder");
-    GAME.pendingPlay.result = Math.random() < (0.45 + contact * 0.25) ? "grounderSafe" : "grounderOut";
+    const hitPhysics = calculateHitPhysics({ ballX, ballY });
+    hitPhysics.flightType = "grounder";
+    hitPhysics.launchAngle = randomRange(-8, 6);
+    launchBattedBall("grounder", hitPhysics, "grounder");
+    GAME.pendingPlay.result = "grounder";
     setMessage("Weak grounder in play...");
     createBurst(ballX, ballY, "#eadfbe", 8);
     resetPitchBall();
     return;
   }
   if (weakRoll < 0.7) {
-    launchBattedBall("single");
+    const hitPhysics = calculateHitPhysics({ ballX, ballY });
+    launchBattedBall("single", hitPhysics);
     registerHit("single");
     createBurst(ballX, ballY, "#c6ffd8", 8);
     resetPitchBall();
@@ -892,7 +981,8 @@ function handleSwingInput() {
   batter.activeSwing = true;
   batter.swingTime = batter.swingDuration;
   if (!pitchBall.active || pitchBall.judged) return;
-  const dx = Math.abs(pitchBall.x - (FIELD.home.x - 18));
+  const zone = getStrikeZoneBounds();
+  const dx = Math.abs(pitchBall.x - zone.cx);
   if (dx <= 64) {
     pitchBall.judged = true;
     resolveSwing(pitchBall.x, pitchBall.y);
@@ -949,111 +1039,214 @@ function updateFieldingInput(dt) {
   }
 }
 
-function chooseNearestFielder(x, y) {
-  let best = 1;
-  let dist = Number.POSITIVE_INFINITY;
-  for (let i = 1; i < defensiveFielders.length; i += 1) {
-    const f = defensiveFielders[i];
-    const d = (f.x - x) ** 2 + (f.y - y) ** 2;
-    if (d < dist) {
-      dist = d;
-      best = i;
+function getRoleHomeTarget(fielder, ballObj = null) {
+  if (!ballObj) return { x: fielder.homeX, y: fielder.homeY };
+  const role = fielder.role;
+  if (role === "first" && ballObj.flightType === "grounder") {
+    return { x: FIELD.first.x + 10, y: FIELD.first.y - 10 };
+  }
+  if (role === "catcher") {
+    if ((ballObj.groundY ?? ballObj.y) > FIELD.home.y + 8) {
+      return { x: ballObj.x, y: ballObj.groundY ?? ballObj.y };
+    }
+    return { x: fielder.homeX, y: fielder.homeY };
+  }
+  if (role === "pitcher") {
+    return { x: FIELD.mound.x - 8, y: FIELD.mound.y - 12 };
+  }
+  if (["left", "center", "right"].includes(role)) {
+    const inOutfield = (ballObj.groundY ?? ballObj.y) < FIELD.second.y - 20;
+    if (inOutfield) {
+      return { x: ballObj.x, y: ballObj.groundY ?? ballObj.y };
     }
   }
-  return best;
+  return { x: fielder.homeX, y: fielder.homeY };
 }
 
-function nearestBaseKeyFromFielder(fielder) {
-  const keys = ["home", "first", "second", "third"];
-  let winner = "first";
-  let dist = Number.POSITIVE_INFINITY;
-  keys.forEach((key) => {
-    const b = FIELD[key];
-    const d = (b.x - fielder.x) ** 2 + (b.y - fielder.y) ** 2;
-    if (d < dist) {
-      dist = d;
-      winner = key;
+function findAssignedFielderForBall(ballObj) {
+  const landingY = ballObj.groundY ?? ballObj.y;
+  let winner = 0;
+  let winnerDist = Number.POSITIVE_INFINITY;
+  defensiveFielders.forEach((fielder, idx) => {
+    const roleTarget = getRoleHomeTarget(fielder, ballObj);
+    const roleBias = (idx === 0 ? 1.08 : 1);
+    const d = Math.hypot(roleTarget.x - ballObj.x, roleTarget.y - landingY) * roleBias;
+    if (d < winnerDist) {
+      winnerDist = d;
+      winner = idx;
     }
   });
   return winner;
 }
 
-function resolveThrow(baseKey) {
+function executeFieldedBallResult(fieldingRole, ballObj) {
   if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
-  const defenseTeam = GAME.teams[GAME.fieldingSide];
-  const fieldQuality = teamRating(defenseTeam, "fielding");
-
-  // Most non-grounder hits should stay hits. Throws are only decisive on true
-  // infield grounder-out plays, which improves perceived hit fairness.
-  const isGrounderPlay = GAME.pendingPlay.result === "grounderOut" || GAME.pendingPlay.result === "grounderSafe";
-  if (!isGrounderPlay) {
+  const role = fieldingRole ?? "fielder";
+  const isAirCatch = !ballObj.landed && ballObj.height > 8;
+  if (isAirCatch) {
     GAME.pendingPlay.resolved = true;
-    showPlayCallout("SAFE", "safe");
-    setMessage(`Throw to ${baseKey}. Too late, runner is safe.`);
+    showPlayCallout("OUT", "out");
+    addOut(`${role.toUpperCase()} made the catch.`);
+    GAME.battedBall = null;
     return;
   }
 
-  const throwChance = 0.46 + fieldQuality * 0.26;
+  const infieldRole = ["pitcher", "catcher", "first", "second", "shortstop", "third"].includes(role);
+  GAME.pendingPlay.targetBase = infieldRole ? "first" : "second";
+  GAME.pendingPlay.throwTimer = FIELDING_AI_TUNING.throwDelay;
+  GAME.pendingPlay.result = infieldRole ? "grounderOut" : "single";
+  GAME.pendingPlay.resolved = true;
+  const throwText = infieldRole ? "Throw to first..." : "Relay throw to second...";
+  showPlayCallout("FIELD", "warn");
+  setMessage(`${role.toUpperCase()} fielded it. ${throwText}`);
+  GAME.battedBall = null;
+  GAME.pitchReady = true;
+  GAME.pitchTimer = 0;
+  GAME.nextPitchDelay = PITCH_DELAY_TUNING.afterPlayMin + Math.random() * PITCH_DELAY_TUNING.afterPlayRange;
+}
+
+function updateDebugState(dt) {
+  const strike = getStrikeZoneBounds();
+  GAME.debugInfo.strikeZone = `${Math.round(strike.x)},${Math.round(strike.y)} ${Math.round(strike.w)}x${Math.round(strike.h)}`;
+  if (pitchBall.active) {
+    GAME.debugInfo.pitchTarget = `${Math.round(pitchBall.targetX)}, ${Math.round(pitchBall.targetY)}`;
+    GAME.debugInfo.ball = `${Math.round(pitchBall.x)}, ${Math.round(pitchBall.y)}`;
+    GAME.debugInfo.ballHeight = `${Math.round(pitchBall.height ?? 0)}`;
+  } else if (GAME.battedBall) {
+    GAME.debugInfo.ball = `${Math.round(GAME.battedBall.x)}, ${Math.round(GAME.battedBall.y)}`;
+    GAME.debugInfo.ballHeight = `${Math.round(GAME.battedBall.height ?? GAME.battedBall.z ?? 0)}`;
+  } else {
+    GAME.debugInfo.ball = "-";
+    GAME.debugInfo.ballHeight = "-";
+  }
+  const assigned = GAME.pendingPlay?.assignedFielder ?? -1;
+  GAME.debugInfo.assignedFielder = assigned >= 0 ? `${assigned}:${defensiveFielders[assigned]?.role ?? "?"}` : "-";
+  if (assigned >= 0 && defensiveFielders[assigned]) {
+    const f = defensiveFielders[assigned];
+    GAME.debugInfo.fielderTarget = `${Math.round(f.targetX ?? f.homeX)}, ${Math.round(f.targetY ?? f.homeY)}`;
+  } else {
+    GAME.debugInfo.fielderTarget = "-";
+  }
+
+  if (DEBUG_STATE.enabled) {
+    DEBUG_STATE.lastConsoleLog += dt;
+    if (DEBUG_STATE.lastConsoleLog >= DEBUG_STATE.consoleInterval) {
+      DEBUG_STATE.lastConsoleLog = 0;
+      console.log("[debug]", {
+        pitchTarget: GAME.debugInfo.pitchTarget,
+        strikeZone: GAME.debugInfo.strikeZone,
+        ball: GAME.debugInfo.ball,
+        ballHeight: GAME.debugInfo.ballHeight,
+        hitType: GAME.debugInfo.hitType,
+        assignedFielder: GAME.debugInfo.assignedFielder,
+        fielderTarget: GAME.debugInfo.fielderTarget
+      });
+    }
+  } else {
+    DEBUG_STATE.lastConsoleLog = 0;
+  }
+}
+
+function resolveThrow(baseKey) {
+  if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
+  const result = GAME.pendingPlay.result;
+  if (!["grounderOut", "single", "double", "triple"].includes(result)) return;
+  const defenseTeam = GAME.teams[GAME.fieldingSide];
+  const fieldQuality = teamRating(defenseTeam, "fielding");
+  const throwChance = 0.44 + fieldQuality * 0.3;
   const success = Math.random() < throwChance;
+
   if (!success) {
     GAME.pendingPlay.resolved = true;
     showPlayCallout("SAFE", "safe");
-    setMessage("Throw missed! Safe on the play.");
+    setMessage(`Throw to ${baseKey} skipped wide. Safe.`);
     return;
   }
 
-  if (GAME.pendingPlay.result === "grounderOut") {
+  if (result === "grounderOut") {
     GAME.pendingPlay.resolved = true;
     showPlayCallout("OUT", "out");
     addOut(`Out at ${baseKey}!`);
     return;
   }
 
-  if (GAME.pendingPlay.result === "grounderSafe") {
-    GAME.pendingPlay.resolved = true;
-    showPlayCallout("SAFE", "safe");
-    setMessage(`Infield single. Throw to ${baseKey} is late.`);
-    return;
-  }
-
   GAME.pendingPlay.resolved = true;
   showPlayCallout("SAFE", "safe");
-  setMessage(`Throw to ${baseKey}. Play continues safe.`);
+  setMessage(`Throw to ${baseKey}. Runner beats it.`);
 }
 
 function updateBattedBall(dt) {
   if (!GAME.battedBall) return;
   const ballObj = GAME.battedBall;
   ballObj.elapsed += dt;
-  const t = Math.min(1, ballObj.elapsed / ballObj.travelTime);
-  ballObj.x = ballObj.startX + (ballObj.targetX - ballObj.startX) * t;
-  const baseY = ballObj.startY + (ballObj.targetY - ballObj.startY) * t;
-  if (ballObj.flightType === "grounder") {
-    // Keep grounders visibly low with a tiny bounce.
-    const bounce = Math.sin(t * Math.PI * 4) * Math.max(0, 3 * (1 - t));
-    ballObj.y = baseY - bounce;
-  } else if (ballObj.flightType === "line") {
-    // Line drives stay flatter than fly balls.
-    ballObj.y = baseY - Math.sin(t * Math.PI) * (ballObj.arcHeight * 0.55);
-  } else {
-    ballObj.y = baseY - Math.sin(t * Math.PI) * ballObj.arcHeight;
+
+  if (ballObj.trailClock === undefined) ballObj.trailClock = 0;
+  ballObj.trailClock += dt;
+  if (ballObj.trailClock >= 0.04) {
+    ballObj.trailClock = 0;
+    if (!Array.isArray(ballObj.trail)) ballObj.trail = [];
+    ballObj.trail.push({ x: ballObj.x, y: ballObj.y });
+    if (ballObj.trail.length > BALL_VISUAL_TUNING.battedTrailMax) ballObj.trail.shift();
   }
 
-  if (GAME.pendingPlay && !GAME.pendingPlay.resolved) {
-    GAME.pendingPlay.elapsed += dt;
-    if (GAME.pendingPlay.elapsed >= GAME.pendingPlay.deadline) {
-      GAME.pendingPlay.resolved = true;
-      if (GAME.pendingPlay.result === "grounderOut") {
-        showPlayCallout("SAFE", "safe");
-        setMessage("No throw made. Infield single!");
+  ballObj.x += ballObj.vx * dt;
+  ballObj.groundY += ballObj.vy * dt;
+  ballObj.vx *= 0.996;
+  ballObj.vy *= 0.996;
+
+  if (!ballObj.landed || ballObj.vz > 0) {
+    ballObj.vz -= FIELDING_AI_TUNING.gravity * dt;
+    ballObj.height += ballObj.vz * dt;
+    if (ballObj.height <= 0) {
+      ballObj.height = 0;
+      ballObj.landed = true;
+      if (ballObj.flightType === "grounder") {
+        ballObj.vx *= 0.92;
+        ballObj.vy *= 0.92;
+      } else {
+        ballObj.vx *= 0.84;
+        ballObj.vy *= 0.84;
+      }
+    }
+  } else {
+    const friction = ballObj.flightType === "grounder"
+      ? FIELDING_AI_TUNING.grounderFriction
+      : FIELDING_AI_TUNING.flyFriction;
+    ballObj.vx *= friction;
+    ballObj.vy *= friction;
+  }
+
+  ballObj.y = ballObj.groundY - ballObj.height;
+  GAME.debugInfo.ball = `${Math.round(ballObj.x)}, ${Math.round(ballObj.y)}`;
+  GAME.debugInfo.ballHeight = `${Math.round(ballObj.height)}`;
+
+  if (GAME.pendingPlay && !GAME.pendingPlay.resolved && GAME.pendingPlay.assignedFielder < 0) {
+    GAME.pendingPlay.assignedFielder = findAssignedFielderForBall(ballObj);
+    GAME.controlledFielder = GAME.pendingPlay.assignedFielder;
+  }
+
+  if (GAME.pendingPlay && GAME.pendingPlay.assignedFielder >= 0 && !ballObj.fielded) {
+    const fielder = defensiveFielders[GAME.pendingPlay.assignedFielder];
+    if (fielder) {
+      const dist = Math.hypot(fielder.x - ballObj.x, fielder.y - ballObj.groundY);
+      const catchRadius = (!ballObj.landed && ballObj.height > 10)
+        ? FIELDING_AI_TUNING.airCatchRadius
+        : FIELDING_AI_TUNING.pickupRadius;
+      if (dist <= catchRadius) {
+        ballObj.fielded = true;
+        ballObj.fieldedBy = GAME.pendingPlay.assignedFielder;
+        executeFieldedBallResult(fielder.role, ballObj);
       }
     }
   }
 
-  if (t >= 1) {
-    const nearest = chooseNearestFielder(ballObj.targetX, ballObj.targetY);
-    GAME.controlledFielder = nearest;
-    createBurst(ballObj.targetX, ballObj.targetY, "#d8f3ff", 7);
+  const movingSpeed = Math.hypot(ballObj.vx, ballObj.vy) + Math.abs(ballObj.vz);
+  if (!ballObj.fielded && ballObj.landed && movingSpeed < 18) {
+    if (GAME.pendingPlay && !GAME.pendingPlay.resolved) {
+      GAME.pendingPlay.resolved = true;
+      showPlayCallout("SAFE", "safe");
+      setMessage("Ball gets through for a hit.");
+    }
     GAME.battedBall = null;
     GAME.pitchReady = true;
     GAME.pitchTimer = 0;
@@ -1064,58 +1257,32 @@ function updateBattedBall(dt) {
 function updateFielders(dt) {
   const defenseTeam = GAME.teams[GAME.fieldingSide];
   const fieldReaction = teamRating(defenseTeam, "fielding");
+  const ballObj = GAME.battedBall;
   defensiveFielders.forEach((f, idx) => {
-    let tx = f.homeX;
-    let ty = f.homeY;
-    if (GAME.battedBall && idx !== GAME.controlledFielder) {
-      const progress = Math.min(1, GAME.battedBall.elapsed / GAME.battedBall.travelTime);
-      const isAirBall = GAME.battedBall.flightType === "fly" || GAME.battedBall.flightType === "homer";
-      // Delay convergence on deep air balls so every play doesn't look auto-caught.
-      if (!isAirBall || progress > 0.82) {
-        tx = GAME.battedBall.targetX - 8 + (isAirBall ? 14 : 0);
-        ty = GAME.battedBall.targetY + 16 + (isAirBall ? 8 : 0);
-      }
+    let target = getRoleHomeTarget(f, ballObj);
+    if (ballObj && GAME.pendingPlay?.assignedFielder === idx && !ballObj.fielded) {
+      target = { x: ballObj.x, y: ballObj.groundY ?? ballObj.y };
+      f.state = "chase";
+    } else if (ballObj) {
+      f.state = "backup";
+    } else {
+      f.state = "idle";
     }
-    const dx = tx - f.x;
-    const dy = ty - f.y;
+    f.targetX = target.x;
+    f.targetY = target.y;
+    const dx = target.x - f.x;
+    const dy = target.y - f.y;
     const d = Math.hypot(dx, dy);
     if (d < 0.2) return;
     const step = (f.speed * (0.62 + fieldReaction * 0.54)) * dt;
     if (d <= step) {
-      f.x = tx;
-      f.y = ty;
+      f.x = target.x;
+      f.y = target.y;
       return;
     }
     f.x += (dx / d) * step;
     f.y += (dy / d) * step;
   });
-}
-
-function createBurst(x, y, color, count) {
-  for (let i = 0; i < count; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 60 + Math.random() * 230;
-    GAME.particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 0.35 + Math.random() * 0.35,
-      color,
-      size: 2 + Math.random() * 3
-    });
-  }
-}
-
-function updateParticles(dt) {
-  for (let i = GAME.particles.length - 1; i >= 0; i -= 1) {
-    const p = GAME.particles[i];
-    p.life -= dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    p.vy += 900 * dt * 0.2;
-    if (p.life <= 0) GAME.particles.splice(i, 1);
-  }
 }
 
 function update(dt) {
@@ -1158,12 +1325,26 @@ function update(dt) {
   }
 
   if (pitchBall.active) {
-    pitchBall.x += pitchBall.vx * dt;
-    pitchBall.y += pitchBall.vy * dt;
-    pitchBall.vy += pitchBall.curve * dt;
+    pitchBall.elapsed += dt;
+    const t = Math.min(1, pitchBall.elapsed / Math.max(0.001, pitchBall.travelTime));
+    const inv = 1 - t;
+    pitchBall.x = inv * inv * (pitcher.x + 14) + 2 * inv * t * pitchBall.controlX + t * t * pitchBall.targetX;
+    pitchBall.y = inv * inv * (pitcher.y + 16) + 2 * inv * t * pitchBall.controlY + t * t * pitchBall.targetY;
+    pitchBall.shadowY = pitchBall.targetY;
+    pitchBall.height = Math.sin(t * Math.PI) * 16;
+    pitchBall.trailClock += dt;
+    if (pitchBall.trailClock >= 0.03) {
+      pitchBall.trailClock = 0;
+      pitchBall.trail.push({ x: pitchBall.x, y: pitchBall.y });
+      if (pitchBall.trail.length > BALL_VISUAL_TUNING.pitchTrailMax) {
+        pitchBall.trail.shift();
+      }
+    }
+    GAME.debugInfo.ball = `${Math.round(pitchBall.x)}, ${Math.round(pitchBall.y)}`;
+    GAME.debugInfo.ballHeight = `${Math.round(pitchBall.height)}`;
 
     if (GAME.swingBuffer > 0 && !pitchBall.judged) {
-      const dx = Math.abs(pitchBall.x - (FIELD.home.x - 18));
+      const dx = Math.abs(pitchBall.x - getStrikeZoneBounds().cx);
       if (dx <= 18) {
         pitchBall.judged = true;
         GAME.swingBuffer = 0;
@@ -1171,16 +1352,17 @@ function update(dt) {
       }
     }
 
-    // Ball reaches plate.
-    if (pitchBall.x >= FIELD.home.x + 8 && !pitchBall.judged) {
+    if ((t >= 0.98 || pitchBall.x >= pitchBall.targetX - 1) && !pitchBall.judged) {
       resolveTakenPitch();
     }
 
-    if (pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
+    if (t >= 1.08 || pitchBall.x > GAME.width + 40 || pitchBall.y < -40 || pitchBall.y > GAME.height + 40) {
       resetPitchBall();
       GAME.pitchReady = true;
     }
   }
+
+  updateDebugState(dt);
 }
 
 function drawBackground() {
@@ -1338,6 +1520,17 @@ function drawBatterBox(homeX, homeY) {
   ctx.strokeRect(homeX - 90, homeY - 40, 70, 66);
 }
 
+function drawStrikeZone() {
+  const zone = getStrikeZoneBounds();
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 2;
+  ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+  ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
+  ctx.restore();
+}
+
 function drawRunnerDots() {
   const basePoints = [FIELD.first, FIELD.second, FIELD.third];
   basePoints.forEach((point, idx) => {
@@ -1476,48 +1669,150 @@ function drawBattedBall() {
   if (!GAME.battedBall) return;
   const ballObj = GAME.battedBall;
   const flight = ballObj.flightType ?? "fly";
+  const radius = BALL_VISUAL_TUNING.battedRadius;
+  const shadowAlpha = clampValue(0.34 - (ballObj.height / 260), 0.08, 0.34);
+
+  ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    ballObj.x,
+    ballObj.groundY + 5,
+    Math.max(4, radius + 1 - ballObj.height * 0.012),
+    Math.max(2, radius - 2 - ballObj.height * 0.016),
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  if (Array.isArray(ballObj.trail) && ballObj.trail.length > 0) {
+    ballObj.trail.forEach((tp, index) => {
+      const fade = (index + 1) / ballObj.trail.length;
+      ctx.fillStyle = `rgba(255,255,255,${0.16 * fade})`;
+      ctx.beginPath();
+      ctx.arc(tp.x, tp.y, radius * (0.6 * fade), 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
 
   if (flight === "grounder") {
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
-    ctx.fillRect(ballObj.x - 6, ballObj.y + 4, 12, 4);
-    ctx.fillStyle = "#fff8d9";
+    ctx.strokeStyle = "#25334f";
+    ctx.lineWidth = 2;
+    ctx.fillStyle = "#fffef2";
     ctx.beginPath();
-    ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
+    ctx.arc(ballObj.x, ballObj.y, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
     return;
   }
 
   if (flight === "line") {
-    ctx.fillStyle = "rgba(0,0,0,0.2)";
-    ctx.fillRect(ballObj.x - 5, ballObj.y + 7, 10, 4);
-    ctx.fillStyle = "#fff8d9";
+    ctx.strokeStyle = "#25334f";
+    ctx.lineWidth = 2;
+    ctx.fillStyle = "#fffef2";
     ctx.beginPath();
-    ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
+    ctx.arc(ballObj.x, ballObj.y, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
     return;
   }
 
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.fillRect(ballObj.x - 4, ballObj.y + 8, 8, 4);
-  ctx.fillStyle = "#fff9db";
+  ctx.strokeStyle = "#25334f";
+  ctx.lineWidth = 2;
+  ctx.fillStyle = "#fffef2";
   ctx.beginPath();
-  ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
+  ctx.arc(ballObj.x, ballObj.y, radius, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 }
 
 function drawPitchBall() {
   if (!pitchBall.active) return;
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
-  ctx.fillRect(pitchBall.x - 3, pitchBall.y + 8, 8, 4);
-  ctx.fillStyle = "#ffffff";
+  const r = BALL_VISUAL_TUNING.pitchRadius;
+
+  if (Array.isArray(pitchBall.trail) && pitchBall.trail.length > 0) {
+    pitchBall.trail.forEach((tp, index) => {
+      const fade = (index + 1) / pitchBall.trail.length;
+      ctx.fillStyle = `rgba(180,230,255,${0.22 * fade})`;
+      ctx.beginPath();
+      ctx.arc(tp.x, tp.y, Math.max(2, r * 0.58 * fade), 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  const shadowAlpha = clampValue(0.32 - (pitchBall.height / 180), 0.09, 0.32);
+  ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
   ctx.beginPath();
-  ctx.arc(pitchBall.x, pitchBall.y, 6, 0, Math.PI * 2);
+  ctx.ellipse(
+    pitchBall.x,
+    pitchBall.shadowY + 4,
+    Math.max(4, r + 1 - pitchBall.height * 0.014),
+    Math.max(2, r - 2 - pitchBall.height * 0.018),
+    0,
+    0,
+    Math.PI * 2
+  );
   ctx.fill();
-  ctx.strokeStyle = "#ff6868";
+
+  ctx.fillStyle = "rgba(167, 232, 255, 0.32)";
+  ctx.beginPath();
+  ctx.arc(pitchBall.x, pitchBall.y, r + 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#23304a";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(pitchBall.x, pitchBall.y, 4, 0.4, 2.6);
+  ctx.arc(pitchBall.x, pitchBall.y, r, 0, Math.PI * 2);
+  ctx.fill();
   ctx.stroke();
+}
+
+function drawDebugOverlay() {
+  const lines = [
+    `Pitch target: ${GAME.debugInfo.pitchTarget}`,
+    `Strike zone: ${GAME.debugInfo.strikeZone}`,
+    `Ball: ${GAME.debugInfo.ball}`,
+    `Ball h: ${GAME.debugInfo.ballHeight}`,
+    `Hit type: ${GAME.debugInfo.hitType}`,
+    `Assigned fielder: ${GAME.debugInfo.assignedFielder}`,
+    `Fielder target: ${GAME.debugInfo.fielderTarget}`
+  ];
+  const pad = 10;
+  const x = GAME.width - 288;
+  const y = 104;
+  const w = 274;
+  const h = lines.length * 15 + 16;
+  ctx.save();
+  ctx.fillStyle = "rgba(6, 14, 30, 0.78)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(83, 210, 255, 0.65)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = "#d7f4ff";
+  ctx.font = "12px 'Trebuchet MS', sans-serif";
+  lines.forEach((line, i) => {
+    ctx.fillText(line, x + pad, y + 16 + i * 15);
+  });
+  ctx.restore();
+}
+
+function drawPitchTargetDebug() {
+  if (!DEBUG_STATE.enabled || !pitchBall.active) return;
+  ctx.save();
+  ctx.strokeStyle = "rgba(173, 227, 255, 0.68)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(pitcher.x + 14, pitcher.y + 16);
+  ctx.lineTo(pitchBall.targetX, pitchBall.targetY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "rgba(173, 227, 255, 0.88)";
+  ctx.beginPath();
+  ctx.arc(pitchBall.targetX, pitchBall.targetY, 4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawParticles() {
@@ -1538,15 +1833,17 @@ function drawBall() {
 function drawHitTrajectory() {
   if (!GAME.battedBall) return;
   const ballObj = GAME.battedBall;
-  const life = Math.max(0, 1 - (ballObj.elapsed / ballObj.travelTime));
+  const life = Math.max(0, 1 - (ballObj.elapsed / 1.2));
   const alpha = 0.32 * life;
   ctx.save();
   ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
   ctx.lineWidth = 1.25;
   ctx.beginPath();
-  ctx.moveTo(ballObj.startX, ballObj.startY);
-  const shortX = ballObj.startX + (ballObj.targetX - ballObj.startX) * 0.18;
-  const shortY = ballObj.startY + (ballObj.targetY - ballObj.startY) * 0.18;
+  const startX = ballObj.startX ?? ballObj.x;
+  const startY = ballObj.startY ?? ballObj.groundY ?? ballObj.y;
+  ctx.moveTo(startX, startY);
+  const shortX = startX + (ballObj.x - startX) * 0.3;
+  const shortY = startY + ((ballObj.groundY ?? ballObj.y) - startY) * 0.3;
   ctx.lineTo(shortX, shortY);
   ctx.stroke();
   ctx.restore();
@@ -1617,6 +1914,9 @@ function drawAimMeters() {
 function drawUI() {
   drawPlayCallout();
   drawAimMeters();
+  if (DEBUG_STATE.enabled) {
+    drawDebugOverlay();
+  }
 }
 
 function clearCanvas() {
@@ -1633,6 +1933,8 @@ function render() {
   drawBackground();
   drawField();
   drawBasesAndLines();
+  drawStrikeZone();
+  drawPitchTargetDebug();
   drawPlayers();
   drawBall();
   drawBat();
@@ -1662,6 +1964,11 @@ function throwToNumber(key) {
 function handleKeyDown(event) {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
   input.keys.add(key);
+
+  if (key === "`") {
+    DEBUG_STATE.enabled = !DEBUG_STATE.enabled;
+    setMessage(DEBUG_STATE.enabled ? "Debug overlay ON" : "Debug overlay OFF");
+  }
 
   if (key === "Enter" && (GAME.mode === "start" || GAME.mode === "over")) {
     startGame();
