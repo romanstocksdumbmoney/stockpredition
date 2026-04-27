@@ -34,11 +34,16 @@ const finalScoreText = document.getElementById("finalScoreText");
 
 // Centralized render geometry. Every field/actor draw uses this system.
 const FIELD_LAYOUT_RATIOS = {
-  homeY: 0.82,
-  secondY: 0.42,
-  baseSpread: 0.22,
+  // Bigger, deeper isometric playfield so pitcher/fielders are not cramped.
+  homeY: 0.86,
+  secondY: 0.30,
+  baseSpread: 0.27,
   hudHeight: 70,
   bottomBarHeight: 60
+};
+
+const FIELD_DEPTH_TUNING = {
+  moundDepthRatio: 0.57
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -55,13 +60,13 @@ const PITCH_DELAY_TUNING = {
 const HIT_PHYSICS_TUNING = {
   timingWindowPx: 78,
   contactWindowPx: 56,
-  minExitVelocity: 300,
-  maxExitVelocity: 980,
+  minExitVelocity: 320,
+  maxExitVelocity: 1120,
   launchAngles: {
-    grounder: { min: -8, max: 11 },
-    line: { min: 10, max: 27 },
-    fly: { min: 28, max: 48 },
-    pop: { min: 49, max: 66 }
+    grounder: { min: -10, max: 9 },
+    line: { min: 12, max: 32 },
+    fly: { min: 30, max: 52 },
+    pop: { min: 52, max: 68 }
   },
   gravity: 1750,
   airDrag: 0.16,
@@ -95,6 +100,8 @@ const DEBUG_FIELDING = false;
 const PITCH_DURATION_MS = 1150;
 const PITCH_DURATION_RANGE_MS = { min: 1000, max: 1300 };
 const PITCH_MAX_VELOCITY = 980;
+const SWING_BUFFER_WINDOW = 0.2;
+const SWING_ASSIST_CONTACT_RADIUS = 88;
 
 const FIELDING_SPEED_RANGES = {
   pitcher: [120, 150],
@@ -179,7 +186,7 @@ function buildFieldLayout(width, height) {
     third: { x: layout.centerX - layout.baseSpread, y: midY },
     mound: {
       x: layout.centerX,
-      y: layout.homeY - (layout.homeY - layout.secondY) * 0.45
+      y: layout.homeY - (layout.homeY - layout.secondY) * FIELD_DEPTH_TUNING.moundDepthRatio
     }
   };
   const toFirst = normalizeVector(bases.first.x - bases.home.x, bases.first.y - bases.home.y);
@@ -235,10 +242,10 @@ function syncRenderLayout() {
   FIELD.foulBottom = { ...RENDER_LAYOUT.foulRight };
 
   // Keep batter to the side of the strike zone/home-plate channel.
-  batter.x = FIELD.home.x + 46;
-  batter.y = FIELD.home.y - 46;
+  batter.x = FIELD.home.x + 64;
+  batter.y = FIELD.home.y - 58;
   pitcher.x = FIELD.mound.x - 10;
-  pitcher.y = FIELD.mound.y - 46;
+  pitcher.y = FIELD.mound.y - 54;
   const zoneWidth = 70;
   const zoneHeight = 90;
   const zoneX = FIELD.home.x - 35;
@@ -538,9 +545,9 @@ function setupDefense() {
     { role: "second", x: rightInfieldX, y: (first.y + second.y) / 2 - 6 },
     { role: "shortstop", x: leftInfieldX, y: (third.y + second.y) / 2 - 2 },
     { role: "third", x: third.x - 24, y: third.y - 10 },
-    { role: "left", x: third.x - 84, y: third.y - 128 },
-    { role: "center", x: second.x - 16, y: second.y - 150 },
-    { role: "right", x: first.x + 84, y: first.y - 128 }
+    { role: "left", x: third.x - 104, y: third.y - 182 },
+    { role: "center", x: second.x - 14, y: second.y - 236 },
+    { role: "right", x: first.x + 104, y: first.y - 182 }
   ];
 
   defensiveFielders.length = 0;
@@ -570,10 +577,10 @@ function setupDefense() {
 function getOutfieldWall() {
   const fieldTop = RENDER_LAYOUT.fieldRect.top;
   const centerX = FIELD.second.x;
-  const xLeft = FIELD.third.x - 190;
-  const xRight = FIELD.first.x + 190;
-  const y = Math.max(fieldTop + 78, FIELD.second.y - 168);
-  const radiusX = Math.max(120, (xRight - xLeft) * 0.5);
+  const xLeft = FIELD.third.x - 250;
+  const xRight = FIELD.first.x + 250;
+  const y = Math.max(fieldTop + 78, FIELD.second.y - 254);
+  const radiusX = Math.max(190, (xRight - xLeft) * 0.5);
   const yAt = (x) => {
     const nx = clampValue((x - centerX) / radiusX, -1, 1);
     return y + Math.abs(nx) * 26;
@@ -590,14 +597,14 @@ function getOutfieldWall() {
 
 function buildHitZones() {
   return [
-    { name: "leftInfield", minForward: -30, maxForward: 300, minLateral: -620, maxLateral: -88, roles: ["third", "shortstop", "pitcher"], backupRoles: ["left", "second"] },
-    { name: "middleInfield", minForward: -30, maxForward: 310, minLateral: -88, maxLateral: 88, roles: ["pitcher", "shortstop", "second"], backupRoles: ["first", "center"] },
-    { name: "rightInfield", minForward: -30, maxForward: 300, minLateral: 88, maxLateral: 620, roles: ["first", "second", "pitcher"], backupRoles: ["right", "shortstop"] },
-    { name: "leftField", minForward: 300, maxForward: 860, minLateral: -620, maxLateral: -180, roles: ["left", "center"], backupRoles: ["shortstop", "third"] },
-    { name: "leftCenterGap", minForward: 330, maxForward: 880, minLateral: -180, maxLateral: -55, roles: ["center", "left"], backupRoles: ["left", "shortstop"] },
-    { name: "centerField", minForward: 330, maxForward: 900, minLateral: -55, maxLateral: 55, roles: ["center", "left", "right"], backupRoles: ["left", "right"] },
-    { name: "rightCenterGap", minForward: 330, maxForward: 880, minLateral: 55, maxLateral: 180, roles: ["center", "right"], backupRoles: ["right", "second"] },
-    { name: "rightField", minForward: 300, maxForward: 860, minLateral: 180, maxLateral: 620, roles: ["right", "center"], backupRoles: ["first", "second"] },
+    { name: "leftInfield", minForward: -30, maxForward: 350, minLateral: -700, maxLateral: -100, roles: ["third", "shortstop", "pitcher"], backupRoles: ["left", "second"] },
+    { name: "middleInfield", minForward: -30, maxForward: 360, minLateral: -100, maxLateral: 100, roles: ["pitcher", "shortstop", "second"], backupRoles: ["first", "center"] },
+    { name: "rightInfield", minForward: -30, maxForward: 350, minLateral: 100, maxLateral: 700, roles: ["first", "second", "pitcher"], backupRoles: ["right", "shortstop"] },
+    { name: "leftField", minForward: 350, maxForward: 1120, minLateral: -700, maxLateral: -220, roles: ["left", "center"], backupRoles: ["shortstop", "third"] },
+    { name: "leftCenterGap", minForward: 390, maxForward: 1160, minLateral: -220, maxLateral: -70, roles: ["center", "left"], backupRoles: ["left", "shortstop"] },
+    { name: "centerField", minForward: 390, maxForward: 1200, minLateral: -70, maxLateral: 70, roles: ["center", "left", "right"], backupRoles: ["left", "right"] },
+    { name: "rightCenterGap", minForward: 390, maxForward: 1160, minLateral: 70, maxLateral: 220, roles: ["center", "right"], backupRoles: ["right", "second"] },
+    { name: "rightField", minForward: 350, maxForward: 1120, minLateral: 220, maxLateral: 700, roles: ["right", "center"], backupRoles: ["first", "second"] },
     { name: "foulTerritory", foul: true, roles: ["catcher", "third", "first"], backupRoles: ["pitcher", "shortstop"] }
   ];
 }
@@ -620,7 +627,7 @@ function getBallFieldVector(pointX, pointY) {
 function isFoulTerritory(pointX, pointY) {
   const { forwardDist, lateralDist } = getBallFieldVector(pointX, pointY);
   if (forwardDist < -30) return true;
-  const fairHalfWidth = Math.max(115, forwardDist * 1.35 + 115);
+  const fairHalfWidth = Math.max(160, forwardDist * 1.08 + 145);
   return Math.abs(lateralDist) > fairHalfWidth;
 }
 
@@ -737,7 +744,8 @@ function resetPitchBall() {
   pitchBall.trailClock = 0;
   batter.activeSwing = false;
   batter.swingTime = 0;
-  GAME.swingBuffer = 0;
+  // Preserve swing buffer between pitches so queued SPACE inputs can trigger on next pitch.
+  GAME.swingBuffer = Math.min(GAME.swingBuffer, SWING_BUFFER_WINDOW);
   GAME.debugInfo.hitDetected = "false";
   GAME.debugInfo.hitZone = "-";
   GAME.debugInfo.landingPoint = "-";
@@ -978,11 +986,11 @@ function calculateHitPhysics({ ballX, ballY }) {
   const contactNorm = clamp(contactOffsetY / HIT_PHYSICS_TUNING.contactWindowPx, -1, 1);
 
   let category = "line";
-  if (contactNorm <= -0.38) category = "grounder";
-  else if (contactNorm >= 0.62) category = "pop";
-  else if (Math.abs(contactNorm) <= 0.22 && timingQuality > 0.42) category = "line";
-  else if (contactNorm > 0.22) category = "fly";
-  else if (contactNorm < -0.22) category = "grounder";
+  if (contactNorm <= -0.46) category = "grounder";
+  else if (contactNorm >= 0.7) category = "pop";
+  else if (Math.abs(contactNorm) <= 0.26 && timingQuality > 0.35) category = "line";
+  else if (contactNorm > 0.26) category = "fly";
+  else if (contactNorm < -0.26) category = "grounder";
 
   // Launch angle ranges (arcade-believable by request).
   let launchRange = HIT_PHYSICS_TUNING.launchAngles.line;
@@ -996,19 +1004,20 @@ function calculateHitPhysics({ ballX, ballY }) {
   launchAngleDeg = clamp(launchAngleDeg, -14, 72);
 
   // Direction yaw controls pull/opposite spread.
-  const pullBase = -18;
-  const oppoBase = 18;
+  const pullBase = -28;
+  const oppoBase = 28;
   const timingYaw = timingNorm >= 0
     ? pullBase * Math.abs(timingNorm)
     : oppoBase * Math.abs(timingNorm);
-  const aimYaw = GAME.swingAim * 16;
-  const sprayYaw = randomRange(-8, 8);
+  const aimYaw = GAME.swingAim * 24;
+  const sprayYaw = randomRange(-12, 12);
   const yawDeg = timingYaw + aimYaw + sprayYaw;
 
   // Exit velocity from timing + contact quality.
   const contactQuality = 1 - Math.min(1, Math.abs(contactNorm));
+  const squareContactBoost = (timingQuality > 0.75 && contactQuality > 0.72) ? 0.08 : 0;
   const rawQuality = clamp(
-    0.58 * timingQuality + 0.42 * contactQuality + randomRange(-0.08, 0.08),
+    0.62 * timingQuality + 0.38 * contactQuality + squareContactBoost + randomRange(-0.08, 0.08),
     0,
     1
   );
@@ -1114,7 +1123,8 @@ function spawnPitch() {
   pitchBall.trailClock = 0;
   GAME.pitchReady = false;
   GAME.pitchTimer = 0;
-  GAME.swingBuffer = 0;
+  // Preserve buffered swing briefly into next pitch for reliable input feel.
+  GAME.swingBuffer = Math.max(0, GAME.swingBuffer);
   GAME.debugInfo.hitDetected = "false";
   GAME.debugInfo.pitchTarget = `${Math.round(targetX)}, ${Math.round(targetY)}`;
   GAME.debugInfo.strikeZone = `${Math.round(zone.x)},${Math.round(zone.y)} ${Math.round(zone.w)}x${Math.round(zone.h)}`;
@@ -1128,11 +1138,11 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
   let physics = hitPhysics;
   if (!physics) {
     const launchConfig = {
-      grounder: { angle: randomRange(-6, 8), exit: randomRange(320, 480), flightType: "grounder" },
-      single: { angle: randomRange(9, 20), exit: randomRange(420, 650), flightType: "line" },
-      double: { angle: randomRange(18, 30), exit: randomRange(560, 760), flightType: "line" },
-      triple: { angle: randomRange(28, 38), exit: randomRange(650, 850), flightType: "fly" },
-      homer: { angle: randomRange(34, 48), exit: randomRange(760, 980), flightType: "fly" }
+      grounder: { angle: randomRange(-7, 7), exit: randomRange(360, 560), flightType: "grounder" },
+      single: { angle: randomRange(10, 22), exit: randomRange(520, 780), flightType: "line" },
+      double: { angle: randomRange(18, 31), exit: randomRange(680, 920), flightType: "line" },
+      triple: { angle: randomRange(28, 40), exit: randomRange(820, 1040), flightType: "fly" },
+      homer: { angle: randomRange(34, 50), exit: randomRange(940, 1120), flightType: "fly" }
     };
     const cfg = launchConfig[type] ?? launchConfig.single;
     const forward = normalize2D(FIELD.second.x - FIELD.home.x, FIELD.second.y - FIELD.home.y);
@@ -1149,8 +1159,8 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
   }
   const speedScale = normalizeInRange(physics.exitVelocity, HIT_PHYSICS_TUNING.minExitVelocity, HIT_PHYSICS_TUNING.maxExitVelocity);
   const launchRad = degreesToRadians(physics.launchAngle);
-  const horizontalSpeed = lerp(260, 640, speedScale) * Math.cos(launchRad);
-  const verticalSpeed = lerp(220, 700, speedScale) * Math.sin(launchRad);
+  const horizontalSpeed = lerp(360, 920, speedScale) * Math.cos(launchRad);
+  const verticalSpeed = lerp(240, 760, speedScale) * Math.sin(launchRad);
   const flightType = flightTypeOverride ?? physics.flightType ?? (physics.launchAngle > 48 ? "pop" : "fly");
   const normalizedType = ({
     grounder: "grounder",
@@ -1170,13 +1180,13 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
   let vz = Number.isFinite(verticalSpeed) ? verticalSpeed : defaultVel.vz;
 
   if (normalizedType === "popFly") {
-    vx *= 0.58;
-    vy *= 0.58;
-    vz *= 1.18;
+    vx *= 0.52;
+    vy *= 0.52;
+    vz *= 1.22;
   } else if (normalizedType === "homeRun") {
-    vx *= 1.08;
-    vy *= 1.08;
-    vz *= 1.06;
+    vx *= 1.18;
+    vy *= 1.18;
+    vz *= 1.16;
   }
 
   const landing = predictBallLanding(startX, startY, 4, vx, vy, vz);
@@ -1270,7 +1280,7 @@ function resolveSwing(ballX, ballY) {
   const distance = Math.hypot(ballX - contactPoint.x, ballY - contactPoint.y);
   GAME.lastContactOffset = ballX - contactPoint.x;
 
-  if (distance >= 55) {
+  if (distance >= SWING_ASSIST_CONTACT_RADIUS) {
     GAME.debugInfo.hitDetected = "false";
     return;
   }
@@ -1337,8 +1347,11 @@ function resolveSwing(ballX, ballY) {
 
 function handleSwingInput() {
   if (GAME.mode !== "play" || GAME.battedBall || !pitchBall.active) return;
-  if (pitchBall.judged || pitchBall.swingAttempted) return;
-  console.log("SWING");
+  // Queue a tiny swing buffer if user presses a hair early.
+  if (pitchBall.judged || pitchBall.swingAttempted) {
+    GAME.swingBuffer = SWING_BUFFER_WINDOW;
+    return;
+  }
   batter.activeSwing = true;
   batter.swingTime = batter.swingDuration;
   pitchBall.swingAttempted = true;
@@ -1744,10 +1757,12 @@ function updateFielders(dt) {
       f.state = "chase";
     } else if (ballObj && pending && !pending.homeRun && pending.backupFielder === idx) {
       const anchor = pending.landingPoint ?? { x: ballObj.x, y: ballObj.groundY ?? ballObj.y };
-      const sideOffset = f.role === "left" ? -30 : (f.role === "right" ? 30 : 0);
+      const sideOffset = f.role === "left" ? -34 : (f.role === "right" ? 34 : 0);
       target = { x: anchor.x + sideOffset, y: anchor.y + 26 };
       f.state = "backup";
     } else if (ballObj && !pending?.homeRun) {
+      const dynamicBackup = getRoleHomeTarget(f, ballObj);
+      target = dynamicBackup;
       f.state = "backup";
     } else {
       f.state = "idle";
@@ -1793,9 +1808,13 @@ function update(dt) {
   }
 
   if (GAME.battedBall) {
-    const followStrength = 0.08;
-    GAME.cameraTargetX = clampValue(GAME.battedBall.x - FIELD.home.x, -90, 90);
-    GAME.cameraTargetY = clampValue((GAME.battedBall.groundY ?? GAME.battedBall.y) - FIELD.home.y, -70, 60);
+    const followStrength = 0.09;
+    const followBall = GAME.battedBall;
+    const followX = followBall.x;
+    const followY = followBall.groundY ?? followBall.y;
+    const isOutfield = getBallFieldVector(followX, followY).forwardDist > 300;
+    GAME.cameraTargetX = clampValue(followX - FIELD.home.x, -220, 220);
+    GAME.cameraTargetY = clampValue(followY - FIELD.home.y, isOutfield ? -230 : -130, 95);
     GAME.cameraX += (GAME.cameraTargetX - GAME.cameraX) * followStrength;
     GAME.cameraY += (GAME.cameraTargetY - GAME.cameraY) * followStrength;
   } else {
@@ -1878,6 +1897,19 @@ function update(dt) {
       }
     }
 
+    if (!pitchBall.swingAttempted && GAME.swingBuffer > 0) {
+      // Early press assist: consume buffered input as ball enters contact lane.
+      const contactZone = getStrikeZoneBounds();
+      const distToContact = Math.hypot(pitchBall.x - contactZone.cx, pitchBall.y - (contactZone.cy + 8));
+      if (distToContact <= SWING_ASSIST_CONTACT_RADIUS) {
+        batter.activeSwing = true;
+        batter.swingTime = batter.swingDuration;
+        pitchBall.swingAttempted = true;
+        GAME.swingBuffer = 0;
+        resolveSwing(pitchBall.x, pitchBall.y);
+      }
+    }
+
     pitchBall.shadowY = pitchBall.y + 16;
     pitchBall.height = Math.sin(t * Math.PI) * 16;
     pitchBall.trailClock += dt;
@@ -1925,15 +1957,17 @@ function drawBackground() {
   ctx.fillStyle = "#263f68";
   ctx.fillRect(0, top + 4, GAME.width, 20);
 
-  // Distant stadium wall for depth.
-  ctx.fillStyle = "rgba(22,44,72,0.88)";
-  ctx.fillRect(0, top + 22, GAME.width, 18);
-  ctx.fillStyle = "rgba(95,172,212,0.3)";
-  ctx.fillRect(0, top + 22, GAME.width, 2);
-
-  for (let x = 0; x < GAME.width; x += 10) {
-    ctx.fillStyle = x % 20 === 0 ? "#53d0ff" : "#f2b0ff";
-    ctx.fillRect(x, top + 8 + ((x / 10) % 2), 4, 5);
+  // Crowd/stadium seats for a fuller 3D arcade backdrop.
+  const seatRows = 6;
+  for (let row = 0; row < seatRows; row += 1) {
+    const y = top - 10 + row * 7;
+    const shade = 28 + row * 8;
+    ctx.fillStyle = `rgba(${shade},${52 + row * 7},${88 + row * 9},0.92)`;
+    ctx.fillRect(0, y, GAME.width, 6);
+    for (let x = row % 2 === 0 ? 4 : 10; x < GAME.width; x += 16) {
+      ctx.fillStyle = row % 2 === 0 ? "rgba(255,214,128,0.8)" : "rgba(142,226,255,0.78)";
+      ctx.fillRect(x, y + 1, 3, 3);
+    }
   }
 }
 
@@ -2008,6 +2042,17 @@ function drawField() {
   ctx.strokeStyle = wall.railColor;
   ctx.lineWidth = 3;
   ctx.stroke();
+
+  // Fence posts enhance depth and make HR boundary obvious.
+  ctx.strokeStyle = "rgba(170,210,255,0.65)";
+  ctx.lineWidth = 1.25;
+  for (let x = wall.xLeft; x <= wall.xRight; x += 44) {
+    const y = wall.yAt(x);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + 25);
+    ctx.stroke();
+  }
 }
 
 function drawBasesAndLines() {
@@ -2175,15 +2220,33 @@ function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = 
 
 function drawPitcher() {
   const team = GAME.teams[GAME.fieldingSide];
+  const pitcherFielder = defensiveFielders.find((f) => f.role === "pitcher");
+  const baseX = pitcherFielder ? pitcherFielder.x : pitcher.x;
+  const baseY = pitcherFielder ? pitcherFielder.y : pitcher.y;
   const wobble = Math.sin(performance.now() * 0.015) * (pitcher.windup > 0 ? 4 : 1.5);
   drawPlayer(
-    pitcher.x + wobble,
-    pitcher.y,
+    baseX + wobble,
+    baseY,
     team,
-    { skin: "#dca37f", hair: "#3d2414" },
+    { skin: pitcherFielder?.skin ?? "#dca37f", hair: pitcherFielder?.hair ?? "#3d2414" },
     1,
     true,
     false
+  );
+}
+
+function drawCatcher() {
+  const catcher = defensiveFielders.find((f) => f.role === "catcher");
+  if (!catcher) return;
+  const team = GAME.teams[GAME.fieldingSide];
+  drawPlayer(
+    catcher.x,
+    catcher.y,
+    team,
+    { skin: catcher.skin, hair: catcher.hair },
+    1,
+    true,
+    GAME.battedBall && defensiveFielders.indexOf(catcher) === GAME.controlledFielder
   );
 }
 
@@ -2223,7 +2286,9 @@ function drawBat() {
 
 function drawFielders() {
   const team = GAME.teams[GAME.fieldingSide];
-  const sorted = [...defensiveFielders].sort((a, b) => a.y - b.y);
+  const sorted = defensiveFielders
+    .filter((fielder) => fielder.role !== "catcher")
+    .sort((a, b) => a.y - b.y);
   sorted.forEach((fielder) => {
     const index = defensiveFielders.indexOf(fielder);
     drawPlayer(
@@ -2240,6 +2305,7 @@ function drawFielders() {
 
 function drawPlayers() {
   drawPitcher();
+  drawCatcher();
   drawFielders();
   drawBatter();
   drawRunnerDots();
