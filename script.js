@@ -34,24 +34,24 @@ const finalScoreText = document.getElementById("finalScoreText");
 
 // Core geometry controls for field proportion/camera tuning.
 const FIELD_TUNING = {
-  homeX: 780,
-  homeY: 396,
-  baseSpacingX: 240,
-  baseSpacingY: 146,
-  moundForwardOffsetX: -36,
-  moundForwardOffsetY: -6,
+  homeX: canvas.width * 0.5,
+  homeY: 476,
+  baseSpacingX: 196,
+  baseSpacingY: 122,
+  moundForwardOffsetX: 0,
+  moundForwardOffsetY: -10,
   moundRadiusX: 92,
   moundRadiusY: 40,
-  wallRadius: 610,
-  warningTrackWidth: 34,
+  wallRadius: 520,
+  warningTrackWidth: 28,
   cameraZoom: 1.08
 };
 
 const LAYOUT = {
   fieldOffsetX: 0,
   fieldOffsetY: 0,
-  fieldInsetTop: 56,
-  fieldInsetBottom: 104,
+  fieldInsetTop: 52,
+  fieldInsetBottom: 78,
   fieldInsetSide: 32
 };
 
@@ -92,23 +92,23 @@ function normalizeVector(x, y) {
 const FIELD = {
   home: { x: FIELD_TUNING.homeX, y: FIELD_TUNING.homeY },
   first: {
-    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX,
+    x: FIELD_TUNING.homeX + FIELD_TUNING.baseSpacingX,
     y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY
   },
   second: {
-    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2,
-    y: FIELD_TUNING.homeY
+    x: FIELD_TUNING.homeX,
+    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY * 2
   },
   third: {
     x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX,
-    y: FIELD_TUNING.homeY + FIELD_TUNING.baseSpacingY
+    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY
   },
   mound: {
-    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX + FIELD_TUNING.moundForwardOffsetX,
-    y: FIELD_TUNING.homeY + FIELD_TUNING.moundForwardOffsetY
+    x: FIELD_TUNING.homeX + FIELD_TUNING.moundForwardOffsetX,
+    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY + FIELD_TUNING.moundForwardOffsetY
   },
-  foulTop: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: 22 },
-  foulBottom: { x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX * 2 - 88, y: canvas.height - 18 }
+  foulTop: { x: canvas.width - 82, y: 84 },
+  foulBottom: { x: 82, y: 84 }
 };
 
 const BASE_KEYS = ["home", "first", "second", "third"];
@@ -283,17 +283,17 @@ function setupDefense() {
   const defenseTeam = GAME.teams[GAME.fieldingSide];
   const skin = ["#f8d2ad", "#c58b62", "#8b5b3f"];
   const hair = ["#1e1e1e", "#5d3414", "#704224"];
-  const rightInfieldX = (FIELD.first.x + FIELD.second.x) / 2 + 24;
-  const leftInfieldX = (FIELD.third.x + FIELD.second.x) / 2 + 24;
+  const rightInfieldX = (FIELD.first.x + FIELD.second.x) / 2 + 16;
+  const leftInfieldX = (FIELD.third.x + FIELD.second.x) / 2 + 16;
   const spots = [
-    { role: "catcher", x: FIELD.home.x + 28, y: FIELD.home.y - 22 },
-    { role: "first", x: FIELD.first.x + 18, y: FIELD.first.y - 20 },
-    { role: "second", x: rightInfieldX, y: (FIELD.first.y + FIELD.second.y) / 2 - 18 },
-    { role: "shortstop", x: leftInfieldX, y: (FIELD.third.y + FIELD.second.y) / 2 + 18 },
-    { role: "third", x: FIELD.third.x - 8, y: FIELD.third.y + 12 },
-    { role: "left", x: FIELD.second.x - 124, y: FIELD.third.y - 44 },
-    { role: "center", x: FIELD.second.x - 188, y: FIELD.second.y + 4 },
-    { role: "right", x: FIELD.second.x - 124, y: FIELD.first.y + 44 }
+    { role: "catcher", x: FIELD.home.x + 16, y: FIELD.home.y - 24 },
+    { role: "first", x: FIELD.first.x + 16, y: FIELD.first.y - 20 },
+    { role: "second", x: rightInfieldX, y: (FIELD.first.y + FIELD.second.y) / 2 - 12 },
+    { role: "shortstop", x: leftInfieldX, y: (FIELD.third.y + FIELD.second.y) / 2 + 14 },
+    { role: "third", x: FIELD.third.x - 6, y: FIELD.third.y + 12 },
+    { role: "left", x: FIELD.second.x - 108, y: FIELD.third.y - 36 },
+    { role: "center", x: FIELD.second.x - 178, y: FIELD.second.y + 2 },
+    { role: "right", x: FIELD.second.x - 108, y: FIELD.first.y + 36 }
   ];
 
   defensiveFielders.length = 0;
@@ -1115,93 +1115,78 @@ function drawFairTerritoryMask() {
 }
 
 function drawField() {
-  const fieldInsetX = 22;
-  const fieldTopY = 94;
-  const fieldBottomY = GAME.height - 66;
-  const fieldWidth = GAME.width - fieldInsetX * 2;
-  const outfieldClipRadius = Math.max(430, FIELD_TUNING.wallRadius - 70);
+  const left = LAYOUT.fieldInsetSide;
+  const right = GAME.width - LAYOUT.fieldInsetSide;
+  const top = LAYOUT.fieldInsetTop;
+  const bottom = GAME.height - LAYOUT.fieldInsetBottom;
+  const w = right - left;
+  const outfieldRadius = FIELD_TUNING.wallRadius - 76;
 
-  const sky = ctx.createLinearGradient(0, 0, 0, fieldTopY + 120);
-  sky.addColorStop(0, "#86caff");
-  sky.addColorStop(1, "#5b92dc");
+  // background/stadium
+  const sky = ctx.createLinearGradient(0, 0, 0, top + 96);
+  sky.addColorStop(0, "#85c8ff");
+  sky.addColorStop(1, "#5f95d7");
   ctx.fillStyle = sky;
-  ctx.fillRect(fieldInsetX, 0, fieldWidth, fieldTopY + 118);
+  ctx.fillRect(left, 0, w, top + 90);
 
-  // Stadium depth layers
-  ctx.fillStyle = "#142f59";
-  ctx.fillRect(fieldInsetX, fieldTopY - 28, fieldWidth, 22);
-  ctx.fillStyle = "#263456";
-  ctx.fillRect(fieldInsetX, fieldTopY - 6, fieldWidth, 54);
-  for (let i = fieldInsetX; i < GAME.width - fieldInsetX; i += 8) {
-    ctx.fillStyle = i % 16 === 0 ? "#51d4ff" : "#ffb9f9";
-    ctx.fillRect(i, fieldTopY + 6 + ((i / 8) % 4), 4, 6);
+  ctx.fillStyle = "#183765";
+  ctx.fillRect(left, top - 24, w, 16);
+  ctx.fillStyle = "#283a5f";
+  ctx.fillRect(left, top - 8, w, 44);
+
+  for (let i = left; i < right; i += 8) {
+    ctx.fillStyle = i % 16 === 0 ? "#53d0ff" : "#f2b0ff";
+    ctx.fillRect(i, top + 2 + ((i / 8) % 3), 4, 5);
   }
 
-  // Warning track before wall
-  ctx.strokeStyle = "#b88956";
-  ctx.lineWidth = FIELD_TUNING.warningTrackWidth;
-  ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldClipRadius - 16, -2.58, 2.58);
-  ctx.stroke();
-
+  // outfield grass
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(FIELD.home.x, FIELD.home.y);
-  ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
-  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldClipRadius, -2.58, 2.58);
-  ctx.closePath();
+  drawFairTerritoryMask();
   ctx.clip();
-
-  const grass = ctx.createLinearGradient(0, fieldTopY + 70, 0, fieldBottomY);
-  grass.addColorStop(0, "#2f8e5a");
-  grass.addColorStop(1, "#44a66b");
+  const grass = ctx.createLinearGradient(0, top + 28, 0, bottom);
+  grass.addColorStop(0, "#349860");
+  grass.addColorStop(1, "#2b8756");
   ctx.fillStyle = grass;
-  ctx.fillRect(fieldInsetX, fieldTopY + 46, fieldWidth, fieldBottomY - fieldTopY);
-
-  for (let i = fieldInsetX - 200; i < GAME.width + 250; i += 36) {
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(left, top + 14, w, bottom - top + 24);
+  for (let i = left - 220; i < right + 240; i += 34) {
+    ctx.fillStyle = "rgba(255,255,255,0.075)";
     ctx.beginPath();
-    ctx.moveTo(i, fieldTopY + 30);
-    ctx.lineTo(i + 24, fieldTopY + 30);
-    ctx.lineTo(i + 190, fieldBottomY + 16);
-    ctx.lineTo(i + 166, fieldBottomY + 16);
+    ctx.moveTo(i, top);
+    ctx.lineTo(i + 22, top);
+    ctx.lineTo(i + 174, bottom + 18);
+    ctx.lineTo(i + 152, bottom + 18);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 
-  // Outfield wall
-  ctx.strokeStyle = "#0f335f";
-  ctx.lineWidth = 11;
+  // warning track + wall
+  ctx.strokeStyle = "#b28757";
+  ctx.lineWidth = FIELD_TUNING.warningTrackWidth - 4;
   ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldClipRadius, -2.58, 2.58);
+  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldRadius - 16, -2.56, 2.56);
+  ctx.stroke();
+  ctx.strokeStyle = "#0f335f";
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldRadius, -2.56, 2.56);
   ctx.stroke();
 
-  // Infield dirt cutout
-  ctx.fillStyle = "#cd9a67";
+  // infield dirt
+  ctx.fillStyle = "#cb9965";
   ctx.beginPath();
-  ctx.moveTo(FIELD.home.x + 8, FIELD.home.y + 30);
-  ctx.lineTo(FIELD.third.x - 80, FIELD.third.y + 8);
-  ctx.lineTo(FIELD.second.x - 44, FIELD.second.y - 100);
-  ctx.lineTo(FIELD.first.x + 86, FIELD.first.y - 12);
+  ctx.moveTo(FIELD.home.x, FIELD.home.y + 30);
+  ctx.lineTo(FIELD.third.x - 78, FIELD.third.y + 8);
+  ctx.lineTo(FIELD.second.x - 40, FIELD.second.y - 86);
+  ctx.lineTo(FIELD.first.x + 78, FIELD.first.y - 8);
   ctx.closePath();
   ctx.fill();
 
-  // Base paths
+  // bases and foul lines
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.strokeStyle = "#d3a16e";
-  ctx.lineWidth = 54;
-  ctx.beginPath();
-  ctx.moveTo(FIELD.home.x, FIELD.home.y);
-  ctx.lineTo(FIELD.first.x, FIELD.first.y);
-  ctx.lineTo(FIELD.second.x, FIELD.second.y);
-  ctx.lineTo(FIELD.third.x, FIELD.third.y);
-  ctx.lineTo(FIELD.home.x, FIELD.home.y);
-  ctx.stroke();
-
-  ctx.strokeStyle = "rgba(255,249,232,0.98)";
-  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#f7efe0";
+  ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.first.x, FIELD.first.y);
@@ -1217,16 +1202,17 @@ function drawField() {
   ctx.lineTo(FIELD.foulBottom.x, FIELD.foulBottom.y);
   ctx.stroke();
 
+  // mound
   ctx.fillStyle = "rgba(0,0,0,0.2)";
   ctx.beginPath();
-  ctx.ellipse(FIELD.mound.x + 3, FIELD.mound.y + 38, 64, 27, 0, 0, Math.PI * 2);
+  ctx.ellipse(FIELD.mound.x + 2, FIELD.mound.y + 36, 58, 22, 0, 0, Math.PI * 2);
   ctx.fill();
-  const mound = ctx.createLinearGradient(FIELD.mound.x, FIELD.mound.y + 8, FIELD.mound.x, FIELD.mound.y + 60);
-  mound.addColorStop(0, "#d7a672");
-  mound.addColorStop(1, "#b7814c");
+  const mound = ctx.createLinearGradient(FIELD.mound.x, FIELD.mound.y + 8, FIELD.mound.x, FIELD.mound.y + 54);
+  mound.addColorStop(0, "#d9aa75");
+  mound.addColorStop(1, "#b9834e");
   ctx.fillStyle = mound;
   ctx.beginPath();
-  ctx.ellipse(FIELD.mound.x, FIELD.mound.y + 34, 64, 26, 0, 0, Math.PI * 2);
+  ctx.ellipse(FIELD.mound.x, FIELD.mound.y + 32, 56, 21, 0, 0, Math.PI * 2);
   ctx.fill();
 
   drawBase(FIELD.first.x, FIELD.first.y);
