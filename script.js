@@ -32,25 +32,13 @@ const awayScoreValue = document.getElementById("awayScoreValue");
 const homeScoreValue = document.getElementById("homeScoreValue");
 const finalScoreText = document.getElementById("finalScoreText");
 
-// Core geometry controls for field proportion/camera tuning.
-const FIELD_TUNING = {
-  homeX: canvas.width * 0.5,
-  homeY: canvas.height * 0.82,
-  baseSpacingX: canvas.width * 0.22,
-  baseSpacingY: canvas.height * 0.20,
-  moundForwardOffsetX: 0,
-  moundForwardOffsetY: 10,
-  moundRadiusX: 72,
-  moundRadiusY: 26,
-  wallRadius: canvas.height * 0.56,
-  warningTrackWidth: 20,
-  cameraZoom: 1
-};
-
-const LAYOUT = {
-  fieldInsetTop: 52,
-  fieldInsetBottom: 76,
-  fieldInsetSide: 20
+// Centralized render geometry. Every field/actor draw uses this system.
+const FIELD_LAYOUT_RATIOS = {
+  homeY: 0.82,
+  secondY: 0.42,
+  baseSpread: 0.22,
+  hudHeight: 70,
+  bottomBarHeight: 60
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -69,6 +57,12 @@ const HIT_PHYSICS_TUNING = {
   contactWindowPx: 56,
   minExitVelocity: 300,
   maxExitVelocity: 980,
+  launchAngles: {
+    grounder: { min: -8, max: 11 },
+    line: { min: 10, max: 27 },
+    fly: { min: 28, max: 48 },
+    pop: { min: 49, max: 66 }
+  },
   gravity: 1750,
   airDrag: 0.16,
   groundFriction: 0.86
@@ -77,6 +71,23 @@ const HIT_PHYSICS_TUNING = {
 function clampValue(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
+
+const clamp = clampValue;
+
+function lerp(a, b, t) {
+  return a + (b - a) * clampValue(t, 0, 1);
+}
+
+function normalizeInRange(value, min, max) {
+  if (max <= min) return 0;
+  return clampValue((value - min) / (max - min), 0, 1);
+}
+
+function degreesToRadians(deg) {
+  return deg * (Math.PI / 180);
+}
+
+const degToRad = degreesToRadians;
 
 function randomRange(min, max) {
   return min + Math.random() * (max - min);
@@ -87,40 +98,87 @@ function normalizeVector(x, y) {
   return { x: x / len, y: y / len };
 }
 
+const normalize2D = normalizeVector;
+
+function buildFieldLayout(width, height) {
+  const layout = {
+    centerX: width / 2,
+    homeY: height * FIELD_LAYOUT_RATIOS.homeY,
+    secondY: height * FIELD_LAYOUT_RATIOS.secondY,
+    baseSpread: width * FIELD_LAYOUT_RATIOS.baseSpread,
+    hudHeight: FIELD_LAYOUT_RATIOS.hudHeight,
+    bottomBarHeight: FIELD_LAYOUT_RATIOS.bottomBarHeight
+  };
+  const midY = (layout.homeY + layout.secondY) / 2;
+  const bases = {
+    home: { x: layout.centerX, y: layout.homeY },
+    first: { x: layout.centerX + layout.baseSpread, y: midY },
+    second: { x: layout.centerX, y: layout.secondY },
+    third: { x: layout.centerX - layout.baseSpread, y: midY },
+    mound: {
+      x: layout.centerX,
+      y: layout.homeY - (layout.homeY - layout.secondY) * 0.45
+    }
+  };
+  const toFirst = normalizeVector(bases.first.x - bases.home.x, bases.first.y - bases.home.y);
+  const toThird = normalizeVector(bases.third.x - bases.home.x, bases.third.y - bases.home.y);
+  const foulLength = Math.max(width, height) * 0.92;
+  return {
+    layout,
+    bases,
+    foulRight: { x: bases.home.x + toFirst.x * foulLength, y: bases.home.y + toFirst.y * foulLength },
+    foulLeft: { x: bases.home.x + toThird.x * foulLength, y: bases.home.y + toThird.y * foulLength },
+    fieldRect: {
+      left: 18,
+      right: width - 18,
+      top: layout.hudHeight + 6,
+      bottom: height - layout.bottomBarHeight + 14
+    }
+  };
+}
+
+let RENDER_LAYOUT = buildFieldLayout(canvas.width, canvas.height);
+const COORD_WARNINGS = new Set();
+
+function safePoint(point, key, fallback) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    if (!COORD_WARNINGS.has(key)) {
+      console.warn(`[layout-warning] Missing coordinate for ${key}, using fallback.`);
+      COORD_WARNINGS.add(key);
+    }
+    return fallback;
+  }
+  return point;
+}
+
 const FIELD = {
-  home: { x: FIELD_TUNING.homeX, y: FIELD_TUNING.homeY },
-  first: {
-    x: FIELD_TUNING.homeX + FIELD_TUNING.baseSpacingX,
-    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY
-  },
-  second: {
-    x: FIELD_TUNING.homeX,
-    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY * 2
-  },
-  third: {
-    x: FIELD_TUNING.homeX - FIELD_TUNING.baseSpacingX,
-    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY
-  },
-  mound: {
-    x: FIELD_TUNING.homeX + FIELD_TUNING.moundForwardOffsetX,
-    y: FIELD_TUNING.homeY - FIELD_TUNING.baseSpacingY + FIELD_TUNING.moundForwardOffsetY
-  },
-  foulTop: { x: canvas.width - 82, y: 84 },
-  foulBottom: { x: 82, y: 84 }
+  home: { ...RENDER_LAYOUT.bases.home },
+  first: { ...RENDER_LAYOUT.bases.first },
+  second: { ...RENDER_LAYOUT.bases.second },
+  third: { ...RENDER_LAYOUT.bases.third },
+  mound: { ...RENDER_LAYOUT.bases.mound },
+  foulTop: { ...RENDER_LAYOUT.foulLeft },
+  foulBottom: { ...RENDER_LAYOUT.foulRight }
 };
 
-function getFieldLayout() {
-  const width = GAME.width;
-  const height = GAME.height;
-  return {
-    home: { x: width * 0.5, y: height * 0.82 },
-    first: { x: width * 0.72, y: height * 0.62 },
-    second: { x: width * 0.5, y: height * 0.42 },
-    third: { x: width * 0.28, y: height * 0.62 },
-    mound: { x: width * 0.5, y: height * 0.64 },
-    foulTop: { x: width * 0.5 + (width * 0.72 - width * 0.5) * 1.55, y: height * 0.30 },
-    foulBottom: { x: width * 0.5 - (width * 0.5 - width * 0.28) * 1.55, y: height * 0.30 }
-  };
+function syncRenderLayout() {
+  RENDER_LAYOUT = buildFieldLayout(GAME.width, GAME.height);
+  FIELD.home = { ...RENDER_LAYOUT.bases.home };
+  FIELD.first = { ...RENDER_LAYOUT.bases.first };
+  FIELD.second = { ...RENDER_LAYOUT.bases.second };
+  FIELD.third = { ...RENDER_LAYOUT.bases.third };
+  FIELD.mound = { ...RENDER_LAYOUT.bases.mound };
+  FIELD.foulTop = { ...RENDER_LAYOUT.foulLeft };
+  FIELD.foulBottom = { ...RENDER_LAYOUT.foulRight };
+
+  batter.x = FIELD.home.x + 30;
+  batter.y = FIELD.home.y - 46;
+  pitcher.x = FIELD.mound.x - 10;
+  pitcher.y = FIELD.mound.y - 46;
+  if (!pitchBall.active) {
+    pitchBall.x = pitcher.x + 14;
+    pitchBall.y = pitcher.y + 16;
+  }
 }
 
 const BASE_KEYS = ["home", "first", "second", "third"];
@@ -293,19 +351,23 @@ function clearBases() {
 
 function setupDefense() {
   const defenseTeam = GAME.teams[GAME.fieldingSide];
+  const home = safePoint(FIELD.home, "home", { x: GAME.width * 0.5, y: GAME.height * 0.82 });
+  const first = safePoint(FIELD.first, "first", { x: home.x + GAME.width * 0.22, y: GAME.height * 0.62 });
+  const second = safePoint(FIELD.second, "second", { x: home.x, y: GAME.height * 0.42 });
+  const third = safePoint(FIELD.third, "third", { x: home.x - GAME.width * 0.22, y: GAME.height * 0.62 });
   const skin = ["#f8d2ad", "#c58b62", "#8b5b3f"];
   const hair = ["#1e1e1e", "#5d3414", "#704224"];
-  const rightInfieldX = (FIELD.first.x + FIELD.second.x) / 2 + 14;
-  const leftInfieldX = (FIELD.third.x + FIELD.second.x) / 2 - 14;
+  const rightInfieldX = (first.x + second.x) / 2 + 14;
+  const leftInfieldX = (third.x + second.x) / 2 - 14;
   const spots = [
-    { role: "catcher", x: FIELD.home.x - 12, y: FIELD.home.y + 8 },
-    { role: "first", x: FIELD.first.x + 16, y: FIELD.first.y - 12 },
-    { role: "second", x: rightInfieldX, y: (FIELD.first.y + FIELD.second.y) / 2 - 6 },
-    { role: "shortstop", x: leftInfieldX, y: (FIELD.third.y + FIELD.second.y) / 2 - 2 },
-    { role: "third", x: FIELD.third.x - 24, y: FIELD.third.y - 10 },
-    { role: "left", x: FIELD.third.x - 76, y: FIELD.third.y - 132 },
-    { role: "center", x: FIELD.second.x - 16, y: FIELD.second.y - 146 },
-    { role: "right", x: FIELD.first.x + 76, y: FIELD.first.y - 132 }
+    { role: "catcher", x: home.x - 12, y: home.y + 8 },
+    { role: "first", x: first.x + 16, y: first.y - 12 },
+    { role: "second", x: rightInfieldX, y: (first.y + second.y) / 2 - 6 },
+    { role: "shortstop", x: leftInfieldX, y: (third.y + second.y) / 2 - 2 },
+    { role: "third", x: third.x - 24, y: third.y - 10 },
+    { role: "left", x: third.x - 84, y: third.y - 128 },
+    { role: "center", x: second.x - 16, y: second.y - 150 },
+    { role: "right", x: first.x + 84, y: first.y - 128 }
   ];
 
   defensiveFielders.length = 0;
@@ -351,6 +413,7 @@ function updateHud() {
 
 function startGame() {
   configureTeams();
+  syncRenderLayout();
   GAME.mode = "play";
   GAME.inning = 1;
   GAME.half = "top";
@@ -426,6 +489,7 @@ function applyWalk() {
 }
 
 function switchSides() {
+  syncRenderLayout();
   GAME.outs = 0;
   resetCount();
   clearBases();
@@ -548,13 +612,13 @@ function calculateHitPhysics({ ballX, ballY }) {
 
   // Timing quality: early > 0 (pulled/high), late < 0 (oppo/lower).
   const timingOffset = ballX - contactPointX;
-  const timingNorm = clamp(timingOffset / HIT_PHYSICS_TUNING.timingWindow, -1, 1);
+  const timingNorm = clamp(timingOffset / HIT_PHYSICS_TUNING.timingWindowPx, -1, 1);
   const timingQuality = 1 - Math.min(1, Math.abs(timingNorm));
 
   // Contact point quality from where the bat meets the ball vertically.
   // Top half contact => grounder tendency, bottom half => pop tendency.
   const contactOffsetY = ballY - contactPointY;
-  const contactNorm = clamp(contactOffsetY / HIT_PHYSICS_TUNING.contactWindow, -1, 1);
+  const contactNorm = clamp(contactOffsetY / HIT_PHYSICS_TUNING.contactWindowPx, -1, 1);
 
   let category = "line";
   if (contactNorm <= -0.38) category = "grounder";
@@ -592,8 +656,8 @@ function calculateHitPhysics({ ballX, ballY }) {
     1
   );
   const exitVelocity = lerp(
-    HIT_PHYSICS_TUNING.exitVelocity.min,
-    HIT_PHYSICS_TUNING.exitVelocity.max,
+    HIT_PHYSICS_TUNING.minExitVelocity,
+    HIT_PHYSICS_TUNING.maxExitVelocity,
     rawQuality
   );
 
@@ -614,6 +678,7 @@ function calculateHitPhysics({ ballX, ballY }) {
     contactQuality,
     quality: rawQuality,
     category,
+    flightType: category === "pop" ? "fly" : category,
     launchAngle: launchAngleDeg,
     exitVelocity,
     directionVector
@@ -1118,142 +1183,142 @@ function update(dt) {
   }
 }
 
-function drawField() {
-  const left = LAYOUT.fieldInsetSide;
-  const right = GAME.width - LAYOUT.fieldInsetSide;
-  const top = LAYOUT.fieldInsetTop;
-  const bottom = GAME.height - LAYOUT.fieldInsetBottom;
-  const w = right - left;
-  const outfieldRadius = FIELD_TUNING.wallRadius - 76;
-
-  // background/stadium
-  const sky = ctx.createLinearGradient(0, 0, 0, top + 96);
-  sky.addColorStop(0, "#85c8ff");
-  sky.addColorStop(1, "#5f95d7");
+function drawBackground() {
+  const bounds = RENDER_LAYOUT.fieldRect;
+  const top = Math.max(0, bounds.top - 34);
+  const sky = ctx.createLinearGradient(0, 0, 0, bounds.bottom);
+  sky.addColorStop(0, "#8ac9ff");
+  sky.addColorStop(0.42, "#4f84c9");
+  sky.addColorStop(1, "#245a96");
   ctx.fillStyle = sky;
-  ctx.fillRect(left, 0, w, top + 90);
+  ctx.fillRect(0, 0, GAME.width, bounds.bottom + 30);
 
-  ctx.fillStyle = "#183765";
-  ctx.fillRect(left, top - 24, w, 16);
-  ctx.fillStyle = "#283a5f";
-  ctx.fillRect(left, top - 8, w, 44);
+  ctx.fillStyle = "#1d3255";
+  ctx.fillRect(0, top - 20, GAME.width, 24);
+  ctx.fillStyle = "#263f68";
+  ctx.fillRect(0, top + 4, GAME.width, 20);
 
-  for (let i = left; i < right; i += 8) {
-    ctx.fillStyle = i % 16 === 0 ? "#53d0ff" : "#f2b0ff";
-    ctx.fillRect(i, top + 2 + ((i / 8) % 3), 4, 5);
+  for (let x = 0; x < GAME.width; x += 10) {
+    ctx.fillStyle = x % 20 === 0 ? "#53d0ff" : "#f2b0ff";
+    ctx.fillRect(x, top + 8 + ((x / 10) % 2), 4, 5);
   }
+}
 
-  // outfield grass
-  ctx.save();
-  drawFairTerritoryMask();
-  ctx.clip();
-  const grass = ctx.createLinearGradient(0, top + 28, 0, bottom);
-  grass.addColorStop(0, "#349860");
-  grass.addColorStop(1, "#2b8756");
+function drawField() {
+  const home = safePoint(FIELD.home, "home", { x: GAME.width * 0.5, y: GAME.height * 0.82 });
+  const second = safePoint(FIELD.second, "second", { x: home.x, y: GAME.height * 0.42 });
+  const first = safePoint(FIELD.first, "first", { x: home.x + GAME.width * 0.22, y: (home.y + second.y) / 2 });
+  const third = safePoint(FIELD.third, "third", { x: home.x - GAME.width * 0.22, y: (home.y + second.y) / 2 });
+  const bounds = RENDER_LAYOUT.fieldRect;
+
+  // Outfield grass
+  const grass = ctx.createLinearGradient(0, bounds.top, 0, GAME.height);
+  grass.addColorStop(0, "#2f965f");
+  grass.addColorStop(1, "#206d47");
   ctx.fillStyle = grass;
-  ctx.fillRect(left, top + 14, w, bottom - top + 24);
-  for (let i = left - 220; i < right + 240; i += 34) {
-    ctx.fillStyle = "rgba(255,255,255,0.075)";
+  ctx.fillRect(0, bounds.top, GAME.width, GAME.height - bounds.top);
+
+  // Grass stripes
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(third.x - 220, third.y - 88);
+  ctx.lineTo(second.x, second.y - 220);
+  ctx.lineTo(first.x + 220, first.y - 88);
+  ctx.lineTo(first.x + 330, GAME.height);
+  ctx.lineTo(third.x - 330, GAME.height);
+  ctx.closePath();
+  ctx.clip();
+  for (let x = -160; x < GAME.width + 220; x += 42) {
+    ctx.fillStyle = "rgba(255,255,255,0.065)";
     ctx.beginPath();
-    ctx.moveTo(i, top);
-    ctx.lineTo(i + 22, top);
-    ctx.lineTo(i + 174, bottom + 18);
-    ctx.lineTo(i + 152, bottom + 18);
+    ctx.moveTo(x, bounds.top - 10);
+    ctx.lineTo(x + 16, bounds.top - 10);
+    ctx.lineTo(x + 200, GAME.height + 10);
+    ctx.lineTo(x + 184, GAME.height + 10);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 
-  // warning track + wall
-  ctx.strokeStyle = "#b28757";
-  ctx.lineWidth = FIELD_TUNING.warningTrackWidth - 4;
+  // Infield dirt diamond
+  ctx.fillStyle = "#c99660";
   ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldRadius - 16, -2.56, 2.56);
-  ctx.stroke();
-  ctx.strokeStyle = "#0f335f";
-  ctx.lineWidth = 10;
-  ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldRadius, -2.56, 2.56);
-  ctx.stroke();
-
-  // infield dirt
-  ctx.fillStyle = "#cb9965";
-  ctx.beginPath();
-  ctx.moveTo(FIELD.home.x, FIELD.home.y + 30);
-  ctx.lineTo(FIELD.third.x - 78, FIELD.third.y + 8);
-  ctx.lineTo(FIELD.second.x - 40, FIELD.second.y - 86);
-  ctx.lineTo(FIELD.first.x + 78, FIELD.first.y - 8);
+  ctx.moveTo(home.x, home.y + 30);
+  ctx.lineTo(third.x - 70, third.y + 6);
+  ctx.lineTo(second.x, second.y - 66);
+  ctx.lineTo(first.x + 70, first.y + 6);
   ctx.closePath();
   ctx.fill();
+}
 
-  // bases and foul lines
+function drawBasesAndLines() {
+  const home = safePoint(FIELD.home, "home", { x: GAME.width * 0.5, y: GAME.height * 0.82 });
+  const first = safePoint(FIELD.first, "first", { x: home.x + GAME.width * 0.22, y: GAME.height * 0.62 });
+  const second = safePoint(FIELD.second, "second", { x: home.x, y: GAME.height * 0.42 });
+  const third = safePoint(FIELD.third, "third", { x: home.x - GAME.width * 0.22, y: GAME.height * 0.62 });
+  const mound = safePoint(FIELD.mound, "mound", { x: home.x, y: home.y - (home.y - second.y) * 0.45 });
+  const foulLeft = safePoint(FIELD.foulTop, "foul-left", { x: third.x - 320, y: third.y - 360 });
+  const foulRight = safePoint(FIELD.foulBottom, "foul-right", { x: first.x + 320, y: first.y - 360 });
+
+  // Base paths
+  ctx.strokeStyle = "#e3c68c";
+  ctx.lineWidth = 6;
   ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.strokeStyle = "#f7efe0";
-  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(FIELD.home.x, FIELD.home.y);
-  ctx.lineTo(FIELD.first.x, FIELD.first.y);
-  ctx.lineTo(FIELD.second.x, FIELD.second.y);
-  ctx.lineTo(FIELD.third.x, FIELD.third.y);
+  ctx.moveTo(home.x, home.y);
+  ctx.lineTo(first.x, first.y);
+  ctx.lineTo(second.x, second.y);
+  ctx.lineTo(third.x, third.y);
   ctx.closePath();
   ctx.stroke();
 
+  // Foul lines
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(FIELD.home.x, FIELD.home.y);
-  ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
-  ctx.moveTo(FIELD.home.x, FIELD.home.y);
-  ctx.lineTo(FIELD.foulBottom.x, FIELD.foulBottom.y);
+  ctx.moveTo(home.x, home.y);
+  ctx.lineTo(foulLeft.x, foulLeft.y);
+  ctx.moveTo(home.x, home.y);
+  ctx.lineTo(foulRight.x, foulRight.y);
   ctx.stroke();
 
-  // mound
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  // Mound
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.beginPath();
-  ctx.ellipse(FIELD.mound.x + 2, FIELD.mound.y + 36, 58, 22, 0, 0, Math.PI * 2);
+  ctx.ellipse(mound.x + 2, mound.y + 32, 50, 18, 0, 0, Math.PI * 2);
   ctx.fill();
-  const mound = ctx.createLinearGradient(FIELD.mound.x, FIELD.mound.y + 8, FIELD.mound.x, FIELD.mound.y + 54);
-  mound.addColorStop(0, "#d9aa75");
-  mound.addColorStop(1, "#b9834e");
-  ctx.fillStyle = mound;
+  const moundGrad = ctx.createLinearGradient(mound.x, mound.y + 6, mound.x, mound.y + 40);
+  moundGrad.addColorStop(0, "#ddb785");
+  moundGrad.addColorStop(1, "#ba8754");
+  ctx.fillStyle = moundGrad;
   ctx.beginPath();
-  ctx.ellipse(FIELD.mound.x, FIELD.mound.y + 32, 56, 21, 0, 0, Math.PI * 2);
+  ctx.ellipse(mound.x, mound.y + 30, 48, 17, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  drawBase(FIELD.first.x, FIELD.first.y);
-  drawBase(FIELD.second.x, FIELD.second.y);
-  drawBase(FIELD.third.x, FIELD.third.y);
-  drawHomePlate(FIELD.home.x, FIELD.home.y);
-  drawBatterBox();
+  drawBase(first.x, first.y);
+  drawBase(second.x, second.y);
+  drawBase(third.x, third.y);
+  drawHomePlate(home.x, home.y);
+  drawBatterBox(home.x, home.y);
 }
 
 function drawBase(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
-  ctx.fillRect(-8, -6, 16, 16);
-  ctx.fillStyle = "#fef9e5";
-  ctx.fillRect(-8, -8, 16, 16);
-  ctx.strokeStyle = "#d7cdad";
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fillRect(-9, -7, 18, 18);
+  ctx.fillStyle = "#fff8e8";
+  ctx.fillRect(-9, -9, 18, 18);
+  ctx.strokeStyle = "#d5cbaf";
   ctx.lineWidth = 2;
-  ctx.strokeRect(-8, -8, 16, 16);
+  ctx.strokeRect(-9, -9, 18, 18);
   ctx.restore();
 }
 
 function drawHomePlate(x, y) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.beginPath();
-  ctx.moveTo(2, 2);
-  ctx.lineTo(11, -7);
-  ctx.lineTo(11, 6);
-  ctx.lineTo(2, 15);
-  ctx.lineTo(-8, 7);
-  ctx.lineTo(-8, -7);
-  ctx.closePath();
-  ctx.fill();
-
   ctx.fillStyle = "#fff8e6";
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -1267,10 +1332,10 @@ function drawHomePlate(x, y) {
   ctx.restore();
 }
 
-function drawBatterBox() {
-  ctx.strokeStyle = "rgba(255,255,255,0.84)";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(FIELD.home.x - 86, FIELD.home.y - 38, 72, 66);
+function drawBatterBox(homeX, homeY) {
+  ctx.strokeStyle = "rgba(255,255,255,0.82)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(homeX - 90, homeY - 40, 70, 66);
 }
 
 function drawRunnerDots() {
@@ -1285,44 +1350,45 @@ function drawRunnerDots() {
 }
 
 function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = false) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return;
+  }
+  const palette = team?.colors ?? { jersey: "#4f6ca8", cap: "#2e4678", trim: "#9ec3ff" };
+  const skin = look?.skin ?? "#d8b08c";
+  const hair = look?.hair ?? "#2d1e16";
   const headSize = bigHead ? 13 : 11;
+
   ctx.fillStyle = "rgba(0,0,0,0.24)";
   ctx.fillRect(x + 2, y + 27, 16, 5);
 
-  // head
-  ctx.fillStyle = look.skin;
+  ctx.fillStyle = skin;
   ctx.fillRect(x + 3, y - 7, headSize, 11);
   ctx.strokeStyle = "rgba(22, 22, 32, 0.82)";
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 3, y - 7, headSize, 11);
 
-  // hair + cap
-  ctx.fillStyle = look.hair;
+  ctx.fillStyle = hair;
   ctx.fillRect(x + 3, y - 9, headSize, 3);
-  ctx.fillStyle = team.colors.cap;
+  ctx.fillStyle = palette.cap;
   ctx.fillRect(x + 3, y - 12, headSize, 4);
 
-  // face
   ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(x + 6, y - 2, 2, 2);
   ctx.fillRect(x + 11, y - 2, 2, 2);
   ctx.fillRect(x + 8, y + 1, 3, 1);
 
-  // body
-  ctx.fillStyle = team.colors.jersey;
+  ctx.fillStyle = palette.jersey;
   ctx.fillRect(x + 2, y + 2, 16, 17);
-  ctx.fillStyle = team.colors.trim;
+  ctx.fillStyle = palette.trim;
   ctx.fillRect(x + 2, y + 2, 16, 3);
   ctx.strokeStyle = "rgba(20, 24, 34, 0.9)";
   ctx.strokeRect(x + 2, y + 2, 16, 17);
 
-  // legs
   ctx.fillStyle = "#18203a";
   ctx.fillRect(x + 3, y + 19, 5, 9);
   ctx.fillRect(x + 12, y + 19, 5, 9);
 
-  // arm/glove
-  ctx.fillStyle = look.skin;
+  ctx.fillStyle = skin;
   if (direction > 0) {
     ctx.fillRect(x + 17, y + 9, 5, 4);
   } else {
@@ -1361,21 +1427,24 @@ function drawBatter() {
     true,
     false
   );
+}
 
+function drawBat() {
   const swingProgress = batter.activeSwing
     ? 1 - batter.swingTime / batter.swingDuration
     : 0;
   const angle = batter.activeSwing
-    ? (-0.95 + swingProgress * 1.2)
-    : -0.62;
-
-  ctx.save();
+    ? (-0.92 + swingProgress * 0.9)
+    : -0.56;
   const handX = batter.x + 14;
   const handY = batter.y + 13;
+
+  ctx.save();
   ctx.translate(handX, handY);
   ctx.rotate(angle);
   ctx.fillStyle = batter.batColor;
-  ctx.fillRect(-38, -3, 42, 6);
+  // Small local bat: 40x6, never leaves batter zone.
+  ctx.fillRect(-34, -3, 40, 6);
   ctx.restore();
 }
 
@@ -1396,20 +1465,20 @@ function drawFielders() {
   });
 }
 
-function drawBallTrail(ballObj) {
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  for (let i = 1; i <= 3; i += 1) {
-    ctx.fillRect(ballObj.x + i * 10, ballObj.y + i * 3, 7, 3);
-  }
+function drawPlayers() {
+  drawPitcher();
+  drawFielders();
+  drawBatter();
+  drawRunnerDots();
 }
 
 function drawBattedBall() {
   if (!GAME.battedBall) return;
   const ballObj = GAME.battedBall;
-  const shape = ballObj.shape ?? "fly";
+  const flight = ballObj.flightType ?? "fly";
 
-  if (shape === "grounder") {
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
+  if (flight === "grounder") {
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.fillRect(ballObj.x - 6, ballObj.y + 4, 12, 4);
     ctx.fillStyle = "#fff8d9";
     ctx.beginPath();
@@ -1418,16 +1487,13 @@ function drawBattedBall() {
     return;
   }
 
-  if (shape === "line") {
-    ctx.fillStyle = "rgba(0,0,0,0.24)";
+  if (flight === "line") {
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
     ctx.fillRect(ballObj.x - 5, ballObj.y + 7, 10, 4);
     ctx.fillStyle = "#fff8d9";
     ctx.beginPath();
     ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.fillRect(ballObj.x + 8, ballObj.y + 1, 10, 3);
-    ctx.fillRect(ballObj.x + 18, ballObj.y + 4, 8, 3);
     return;
   }
 
@@ -1437,43 +1503,6 @@ function drawBattedBall() {
   ctx.beginPath();
   ctx.arc(ballObj.x, ballObj.y, 6, 0, Math.PI * 2);
   ctx.fill();
-  drawBallTrail(ballObj);
-}
-
-function drawPlayCallout() {
-  if (!GAME.playCallout) return;
-  const life = GAME.playCallout.life;
-  const alpha = Math.min(1, Math.max(0, life / 1.1));
-  const yFloat = (1 - alpha) * 20;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = "bold 32px 'Trebuchet MS', sans-serif";
-  ctx.textAlign = "center";
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = "rgba(16, 24, 40, 0.8)";
-  ctx.strokeText(GAME.playCallout.text, GAME.width / 2, 86 - yFloat);
-  ctx.fillStyle = GAME.playCallout.color;
-  ctx.fillText(GAME.playCallout.text, GAME.width / 2, 86 - yFloat);
-  ctx.restore();
-}
-
-function drawHitTrajectory() {
-  if (!GAME.battedBall) return;
-  const ballObj = GAME.battedBall;
-  const life = Math.max(0, 1 - (ballObj.elapsed / ballObj.travelTime));
-  const alpha = 0.18 * life;
-  ctx.save();
-  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(ballObj.startX, ballObj.startY);
-  const shortX = ballObj.startX + (ballObj.targetX - ballObj.startX) * 0.24;
-  const shortY = ballObj.startY + (ballObj.targetY - ballObj.startY) * 0.24;
-  ctx.lineTo(shortX, shortY);
-  ctx.stroke();
-  ctx.restore();
 }
 
 function drawPitchBall() {
@@ -1500,25 +1529,66 @@ function drawParticles() {
   });
 }
 
-function drawAimMeters() {
-  // Bottom utility panel keeps UI away from active play space.
-  const panelX = 18;
-  const panelY = GAME.height - 56;
-  const panelW = 296;
-  const panelH = 44;
+function drawBall() {
+  drawBattedBall();
+  drawPitchBall();
+  drawParticles();
+}
 
-  ctx.fillStyle = "rgba(9, 18, 34, 0.84)";
-  ctx.fillRect(panelX, panelY, panelW, panelH);
-  ctx.strokeStyle = "rgba(83, 210, 255, 0.5)";
+function drawHitTrajectory() {
+  if (!GAME.battedBall) return;
+  const ballObj = GAME.battedBall;
+  const life = Math.max(0, 1 - (ballObj.elapsed / ballObj.travelTime));
+  const alpha = 0.32 * life;
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  ctx.moveTo(ballObj.startX, ballObj.startY);
+  const shortX = ballObj.startX + (ballObj.targetX - ballObj.startX) * 0.18;
+  const shortY = ballObj.startY + (ballObj.targetY - ballObj.startY) * 0.18;
+  ctx.lineTo(shortX, shortY);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlayCallout() {
+  if (!GAME.playCallout) return;
+  const life = GAME.playCallout.life;
+  const alpha = Math.min(1, Math.max(0, life / 1.1));
+  const yFloat = (1 - alpha) * 20;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = "bold 32px 'Trebuchet MS', sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(16, 24, 40, 0.8)";
+  ctx.strokeText(GAME.playCallout.text, GAME.width / 2, 86 - yFloat);
+  ctx.fillStyle = GAME.playCallout.color;
+  ctx.fillText(GAME.playCallout.text, GAME.width / 2, 86 - yFloat);
+  ctx.restore();
+}
+
+function drawAimMeters() {
+  const leftPad = 14;
+  const bottomPad = 14;
+  const panelH = 44;
+  const panelW = 292;
+  const panelY = GAME.height - panelH - bottomPad;
+
+  ctx.fillStyle = "rgba(9, 18, 34, 0.86)";
+  ctx.fillRect(leftPad, panelY, panelW, panelH);
+  ctx.strokeStyle = "rgba(83, 210, 255, 0.58)";
   ctx.lineWidth = 2;
-  ctx.strokeRect(panelX, panelY, panelW, panelH);
+  ctx.strokeRect(leftPad, panelY, panelW, panelH);
 
   ctx.fillStyle = "#dff7ff";
   ctx.font = "12px 'Trebuchet MS', sans-serif";
-  ctx.fillText("Aim (A/D):", panelX + 10, panelY + 16);
-  ctx.fillText(`Pitch ${Math.round(GAME.pitchAim * 100)}`, panelX + 10, panelY + 31);
+  ctx.fillText("Aim (A/D):", leftPad + 10, panelY + 16);
+  ctx.fillText(`Pitch ${Math.round(GAME.pitchAim * 100)}`, leftPad + 10, panelY + 31);
 
-  const meterTrackX = panelX + 104;
+  const meterTrackX = leftPad + 104;
   const meterTrackY = panelY + 24;
   const meterTrackW = 172;
   ctx.fillStyle = "rgba(26, 46, 74, 0.9)";
@@ -1526,68 +1596,48 @@ function drawAimMeters() {
   ctx.fillStyle = "#7de1ff";
   ctx.fillRect(meterTrackX + 2, meterTrackY + 1, (GAME.pitchAim + 1) * ((meterTrackW - 4) / 2), 7);
 
-  // Compact contact meter docked to lower-right, out of field action.
-  const bx = GAME.width - 176;
-  const by = GAME.height - 52;
-  ctx.fillStyle = "rgba(9, 18, 34, 0.84)";
-  ctx.fillRect(bx, by, 158, 34);
-  ctx.strokeStyle = "rgba(83, 210, 255, 0.5)";
-  ctx.strokeRect(bx, by, 158, 34);
+  const rightW = 164;
+  const rightH = 36;
+  const rightX = GAME.width - rightW - leftPad;
+  const rightY = GAME.height - rightH - bottomPad;
+  ctx.fillStyle = "rgba(9, 18, 34, 0.86)";
+  ctx.fillRect(rightX, rightY, rightW, rightH);
+  ctx.strokeStyle = "rgba(83, 210, 255, 0.58)";
+  ctx.strokeRect(rightX, rightY, rightW, rightH);
   ctx.fillStyle = "#dff7ff";
-  ctx.fillText("Contact", bx + 10, by + 14);
+  ctx.fillText("Contact", rightX + 10, rightY + 14);
   ctx.fillStyle = "#ffa85e";
-  ctx.fillRect(bx + 10, by + 18, 132, 10);
+  ctx.fillRect(rightX + 10, rightY + 18, 132, 10);
   ctx.fillStyle = "#7bffb4";
-  ctx.fillRect(bx + 56, by + 18, 34, 10);
+  ctx.fillRect(rightX + 56, rightY + 18, 34, 10);
   ctx.fillStyle = "#111";
-  ctx.fillRect(bx + 74 + GAME.swingAim * 34, by + 17, 3, 12);
+  ctx.fillRect(rightX + 74 + GAME.swingAim * 34, rightY + 17, 3, 12);
 }
 
-function applyRenderGridLayout() {
-  const width = GAME.width;
-  const height = GAME.height;
-  FIELD.home.x = width * 0.5;
-  FIELD.home.y = height * 0.82;
-  FIELD.first.x = width * 0.72;
-  FIELD.first.y = height * 0.62;
-  FIELD.second.x = width * 0.5;
-  FIELD.second.y = height * 0.42;
-  FIELD.third.x = width * 0.28;
-  FIELD.third.y = height * 0.62;
-  FIELD.mound.x = width * 0.5;
-  FIELD.mound.y = height * 0.64;
-  FIELD.foulTop.x = width * 0.18;
-  FIELD.foulTop.y = height * 0.08;
-  FIELD.foulBottom.x = width * 0.82;
-  FIELD.foulBottom.y = height * 0.08;
+function drawUI() {
+  drawPlayCallout();
+  drawAimMeters();
+}
 
-  batter.x = FIELD.home.x + 30;
-  batter.y = FIELD.home.y - 46;
-  pitcher.x = FIELD.mound.x - 10;
-  pitcher.y = FIELD.mound.y - 46;
-  if (!pitchBall.active) {
-    pitchBall.x = pitcher.x + 14;
-    pitchBall.y = pitcher.y + 16;
-  }
+function clearCanvas() {
+  ctx.clearRect(0, 0, GAME.width, GAME.height);
 }
 
 function render() {
-  applyRenderGridLayout();
+  syncRenderLayout();
   const shake = GAME.cameraShake > 0 ? Math.sin(performance.now() * 0.1) * 6 : 0;
   ctx.save();
-  ctx.clearRect(0, 0, GAME.width, GAME.height);
+  clearCanvas();
   ctx.translate(shake, 0);
+
+  drawBackground();
   drawField();
-  drawRunnerDots();
-  drawPitcher();
-  drawFielders();
-  drawBattedBall();
-  drawBatter();
+  drawBasesAndLines();
+  drawPlayers();
+  drawBall();
+  drawBat();
   drawHitTrajectory();
-  drawPitchBall();
-  drawParticles();
-  drawPlayCallout();
-  drawAimMeters();
+  drawUI();
   ctx.restore();
 
   if (GAME.flashTime > 0) {
