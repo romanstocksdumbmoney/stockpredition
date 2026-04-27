@@ -148,6 +148,7 @@ const FIELDING_AI_TUNING = {
 
 const DEBUG = false;
 const DEBUG_FIELDING = false;
+const DEBUG_INPUT = true;
 const PITCH_DURATION_MS = 1150;
 const PITCH_DURATION_RANGE_MS = { min: 1000, max: 1300 };
 const PITCH_MAX_VELOCITY = 980;
@@ -339,33 +340,41 @@ function getStrikeZoneBounds() {
 
 const BASE_KEYS = ["home", "first", "second", "third"];
 
+const INPUT_ACTION_MAP = {
+  moveUp: ["w", "ArrowUp"],
+  moveDown: ["s", "ArrowDown"],
+  moveLeft: ["a", "ArrowLeft"],
+  moveRight: ["d", "ArrowRight"],
+  swing: ["Space"],
+  powerSwing: ["Shift"],
+  pitchThrow: ["Space"],
+  throwFirst: ["q"],
+  throwSecond: ["f"],
+  throwThird: ["e"],
+  throwHome: ["r"],
+  catchDive: ["Space"]
+};
+
 const CONTROL_PRESETS = {
-  player1: {
-    moveUp: ["w", "ArrowUp"],
-    moveDown: ["s", "ArrowDown"],
-    moveLeft: ["a", "ArrowLeft"],
-    moveRight: ["d", "ArrowRight"],
-    swing: ["Space"],
-    powerSwing: ["Shift"],
-    pitchHold: ["f"],
-    throwFirst: ["q"],
-    throwSecond: ["w"],
-    throwThird: ["e"],
-    throwHome: ["r"]
-  },
-  player2: {
-    moveUp: ["i"],
-    moveDown: ["k"],
-    moveLeft: ["j"],
-    moveRight: ["l"],
-    swing: ["/"],
-    powerSwing: ["."],
-    pitchHold: ["Enter"],
-    throwFirst: ["u", "q"],
-    throwSecond: ["i", "w"],
-    throwThird: ["o", "e"],
-    throwHome: ["p", "r"]
-  }
+  player1: { ...INPUT_ACTION_MAP },
+  player2: { ...INPUT_ACTION_MAP }
+};
+
+const ACTIVE_ROLE_ACTIONS = {
+  batter: ["moveUp", "moveDown", "moveLeft", "moveRight", "swing", "powerSwing"],
+  pitcher: ["moveUp", "moveDown", "moveLeft", "moveRight", "pitchThrow"],
+  fielder: [
+    "moveUp",
+    "moveDown",
+    "moveLeft",
+    "moveRight",
+    "catchDive",
+    "throwFirst",
+    "throwSecond",
+    "throwThird",
+    "throwHome"
+  ],
+  none: []
 };
 
 const TEAMS = [
@@ -548,18 +557,21 @@ function normalizeInputKey(event) {
 }
 
 function isActionHeld(controller, action) {
+  if (!actionAllowedForRole(GAME.controlledRole, action)) return false;
   const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
   const keys = preset[action] ?? [];
   return keys.some((key) => input.keys.has(key));
 }
 
 function wasActionPressed(controller, action) {
+  if (!actionAllowedForRole(GAME.controlledRole, action)) return false;
   const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
   const keys = preset[action] ?? [];
   return keys.some((key) => input.justPressed.has(key));
 }
 
 function wasActionReleased(controller, action) {
+  if (!actionAllowedForRole(GAME.controlledRole, action)) return false;
   const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
   const keys = preset[action] ?? [];
   return keys.some((key) => input.justReleased.has(key));
@@ -571,7 +583,7 @@ function clearInputFrame() {
 }
 
 function getControllerForSide(side) {
-  return GAME.controllerSides?.player1 === side ? "player1" : "player2";
+  return "player1";
 }
 
 function getBattingController() {
@@ -582,20 +594,36 @@ function getFieldingController() {
   return getControllerForSide(GAME.fieldingSide);
 }
 
+function getEffectiveControllerForRole(role) {
+  if (role === "batter") return getBattingController();
+  if (role === "pitcher" || role === "fielder") return getFieldingController();
+  return "player1";
+}
+
+function actionAllowedForRole(role, action) {
+  const allow = ACTIVE_ROLE_ACTIONS[role] ?? ACTIVE_ROLE_ACTIONS.none;
+  return allow.includes(action);
+}
+
+function determineActiveInputRole() {
+  if (GAME.mode !== "play") return "none";
+  if (GAME.battedBall) return "fielder";
+  if (pitchBall.active) return "batter";
+  return "pitcher";
+}
+
+function logInputEvent(action, details = "") {
+  if (!DEBUG_INPUT) return;
+  const state = `${GAME.mode}/${GAME.phase}`;
+  if (details) {
+    console.log(`[INPUT] ${action} in state: ${state} (${details})`);
+  } else {
+    console.log(`[INPUT] ${action} in state: ${state}`);
+  }
+}
+
 function updateControlledRole() {
-  if (GAME.mode !== "play") {
-    GAME.controlledRole = "none";
-    return;
-  }
-  if (GAME.battedBall && GAME.pendingPlay?.awaitingThrow) {
-    GAME.controlledRole = "fielder";
-    return;
-  }
-  if (pitchBall.active) {
-    GAME.controlledRole = "batter";
-    return;
-  }
-  GAME.controlledRole = "pitcher";
+  GAME.controlledRole = determineActiveInputRole();
 }
 
 const GameManager = {
@@ -747,6 +775,7 @@ function selectPitchTypeByKey(key) {
   if (!selected) return;
   GAME.selectedPitchType = selected;
   GAME.debugInfo.pitchType = PITCH_TYPE_CONFIG[selected].label;
+  logInputEvent("Pitch type selected", PITCH_TYPE_CONFIG[selected].label);
 }
 
 function nearestBaseKeyFromFielder(fielder) {
@@ -883,7 +912,7 @@ function updateThrowBall(dt) {
 }
 
 function updatePitchController(dt) {
-  if (GAME.mode !== "play" || GAME.battedBall) return;
+  if (GAME.mode !== "play" || GAME.battedBall || GAME.controlledRole !== "pitcher") return;
   const pitcherController = getFieldingController();
   const aim = getPitchAimInputs(pitcherController);
   GAME.pitchAim = clampValue(GAME.pitchAim + aim.x * dt * 1.8, -1, 1);
@@ -893,16 +922,17 @@ function updatePitchController(dt) {
     GAME.pitchCharge.meter = 0.5 + 0.5 * Math.sin(GAME.pitchCharge.elapsed * 7.2);
     GAME.debugInfo.pitchCharge = GAME.pitchCharge.meter.toFixed(2);
   }
-  if (!GAME.pitchCharge.active && GAME.pitchReady && wasActionPressed(pitcherController, "pitchHold")) {
+  if (!GAME.pitchCharge.active && GAME.pitchReady && wasActionPressed(pitcherController, "pitchThrow")) {
+    logInputEvent("Pitch throw pressed");
     startPitchCharge();
   }
-  if (GAME.pitchCharge.active && wasActionReleased(pitcherController, "pitchHold")) {
+  if (GAME.pitchCharge.active && wasActionReleased(pitcherController, "pitchThrow")) {
     releasePitchCharge();
   }
 }
 
 function updateBattingController(dt) {
-  if (GAME.mode !== "play") return;
+  if (GAME.mode !== "play" || GAME.controlledRole !== "batter") return;
   if (!pitchBall.active || GAME.battedBall) {
     GAME.timingMeter.active = false;
     return;
@@ -913,6 +943,7 @@ function updateBattingController(dt) {
   GAME.timingMeter.active = true;
   GAME.timingMeter.progress = pitchBall.pitchProgress;
   if (wasActionPressed(batterController, "swing")) {
+    logInputEvent("Swing pressed");
     handleSwingInput();
   }
 }
@@ -1883,17 +1914,12 @@ function applyPendingPitchCall() {
 }
 
 function updatePitchAim(dt) {
-  const batterController = getBattingController();
-  const pitcherController = getFieldingController();
-  const batAim = getPitchAimInputs(batterController);
-  const pitchAim = getPitchAimInputs(pitcherController);
-  GAME.pitchAim = clampValue(GAME.pitchAim + pitchAim.x * dt * 1.6, -1, 1);
-  GAME.pitchAimY = clampValue(GAME.pitchAimY + pitchAim.y * dt * 1.6, -1, 1);
-  GAME.swingAim = clampValue(GAME.swingAim + batAim.x * dt * 1.6, -1, 1);
+  // Per-role aim now updates in each controller to avoid cross-role bleed.
+  void dt;
 }
 
 function updateFieldingInput(dt) {
-  if (GAME.mode !== "play") return;
+  if (GAME.mode !== "play" || GAME.controlledRole !== "fielder") return;
   if (!GAME.battedBall) return;
 
   const controller = getFieldingController();
@@ -1909,17 +1935,31 @@ function updateFieldingInput(dt) {
 
   const len = Math.hypot(dx, dy);
   if (len > 0) {
+    logInputEvent("Fielder move input", `dx:${dx} dy:${dy}`);
     const speed = fielder.speed * dt;
     fielder.x += (dx / len) * speed;
     fielder.y += (dy / len) * speed;
   }
 
   if (GAME.pendingPlay?.awaitingThrow && !GAME.pendingPlay.targetBase) {
-    if (wasActionPressed(controller, "throwFirst")) queueThrowToBase("first");
-    if (wasActionPressed(controller, "throwSecond")) queueThrowToBase("second");
-    if (wasActionPressed(controller, "throwThird")) queueThrowToBase("third");
-    if (wasActionPressed(controller, "throwHome")) queueThrowToBase("home");
-    if (wasActionPressed(controller, "swing")) {
+    if (wasActionPressed(controller, "throwFirst")) {
+      logInputEvent("Throw button pressed", "to first");
+      queueThrowToBase("first");
+    }
+    if (wasActionPressed(controller, "throwSecond")) {
+      logInputEvent("Throw button pressed", "to second");
+      queueThrowToBase("second");
+    }
+    if (wasActionPressed(controller, "throwThird")) {
+      logInputEvent("Throw button pressed", "to third");
+      queueThrowToBase("third");
+    }
+    if (wasActionPressed(controller, "throwHome")) {
+      logInputEvent("Throw button pressed", "to home");
+      queueThrowToBase("home");
+    }
+    if (wasActionPressed(controller, "catchDive")) {
+      logInputEvent("Catch/Dive pressed", "nearest base assist");
       queueThrowToBase(nearestBaseKeyFromFielder(fielder));
     }
   }
@@ -3322,6 +3362,9 @@ function throwToNumber(key) {
 }
 
 function handleKeyDown(event) {
+  if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
+    return;
+  }
   const key = normalizeInputKey(event);
   if (!input.keys.has(key)) {
     input.justPressed.add(key);
@@ -3353,6 +3396,7 @@ function handleKeyDown(event) {
     const batterSwingKeys = (CONTROL_PRESETS[batterController] ?? CONTROL_PRESETS.player1).swing ?? [];
     if (batterSwingKeys.includes(key)) {
       GAME.swingBuffer = SWING_BUFFER_WINDOW;
+      logInputEvent("Swing buffered");
     }
   }
 }
@@ -3379,6 +3423,11 @@ startButton.addEventListener("click", startGame);
 restartButton.addEventListener("click", startGame);
 window.addEventListener("keydown", handleKeyDown);
 window.addEventListener("keyup", handleKeyUp);
+window.addEventListener("click", () => {
+  if (document.activeElement !== document.body) {
+    document.body.focus();
+  }
+});
 
 updateHud();
 render();
