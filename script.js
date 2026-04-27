@@ -34,10 +34,10 @@ const finalScoreText = document.getElementById("finalScoreText");
 
 // Core geometry controls for field proportion/camera tuning.
 const FIELD_TUNING = {
-  homeX: 852,
-  homeY: 408,
-  baseSpacingX: 300,
-  baseSpacingY: 196,
+  homeX: 828,
+  homeY: 404,
+  baseSpacingX: 288,
+  baseSpacingY: 186,
   moundForwardOffsetX: -36,
   moundForwardOffsetY: -6,
   moundRadiusX: 92,
@@ -45,6 +45,14 @@ const FIELD_TUNING = {
   wallRadius: 610,
   warningTrackWidth: 34,
   cameraZoom: 1.08
+};
+
+const LAYOUT = {
+  fieldOffsetX: 0,
+  fieldOffsetY: 0,
+  fieldInsetTop: 56,
+  fieldInsetBottom: 104,
+  fieldInsetSide: 32
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -1102,71 +1110,88 @@ function drawFairTerritoryMask() {
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
-  ctx.arc(FIELD.home.x, FIELD.home.y, 520, -2.6, 2.6);
+  ctx.arc(FIELD.home.x, FIELD.home.y, FIELD_TUNING.wallRadius - FIELD_TUNING.warningTrackWidth - 10, -2.58, 2.58);
   ctx.closePath();
 }
 
 function drawField() {
-  const sky = ctx.createLinearGradient(0, 0, 0, 220);
+  const fieldInsetX = 22;
+  const fieldTopY = 94;
+  const fieldBottomY = GAME.height - 66;
+  const fieldWidth = GAME.width - fieldInsetX * 2;
+  const outfieldClipRadius = Math.max(430, FIELD_TUNING.wallRadius - 70);
+
+  const sky = ctx.createLinearGradient(0, 0, 0, fieldTopY + 120);
   sky.addColorStop(0, "#86caff");
   sky.addColorStop(1, "#5b92dc");
   ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, GAME.width, 220);
+  ctx.fillRect(fieldInsetX, 0, fieldWidth, fieldTopY + 118);
 
-  ctx.fillStyle = "#1a4280";
-  ctx.fillRect(0, 84, GAME.width, 24);
-  ctx.fillStyle = "#25345b";
-  ctx.fillRect(0, 108, GAME.width, 68);
-  for (let i = 0; i < GAME.width; i += 8) {
+  // Stadium depth layers
+  ctx.fillStyle = "#142f59";
+  ctx.fillRect(fieldInsetX, fieldTopY - 28, fieldWidth, 22);
+  ctx.fillStyle = "#263456";
+  ctx.fillRect(fieldInsetX, fieldTopY - 6, fieldWidth, 54);
+  for (let i = fieldInsetX; i < GAME.width - fieldInsetX; i += 8) {
     ctx.fillStyle = i % 16 === 0 ? "#51d4ff" : "#ffb9f9";
-    ctx.fillRect(i, 116 + ((i / 8) % 4), 4, 6);
+    ctx.fillRect(i, fieldTopY + 6 + ((i / 8) % 4), 4, 6);
   }
 
-  ctx.fillStyle = "#c18c57";
-  ctx.fillRect(0, 176, GAME.width, GAME.height - 176);
+  // Warning track before wall
+  ctx.strokeStyle = "#b88956";
+  ctx.lineWidth = FIELD_TUNING.warningTrackWidth;
+  ctx.beginPath();
+  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldClipRadius - 16, -2.58, 2.58);
+  ctx.stroke();
 
   ctx.save();
-  drawFairTerritoryMask();
+  ctx.beginPath();
+  ctx.moveTo(FIELD.home.x, FIELD.home.y);
+  ctx.lineTo(FIELD.foulTop.x, FIELD.foulTop.y);
+  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldClipRadius, -2.58, 2.58);
+  ctx.closePath();
   ctx.clip();
 
-  const grass = ctx.createLinearGradient(0, 176, 0, GAME.height);
-  grass.addColorStop(0, "#35a66a");
-  grass.addColorStop(1, "#1f7a4a");
+  const grass = ctx.createLinearGradient(0, fieldTopY + 70, 0, fieldBottomY);
+  grass.addColorStop(0, "#2f8e5a");
+  grass.addColorStop(1, "#44a66b");
   ctx.fillStyle = grass;
-  ctx.fillRect(0, 176, GAME.width, GAME.height - 176);
+  ctx.fillRect(fieldInsetX, fieldTopY + 46, fieldWidth, fieldBottomY - fieldTopY);
 
-  for (let i = -240; i < GAME.width + 330; i += 34) {
-    ctx.fillStyle = "rgba(255,255,255,0.09)";
+  for (let i = fieldInsetX - 200; i < GAME.width + 250; i += 36) {
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
     ctx.beginPath();
-    ctx.moveTo(i, 164);
-    ctx.lineTo(i + 26, 164);
-    ctx.lineTo(i + 194, GAME.height);
-    ctx.lineTo(i + 168, GAME.height);
+    ctx.moveTo(i, fieldTopY + 30);
+    ctx.lineTo(i + 24, fieldTopY + 30);
+    ctx.lineTo(i + 190, fieldBottomY + 16);
+    ctx.lineTo(i + 166, fieldBottomY + 16);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 
-  ctx.strokeStyle = "#0f2f56";
-  ctx.lineWidth = 13;
+  // Outfield wall
+  ctx.strokeStyle = "#0f335f";
+  ctx.lineWidth = 11;
   ctx.beginPath();
-  ctx.arc(FIELD.home.x, FIELD.home.y, 520, -2.6, 2.6);
+  ctx.arc(FIELD.home.x, FIELD.home.y, outfieldClipRadius, -2.58, 2.58);
   ctx.stroke();
 
-  // Larger infield dirt cutout to emphasize arcade infield action.
+  // Infield dirt cutout
   ctx.fillStyle = "#cd9a67";
   ctx.beginPath();
-  ctx.moveTo(FIELD.home.x + 6, FIELD.home.y + 28);
-  ctx.lineTo(FIELD.third.x - 94, FIELD.third.y + 16);
-  ctx.lineTo(FIELD.second.x - 54, FIELD.second.y - 118);
-  ctx.lineTo(FIELD.first.x + 98, FIELD.first.y - 12);
+  ctx.moveTo(FIELD.home.x + 8, FIELD.home.y + 30);
+  ctx.lineTo(FIELD.third.x - 80, FIELD.third.y + 8);
+  ctx.lineTo(FIELD.second.x - 44, FIELD.second.y - 100);
+  ctx.lineTo(FIELD.first.x + 86, FIELD.first.y - 12);
   ctx.closePath();
   ctx.fill();
 
+  // Base paths
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = "#d3a16e";
-  ctx.lineWidth = 66;
+  ctx.lineWidth = 54;
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.first.x, FIELD.first.y);
@@ -1176,7 +1201,7 @@ function drawField() {
   ctx.stroke();
 
   ctx.strokeStyle = "rgba(255,249,232,0.98)";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.moveTo(FIELD.home.x, FIELD.home.y);
   ctx.lineTo(FIELD.first.x, FIELD.first.y);
@@ -1466,31 +1491,46 @@ function drawParticles() {
 }
 
 function drawAimMeters() {
-  // Pitch meter (when fielding)
-  const meterX = 16;
-  const meterY = 488;
-  ctx.fillStyle = "rgba(10,20,40,0.7)";
-  ctx.fillRect(meterX, meterY, 190, 36);
-  ctx.strokeStyle = "#67d7ff";
-  ctx.strokeRect(meterX, meterY, 190, 36);
+  // Bottom utility panel keeps UI away from active play space.
+  const panelX = 18;
+  const panelY = GAME.height - 56;
+  const panelW = 296;
+  const panelH = 44;
+
+  ctx.fillStyle = "rgba(9, 18, 34, 0.84)";
+  ctx.fillRect(panelX, panelY, panelW, panelH);
+  ctx.strokeStyle = "rgba(83, 210, 255, 0.5)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(panelX, panelY, panelW, panelH);
+
   ctx.fillStyle = "#dff7ff";
   ctx.font = "12px 'Trebuchet MS', sans-serif";
-  ctx.fillText("Aim (A/D):", meterX + 8, meterY + 15);
-  ctx.fillText(`Pitch ${Math.round(GAME.pitchAim * 100)}`, meterX + 8, meterY + 30);
-  ctx.fillStyle = "#7de1ff";
-  ctx.fillRect(meterX + 98, meterY + 20, (GAME.pitchAim + 1) * 42, 8);
+  ctx.fillText("Aim (A/D):", panelX + 10, panelY + 16);
+  ctx.fillText(`Pitch ${Math.round(GAME.pitchAim * 100)}`, panelX + 10, panelY + 31);
 
-  // Contact timing zone near batter.
-  const bx = FIELD.home.x - 132;
-  const by = FIELD.home.y - 62;
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.fillRect(bx, by, 76, 16);
+  const meterTrackX = panelX + 104;
+  const meterTrackY = panelY + 24;
+  const meterTrackW = 172;
+  ctx.fillStyle = "rgba(26, 46, 74, 0.9)";
+  ctx.fillRect(meterTrackX, meterTrackY, meterTrackW, 9);
+  ctx.fillStyle = "#7de1ff";
+  ctx.fillRect(meterTrackX + 2, meterTrackY + 1, (GAME.pitchAim + 1) * ((meterTrackW - 4) / 2), 7);
+
+  // Compact contact meter docked to lower-right, out of field action.
+  const bx = GAME.width - 176;
+  const by = GAME.height - 52;
+  ctx.fillStyle = "rgba(9, 18, 34, 0.84)";
+  ctx.fillRect(bx, by, 158, 34);
+  ctx.strokeStyle = "rgba(83, 210, 255, 0.5)";
+  ctx.strokeRect(bx, by, 158, 34);
+  ctx.fillStyle = "#dff7ff";
+  ctx.fillText("Contact", bx + 10, by + 14);
   ctx.fillStyle = "#ffa85e";
-  ctx.fillRect(bx + 2, by + 2, 72, 12);
+  ctx.fillRect(bx + 10, by + 18, 132, 10);
   ctx.fillStyle = "#7bffb4";
-  ctx.fillRect(bx + 26, by + 2, 22, 12);
+  ctx.fillRect(bx + 56, by + 18, 34, 10);
   ctx.fillStyle = "#111";
-  ctx.fillRect(bx + 38 + GAME.swingAim * 22, by + 1, 2, 14);
+  ctx.fillRect(bx + 74 + GAME.swingAim * 34, by + 17, 3, 12);
 }
 
 function render() {

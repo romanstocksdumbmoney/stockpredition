@@ -10,7 +10,7 @@
     <main class="game-shell">
       <header class="hud">
         <h1>NEON SLUGGER DELUXE</h1>
-        <div class="score-block">
+        <div class="score-block scoreboard-bar">
           <div class="score-line">
             <span class="away" id="awayTeamName">Away</span>
             <strong id="awayScoreValue">0</strong>
@@ -19,11 +19,11 @@
             <strong id="homeScoreValue">0</strong>
           </div>
           <div class="stats">
-            <span>Inning: <strong id="inningValue">1</strong></span>
-            <span>Half: <strong id="halfValue">top</strong></span>
-            <span>B: <strong id="ballsValue">0</strong></span>
-            <span>S: <strong id="strikesValue">0</strong></span>
-            <span>O: <strong id="outsValue">0</strong></span>
+            <span class="stat-item">Inning: <strong id="inningValue">1</strong></span>
+            <span class="stat-item">Half: <strong id="halfValue">top</strong></span>
+            <span class="stat-item">B: <strong id="ballsValue">0</strong></span>
+            <span class="stat-item">S: <strong id="strikesValue">0</strong></span>
+            <span class="stat-item">O: <strong id="outsValue">0</strong></span>
           </div>
         </div>
       </header>
@@ -59,7 +59,9 @@
       </section>
 
       <canvas id="gameCanvas" width="1080" height="620"></canvas>
-      <p id="messageBar" class="message">Select teams and press Start.</p>
+      <div class="bottom-ui-panel">
+        <p id="messageBar" class="message">Select teams and press Start.</p>
+      </div>
     </main>
 
     <script src="script.js"></script>
