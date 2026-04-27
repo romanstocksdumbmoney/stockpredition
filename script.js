@@ -35,15 +35,15 @@ const finalScoreText = document.getElementById("finalScoreText");
 // Centralized render geometry. Every field/actor draw uses this system.
 const FIELD_LAYOUT_RATIOS = {
   // Bigger, deeper isometric playfield so pitcher/fielders are not cramped.
-  homeY: 0.86,
-  secondY: 0.30,
-  baseSpread: 0.27,
+  homeY: 0.89,
+  secondY: 0.22,
+  baseSpread: 0.33,
   hudHeight: 70,
   bottomBarHeight: 60
 };
 
 const FIELD_DEPTH_TUNING = {
-  moundDepthRatio: 0.57
+  moundDepthRatio: 0.64
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -85,6 +85,57 @@ const PITCH_TUNING = {
   speedMax: 345,
   curveStrength: 80
 };
+
+const CAMERA_TUNING = {
+  battingDamping: 0.1,
+  pitchingDamping: 0.11,
+  fieldingDamping: 0.12,
+  homerDamping: 0.13,
+  maxX: 310,
+  maxYTop: -320,
+  maxYBottom: 130
+};
+
+const PITCH_TYPE_CONFIG = {
+  fastball: {
+    key: "1",
+    label: "FASTBALL",
+    durationMs: 1040,
+    curveScale: 0.15,
+    drop: -4,
+    speedBoost: 1
+  },
+  changeup: {
+    key: "2",
+    label: "CHANGEUP",
+    durationMs: 1260,
+    curveScale: 0.25,
+    drop: 22,
+    speedBoost: 0.82
+  },
+  curveball: {
+    key: "3",
+    label: "CURVEBALL",
+    durationMs: 1175,
+    curveScale: 1,
+    drop: 16,
+    speedBoost: 0.9
+  },
+  slider: {
+    key: "4",
+    label: "SLIDER",
+    durationMs: 1110,
+    curveScale: 1.35,
+    drop: 9,
+    speedBoost: 0.95
+  }
+};
+
+const PITCH_TYPE_BY_KEY = Object.fromEntries(
+  Object.entries(PITCH_TYPE_CONFIG).map(([name, cfg]) => [cfg.key, name])
+);
+
+const TIMING_FEEDBACK_ORDER = ["VERY EARLY", "EARLY", "GOOD", "PERFECT", "LATE", "VERY LATE", "MISS"];
 
 const FIELDING_AI_TUNING = {
   gravity: 920,
@@ -145,6 +196,12 @@ const clamp = clampValue;
 
 function lerp(a, b, t) {
   return a + (b - a) * clampValue(t, 0, 1);
+}
+
+function dampLerp(current, target, damping, dt) {
+  const safeDamping = clampValue(damping, 0.001, 0.999);
+  const blend = 1 - Math.pow(1 - safeDamping, dt * 60);
+  return current + (target - current) * blend;
 }
 
 function normalizeInRange(value, min, max) {
@@ -282,6 +339,35 @@ function getStrikeZoneBounds() {
 
 const BASE_KEYS = ["home", "first", "second", "third"];
 
+const CONTROL_PRESETS = {
+  player1: {
+    moveUp: ["w", "ArrowUp"],
+    moveDown: ["s", "ArrowDown"],
+    moveLeft: ["a", "ArrowLeft"],
+    moveRight: ["d", "ArrowRight"],
+    swing: ["Space"],
+    powerSwing: ["Shift"],
+    pitchHold: ["f"],
+    throwFirst: ["q"],
+    throwSecond: ["w"],
+    throwThird: ["e"],
+    throwHome: ["r"]
+  },
+  player2: {
+    moveUp: ["i"],
+    moveDown: ["k"],
+    moveLeft: ["j"],
+    moveRight: ["l"],
+    swing: ["/"],
+    powerSwing: ["."],
+    pitchHold: ["Enter"],
+    throwFirst: ["u", "q"],
+    throwSecond: ["i", "w"],
+    throwThird: ["o", "e"],
+    throwHome: ["p", "r"]
+  }
+};
+
 const TEAMS = [
   {
     id: "comets",
@@ -334,21 +420,44 @@ const GAME = {
   teams: { away: TEAMS[0], home: TEAMS[1] },
   battingSide: "away",
   fieldingSide: "home",
+  phase: "pitch_setup", // pitch_setup | pitch_flight | ball_in_play | throw_resolve
   runners: [false, false, false], // first, second, third
   pitchReady: false,
   pitchTimer: 0,
   nextPitchDelay: 0.75,
   pitchAim: 0,
+  pitchAimY: 0,
   swingAim: 0,
   controlledFielder: 1,
+  controlledRole: "batter",
   cameraShake: 0,
+  cameraMode: "batting",
   particles: [],
   battedBall: null,
   pendingPlay: null,
+  throwBall: null,
   flashTime: 0,
   swingBuffer: 0,
   lastContactOffset: 0,
   playCallout: null,
+  swingFeedback: "",
+  swingFeedbackLife: 0,
+  localMultiplayer: true,
+  selectedPitchType: "fastball",
+  pitchCharge: {
+    active: false,
+    elapsed: 0,
+    meter: 0,
+    quality: 0,
+    owner: "player1"
+  },
+  timingMeter: {
+    active: false,
+    progress: 0,
+    verdict: "",
+    quality: 0,
+    life: 0
+  },
   strikeZone: null,
   cameraX: 0,
   cameraY: 0,
@@ -364,6 +473,8 @@ const GAME = {
     swingActive: "false",
     hitDetected: "false",
     hitType: "-",
+    pitchType: "FASTBALL",
+    pitchCharge: "0.00",
     assignedFielder: "-",
     backupFielder: "-",
     fielderTarget: "-",
@@ -423,10 +534,152 @@ const pitchBall = {
 };
 
 const input = {
-  keys: new Set()
+  keys: new Set(),
+  justPressed: new Set(),
+  justReleased: new Set()
 };
 
 const defensiveFielders = [];
+
+function normalizeInputKey(event) {
+  return event.code === "Space"
+    ? "Space"
+    : (event.key.length === 1 ? event.key.toLowerCase() : event.key);
+}
+
+function isActionHeld(controller, action) {
+  const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
+  const keys = preset[action] ?? [];
+  return keys.some((key) => input.keys.has(key));
+}
+
+function wasActionPressed(controller, action) {
+  const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
+  const keys = preset[action] ?? [];
+  return keys.some((key) => input.justPressed.has(key));
+}
+
+function wasActionReleased(controller, action) {
+  const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
+  const keys = preset[action] ?? [];
+  return keys.some((key) => input.justReleased.has(key));
+}
+
+function clearInputFrame() {
+  input.justPressed.clear();
+  input.justReleased.clear();
+}
+
+function getControllerForSide(side) {
+  return GAME.controllerSides?.player1 === side ? "player1" : "player2";
+}
+
+function getBattingController() {
+  return getControllerForSide(GAME.battingSide);
+}
+
+function getFieldingController() {
+  return getControllerForSide(GAME.fieldingSide);
+}
+
+function updateControlledRole() {
+  if (GAME.mode !== "play") {
+    GAME.controlledRole = "none";
+    return;
+  }
+  if (GAME.battedBall && GAME.pendingPlay?.awaitingThrow) {
+    GAME.controlledRole = "fielder";
+    return;
+  }
+  if (pitchBall.active) {
+    GAME.controlledRole = "batter";
+    return;
+  }
+  GAME.controlledRole = "pitcher";
+}
+
+const GameManager = {
+  setPhase(phase, cameraMode = null) {
+    GAME.phase = phase;
+    if (cameraMode) GAME.cameraMode = cameraMode;
+  },
+  syncControllerRoles() {
+    updateControlledRole();
+  }
+};
+
+const InputManager = {
+  clearFrame() {
+    clearInputFrame();
+  }
+};
+
+const CameraController = {
+  update(dt) {
+    updateCamera(dt);
+  }
+};
+
+const PitchingController = {
+  update(dt) {
+    updatePitchController(dt);
+  }
+};
+
+const BattingController = {
+  update(dt) {
+    updateBattingController(dt);
+  }
+};
+
+const BallPhysics = {
+  update(dt) {
+    updateBattedBall(dt);
+    updateThrowBall(dt);
+  }
+};
+
+const FieldingController = {
+  update(dt) {
+    updateFieldingInput(dt);
+    updateFielders(dt);
+  }
+};
+
+const RunnerManager = {
+  primePendingRunnerTimes(hitType) {
+    const speed = teamRating(GAME.teams[GAME.battingSide], "speed");
+    const groundPenalty = hitType === "grounder" ? 0.16 : 0;
+    const baseTime = 3.05 - speed * 0.5 + groundPenalty;
+    return {
+      first: clampValue(baseTime, 2.45, 3.45),
+      second: clampValue(baseTime + 2.55, 4.85, 6.1),
+      third: clampValue(baseTime + 5.25, 7.4, 8.9)
+    };
+  }
+};
+
+const ScoreboardManager = {
+  refresh() {
+    updateHud();
+  }
+};
+
+const MultiplayerManager = {
+  mode: "local",
+  networkHooks: {
+    // Hook these methods into WebSocket/WebRTC transport in online mode.
+    sendInput: null,
+    onRemoteInput: null,
+    onStateSnapshot: null
+  }
+};
+
+const UIManager = {
+  setMessage(text) {
+    setMessage(text);
+  }
+};
 
 function buildSelectOptions() {
   if (!teamSelectA || !teamSelectB) return;
@@ -469,6 +722,199 @@ function configureTeams() {
 
 function setMessage(text) {
   messageBar.textContent = text;
+}
+
+function setSwingFeedback(text, quality = 0) {
+  GAME.swingFeedback = text;
+  GAME.swingFeedbackLife = 1.0;
+  GAME.timingMeter.verdict = text;
+  GAME.timingMeter.quality = quality;
+  GAME.timingMeter.life = 1.0;
+}
+
+function getPitchAimInputs(controller) {
+  const moveLeft = isActionHeld(controller, "moveLeft");
+  const moveRight = isActionHeld(controller, "moveRight");
+  const moveUp = isActionHeld(controller, "moveUp");
+  const moveDown = isActionHeld(controller, "moveDown");
+  const x = (moveRight ? 1 : 0) - (moveLeft ? 1 : 0);
+  const y = (moveDown ? 1 : 0) - (moveUp ? 1 : 0);
+  return { x, y };
+}
+
+function selectPitchTypeByKey(key) {
+  const selected = PITCH_TYPE_BY_KEY[key];
+  if (!selected) return;
+  GAME.selectedPitchType = selected;
+  GAME.debugInfo.pitchType = PITCH_TYPE_CONFIG[selected].label;
+}
+
+function nearestBaseKeyFromFielder(fielder) {
+  if (!fielder) return "first";
+  const bases = {
+    home: FIELD.home,
+    first: FIELD.first,
+    second: FIELD.second,
+    third: FIELD.third
+  };
+  let best = "first";
+  let bestDist = Number.POSITIVE_INFINITY;
+  BASE_KEYS.forEach((key) => {
+    const base = bases[key];
+    const dist = Math.hypot(fielder.x - base.x, fielder.y - base.y);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = key;
+    }
+  });
+  return best;
+}
+
+function computePitchChargeQuality(meter) {
+  const perfectDist = Math.abs(meter - 0.52);
+  if (perfectDist <= 0.05) return 1;
+  if (perfectDist <= 0.12) return 0.76;
+  if (perfectDist <= 0.2) return 0.52;
+  return 0.3;
+}
+
+function startPitchCharge() {
+  if (!GAME.pitchReady || pitchBall.active || GAME.battedBall) return;
+  const pitcherController = getFieldingController();
+  GAME.pitchCharge.active = true;
+  GAME.pitchCharge.elapsed = 0;
+  GAME.pitchCharge.owner = pitcherController;
+  GameManager.setPhase("pitch_setup", "pitching");
+  setMessage(`${GAME.teams[GAME.fieldingSide].name} charging ${PITCH_TYPE_CONFIG[GAME.selectedPitchType].label}...`);
+}
+
+function releasePitchCharge() {
+  if (!GAME.pitchCharge.active) return;
+  const quality = computePitchChargeQuality(GAME.pitchCharge.meter);
+  GAME.pitchCharge.quality = quality;
+  GAME.pitchCharge.active = false;
+  spawnPitch();
+}
+
+function evaluateSwingTiming(ballX, zone) {
+  const earlyLateNorm = clamp((ballX - zone.cx) / HIT_PHYSICS_TUNING.timingWindowPx, -1, 1);
+  const absNorm = Math.abs(earlyLateNorm);
+  if (absNorm <= 0.08) return { label: "PERFECT", quality: 1, timingNorm: earlyLateNorm };
+  if (absNorm <= 0.22) return { label: "GOOD", quality: 0.82, timingNorm: earlyLateNorm };
+  if (earlyLateNorm > 0.45) return { label: "VERY EARLY", quality: 0.36, timingNorm: earlyLateNorm };
+  if (earlyLateNorm > 0.22) return { label: "EARLY", quality: 0.58, timingNorm: earlyLateNorm };
+  if (earlyLateNorm < -0.45) return { label: "VERY LATE", quality: 0.34, timingNorm: earlyLateNorm };
+  return { label: "LATE", quality: 0.56, timingNorm: earlyLateNorm };
+}
+
+function aimPitchTarget(zone, selectedPitch, pitchQuality) {
+  const baseTargetX = zone.cx + GAME.pitchAim * (zone.w * 0.48);
+  const baseTargetY = zone.cy + GAME.pitchAimY * (zone.h * 0.48);
+  const accuracySpread = lerp(42, 6, clampValue(pitchQuality, 0, 1));
+  const wobbleX = randomRange(-accuracySpread, accuracySpread);
+  const wobbleY = randomRange(-accuracySpread, accuracySpread);
+  const targetX = clampValue(baseTargetX + wobbleX, zone.x - 46, zone.x + zone.w + 46);
+  const targetY = clampValue(baseTargetY + wobbleY, zone.y - 62, zone.y + zone.h + 62);
+  const cfg = PITCH_TYPE_CONFIG[selectedPitch];
+  return { targetX, targetY, cfg };
+}
+
+function updateCamera(dt) {
+  let targetX = 0;
+  let targetY = 0;
+  let damping = CAMERA_TUNING.battingDamping;
+
+  if (GAME.cameraMode === "fielding" && GAME.battedBall) {
+    const trackedFielder = defensiveFielders[GAME.controlledFielder];
+    const blendX = trackedFielder ? lerp(GAME.battedBall.x, trackedFielder.x, 0.36) : GAME.battedBall.x;
+    const blendY = trackedFielder ? lerp(GAME.battedBall.groundY ?? GAME.battedBall.y, trackedFielder.y, 0.36) : (GAME.battedBall.groundY ?? GAME.battedBall.y);
+    targetX = blendX - FIELD.home.x;
+    targetY = blendY - FIELD.home.y - 58;
+    damping = GAME.pendingPlay?.homeRun ? CAMERA_TUNING.homerDamping : CAMERA_TUNING.fieldingDamping;
+  } else if (GAME.cameraMode === "pitching") {
+    targetX = lerp(GAME.pitchAim * 42, GAME.pitchAim * 96, 0.5);
+    targetY = -74 + GAME.pitchAimY * 28;
+    damping = CAMERA_TUNING.pitchingDamping;
+  } else {
+    targetX = 0;
+    targetY = -22;
+    damping = CAMERA_TUNING.battingDamping;
+  }
+
+  GAME.cameraTargetX = clampValue(targetX, -CAMERA_TUNING.maxX, CAMERA_TUNING.maxX);
+  GAME.cameraTargetY = clampValue(targetY, CAMERA_TUNING.maxYTop, CAMERA_TUNING.maxYBottom);
+  GAME.cameraX = dampLerp(GAME.cameraX, GAME.cameraTargetX, damping, dt);
+  GAME.cameraY = dampLerp(GAME.cameraY, GAME.cameraTargetY, damping, dt);
+}
+
+function queueThrowToBase(baseKey) {
+  if (!GAME.pendingPlay || GAME.pendingPlay.resolved || !GAME.pendingPlay.awaitingThrow) return;
+  GAME.pendingPlay.targetBase = baseKey;
+  GAME.pendingPlay.throwTimer = 0;
+  GameManager.setPhase("throw_resolve", "fielding");
+  setMessage(`Throw queued to ${baseKey.toUpperCase()}...`);
+}
+
+function schedulePendingThrowWindow(result) {
+  if (!GAME.pendingPlay) return;
+  GAME.pendingPlay.awaitingThrow = true;
+  GAME.pendingPlay.result = result;
+  GAME.pendingPlay.throwTimer = 0;
+  GAME.pendingPlay.targetBase = null;
+  const hitType = GAME.battedBall?.flightType ?? "line";
+  GAME.pendingPlay.runnerTimes = RunnerManager.primePendingRunnerTimes(hitType);
+  GameManager.setPhase("ball_in_play", "fielding");
+}
+
+function updateThrowBall(dt) {
+  if (!GAME.throwBall) return;
+  const tb = GAME.throwBall;
+  tb.t += dt / tb.travel;
+  if (tb.t >= 1) {
+    tb.t = 1;
+  }
+  const t = tb.t;
+  const inv = 1 - t;
+  tb.x = inv * inv * tb.startX + 2 * inv * t * tb.ctrlX + t * t * tb.endX;
+  tb.y = inv * inv * tb.startY + 2 * inv * t * tb.ctrlY + t * t * tb.endY;
+  if (tb.t >= 1) {
+    GAME.throwBall = null;
+  }
+}
+
+function updatePitchController(dt) {
+  if (GAME.mode !== "play" || GAME.battedBall) return;
+  const pitcherController = getFieldingController();
+  const aim = getPitchAimInputs(pitcherController);
+  GAME.pitchAim = clampValue(GAME.pitchAim + aim.x * dt * 1.8, -1, 1);
+  GAME.pitchAimY = clampValue(GAME.pitchAimY + aim.y * dt * 1.8, -1, 1);
+  if (GAME.pitchCharge.active) {
+    GAME.pitchCharge.elapsed += dt;
+    GAME.pitchCharge.meter = 0.5 + 0.5 * Math.sin(GAME.pitchCharge.elapsed * 7.2);
+    GAME.debugInfo.pitchCharge = GAME.pitchCharge.meter.toFixed(2);
+  }
+  if (!GAME.pitchCharge.active && GAME.pitchReady && wasActionPressed(pitcherController, "pitchHold")) {
+    startPitchCharge();
+  }
+  if (GAME.pitchCharge.active && wasActionReleased(pitcherController, "pitchHold")) {
+    releasePitchCharge();
+  }
+}
+
+function updateBattingController(dt) {
+  if (GAME.mode !== "play") return;
+  if (!pitchBall.active || GAME.battedBall) {
+    GAME.timingMeter.active = false;
+    return;
+  }
+  const batterController = getBattingController();
+  const aim = getPitchAimInputs(batterController);
+  GAME.swingAim = clampValue(GAME.swingAim + aim.x * dt * 1.85, -1, 1);
+  GAME.timingMeter.active = true;
+  GAME.timingMeter.progress = pitchBall.pitchProgress;
+  if (wasActionPressed(batterController, "swing")) {
+    handleSwingInput();
+  }
 }
 
 function showPlayCallout(text, kind = "info") {
@@ -545,9 +991,9 @@ function setupDefense() {
     { role: "second", x: rightInfieldX, y: (first.y + second.y) / 2 - 6 },
     { role: "shortstop", x: leftInfieldX, y: (third.y + second.y) / 2 - 2 },
     { role: "third", x: third.x - 24, y: third.y - 10 },
-    { role: "left", x: third.x - 104, y: third.y - 182 },
-    { role: "center", x: second.x - 14, y: second.y - 236 },
-    { role: "right", x: first.x + 104, y: first.y - 182 }
+    { role: "left", x: third.x - 162, y: third.y - 318 },
+    { role: "center", x: second.x - 18, y: second.y - 394 },
+    { role: "right", x: first.x + 162, y: first.y - 318 }
   ];
 
   defensiveFielders.length = 0;
@@ -577,13 +1023,13 @@ function setupDefense() {
 function getOutfieldWall() {
   const fieldTop = RENDER_LAYOUT.fieldRect.top;
   const centerX = FIELD.second.x;
-  const xLeft = FIELD.third.x - 250;
-  const xRight = FIELD.first.x + 250;
-  const y = Math.max(fieldTop + 78, FIELD.second.y - 254);
-  const radiusX = Math.max(190, (xRight - xLeft) * 0.5);
+  const xLeft = FIELD.third.x - 490;
+  const xRight = FIELD.first.x + 490;
+  const y = Math.max(fieldTop + 32, FIELD.second.y - 438);
+  const radiusX = Math.max(340, (xRight - xLeft) * 0.5);
   const yAt = (x) => {
     const nx = clampValue((x - centerX) / radiusX, -1, 1);
-    return y + Math.abs(nx) * 26;
+    return y + Math.abs(nx) * 52;
   };
   return {
     xLeft,
@@ -597,14 +1043,14 @@ function getOutfieldWall() {
 
 function buildHitZones() {
   return [
-    { name: "leftInfield", minForward: -30, maxForward: 350, minLateral: -700, maxLateral: -100, roles: ["third", "shortstop", "pitcher"], backupRoles: ["left", "second"] },
-    { name: "middleInfield", minForward: -30, maxForward: 360, minLateral: -100, maxLateral: 100, roles: ["pitcher", "shortstop", "second"], backupRoles: ["first", "center"] },
-    { name: "rightInfield", minForward: -30, maxForward: 350, minLateral: 100, maxLateral: 700, roles: ["first", "second", "pitcher"], backupRoles: ["right", "shortstop"] },
-    { name: "leftField", minForward: 350, maxForward: 1120, minLateral: -700, maxLateral: -220, roles: ["left", "center"], backupRoles: ["shortstop", "third"] },
-    { name: "leftCenterGap", minForward: 390, maxForward: 1160, minLateral: -220, maxLateral: -70, roles: ["center", "left"], backupRoles: ["left", "shortstop"] },
-    { name: "centerField", minForward: 390, maxForward: 1200, minLateral: -70, maxLateral: 70, roles: ["center", "left", "right"], backupRoles: ["left", "right"] },
-    { name: "rightCenterGap", minForward: 390, maxForward: 1160, minLateral: 70, maxLateral: 220, roles: ["center", "right"], backupRoles: ["right", "second"] },
-    { name: "rightField", minForward: 350, maxForward: 1120, minLateral: 220, maxLateral: 700, roles: ["right", "center"], backupRoles: ["first", "second"] },
+    { name: "leftInfield", minForward: -30, maxForward: 430, minLateral: -820, maxLateral: -120, roles: ["third", "shortstop", "pitcher"], backupRoles: ["left", "second"] },
+    { name: "middleInfield", minForward: -30, maxForward: 440, minLateral: -120, maxLateral: 120, roles: ["pitcher", "shortstop", "second"], backupRoles: ["first", "center"] },
+    { name: "rightInfield", minForward: -30, maxForward: 430, minLateral: 120, maxLateral: 820, roles: ["first", "second", "pitcher"], backupRoles: ["right", "shortstop"] },
+    { name: "leftField", minForward: 430, maxForward: 1880, minLateral: -980, maxLateral: -260, roles: ["left", "center"], backupRoles: ["shortstop", "third"] },
+    { name: "leftCenterGap", minForward: 500, maxForward: 1980, minLateral: -260, maxLateral: -80, roles: ["center", "left"], backupRoles: ["left", "shortstop"] },
+    { name: "centerField", minForward: 500, maxForward: 2040, minLateral: -80, maxLateral: 80, roles: ["center", "left", "right"], backupRoles: ["left", "right"] },
+    { name: "rightCenterGap", minForward: 500, maxForward: 1980, minLateral: 80, maxLateral: 260, roles: ["center", "right"], backupRoles: ["right", "second"] },
+    { name: "rightField", minForward: 430, maxForward: 1880, minLateral: 260, maxLateral: 980, roles: ["right", "center"], backupRoles: ["first", "second"] },
     { name: "foulTerritory", foul: true, roles: ["catcher", "third", "first"], backupRoles: ["pitcher", "shortstop"] }
   ];
 }
@@ -627,7 +1073,7 @@ function getBallFieldVector(pointX, pointY) {
 function isFoulTerritory(pointX, pointY) {
   const { forwardDist, lateralDist } = getBallFieldVector(pointX, pointY);
   if (forwardDist < -30) return true;
-  const fairHalfWidth = Math.max(160, forwardDist * 1.08 + 145);
+  const fairHalfWidth = Math.max(190, forwardDist * 1.12 + 180);
   return Math.abs(lateralDist) > fairHalfWidth;
 }
 
@@ -714,7 +1160,8 @@ function predictBallLanding(startX, startY, startHeight, vx, vy, vz) {
   return { x: px, y: py, time: t };
 }
 
-function resetPitchBall() {
+function resetPitchBall(options = {}) {
+  const { preservePhase = false } = options;
   pitchBall.active = false;
   pitchBall.visible = false;
   pitchBall.state = "idle";
@@ -749,8 +1196,18 @@ function resetPitchBall() {
   GAME.debugInfo.hitDetected = "false";
   GAME.debugInfo.hitZone = "-";
   GAME.debugInfo.landingPoint = "-";
+  GAME.debugInfo.pitchType = PITCH_TYPE_CONFIG[GAME.selectedPitchType]?.label ?? "FASTBALL";
+  GAME.debugInfo.pitchCharge = "0.00";
+  GAME.pitchCharge.active = false;
+  GAME.pitchCharge.elapsed = 0;
+  GAME.pitchCharge.meter = 0;
+  GAME.pitchCharge.quality = 0;
+  GAME.timingMeter.active = false;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.resetMin + Math.random() * PITCH_DELAY_TUNING.resetRange;
+  if (!preservePhase) {
+    GameManager.setPhase("pitch_setup", "pitching");
+  }
 }
 
 function updateHud() {
@@ -777,18 +1234,39 @@ function startGame() {
   GAME.scores.home = 0;
   GAME.battingSide = "away";
   GAME.fieldingSide = "home";
+  GAME.controllerSides = {
+    player1: "away",
+    player2: "home"
+  };
+  GAME.localMultiplayer = true;
+  GAME.phase = "pitch_setup";
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.initial;
   GAME.pitchAim = 0;
+  GAME.pitchAimY = 0;
   GAME.swingAim = 0;
+  GAME.selectedPitchType = "fastball";
+  GAME.pitchCharge.active = false;
+  GAME.pitchCharge.elapsed = 0;
+  GAME.pitchCharge.meter = 0;
+  GAME.pitchCharge.quality = 0;
+  GAME.timingMeter.active = false;
+  GAME.timingMeter.progress = 0;
+  GAME.timingMeter.verdict = "";
+  GAME.timingMeter.quality = 0;
+  GAME.timingMeter.life = 0;
+  GAME.cameraMode = "pitching";
   GAME.cameraShake = 0;
   GAME.particles = [];
   GAME.battedBall = null;
   GAME.pendingPlay = null;
+  GAME.throwBall = null;
   GAME.flashTime = 0;
   GAME.swingBuffer = 0;
   GAME.playCallout = null;
+  GAME.swingFeedback = "";
+  GAME.swingFeedbackLife = 0;
   GAME.cameraX = 0;
   GAME.cameraY = 0;
   GAME.cameraTargetX = 0;
@@ -800,7 +1278,8 @@ function startGame() {
   startScreen.classList.add("hidden");
   gameOverScreen.classList.add("hidden");
   updateHud();
-  setMessage("Top 1: Auto-pitch enabled. Press SPACE to swing.");
+  setMessage("Top 1: Player 2 pitch hold/release, Player 1 swings. Select pitch with 1-4.");
+  GameManager.syncControllerRoles();
 }
 
 function endGame() {
@@ -855,12 +1334,19 @@ function switchSides() {
   resetPitchBall();
   GAME.battedBall = null;
   GAME.pendingPlay = null;
+  GAME.throwBall = null;
   GAME.swingBuffer = 0;
   GAME.playCallout = null;
+  GAME.swingFeedback = "";
+  GAME.swingFeedbackLife = 0;
   GAME.cameraX = 0;
   GAME.cameraY = 0;
   GAME.cameraTargetX = 0;
   GAME.cameraTargetY = 0;
+  GAME.pitchAim = 0;
+  GAME.pitchAimY = 0;
+  GAME.pitchCharge.active = false;
+  GAME.timingMeter.active = false;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.sideSwitch;
@@ -880,9 +1366,16 @@ function switchSides() {
     }
   }
 
+  const oldControllers = {
+    ...GAME.controllerSides
+  };
+  GAME.controllerSides.player1 = oldControllers.player1 === "away" ? "home" : "away";
+  GAME.controllerSides.player2 = oldControllers.player2 === "away" ? "home" : "away";
   setupDefense();
   updateHud();
-  setMessage(`${GAME.half.toUpperCase()} ${GAME.inning}: Auto-pitch enabled. Press SPACE to swing.`);
+  setMessage(`${GAME.half.toUpperCase()} ${GAME.inning}: Roles switched. Pitch with hold/release, swing on timing.`);
+  GameManager.setPhase("pitch_setup", "pitching");
+  GameManager.syncControllerRoles();
 }
 
 function addOut(reason) {
@@ -891,9 +1384,11 @@ function addOut(reason) {
   resetPitchBall();
   GAME.battedBall = null;
   GAME.pendingPlay = null;
+  GAME.throwBall = null;
   GAME.swingBuffer = 0;
   GAME.playCallout = null;
   GAME.pitchReady = true;
+  GameManager.setPhase("pitch_setup", "pitching");
   updateHud();
   setMessage(reason);
   if (GAME.outs >= 3) {
@@ -1060,38 +1555,26 @@ function spawnPitch() {
   const fieldingTeam = GAME.teams[GAME.fieldingSide];
   const pitchRating = teamRating(fieldingTeam, "pitching");
   const zone = getStrikeZoneBounds();
-  const strikeChance = 0.47 + pitchRating * 0.28;
-  const strikesPitch = Math.random() < strikeChance;
+  const selectedPitch = PITCH_TYPE_CONFIG[GAME.selectedPitchType] ?? PITCH_TYPE_CONFIG.fastball;
+  const pitchQuality = clampValue(GAME.pitchCharge.quality || 0.62, 0.2, 1);
+  const aimed = aimPitchTarget(zone, GAME.selectedPitchType, pitchQuality);
+  const targetX = aimed.targetX;
+  const targetY = aimed.targetY;
   const pitchDurationMs = clampValue(
-    PITCH_DURATION_MS + randomRange(-120, 120) + (0.5 - pitchRating) * 70,
+    selectedPitch.durationMs + (0.5 - pitchRating) * 60 + randomRange(-26, 26),
     PITCH_DURATION_RANGE_MS.min,
     PITCH_DURATION_RANGE_MS.max
   );
-
   const startX = pitcher.x + 14;
   const startY = pitcher.y + 16;
-  const zoneTop = zone.y + 4;
-  const zoneBottom = zone.y + zone.h - 4;
-  const zoneLeft = zone.x + 8;
-  const zoneRight = zone.x + zone.w - 8;
-  let targetX = zone.cx;
-  let targetY;
-  if (strikesPitch) {
-    targetX = randomRange(zoneLeft, zoneRight);
-    targetY = zoneTop + Math.random() * (zoneBottom - zoneTop);
-  } else if (Math.random() < 0.5) {
-    targetX = randomRange(zoneLeft - 18, zoneRight + 18);
-    targetY = zoneTop - (12 + Math.random() * 26);
-  } else {
-    targetX = randomRange(zoneLeft - 18, zoneRight + 18);
-    targetY = zoneBottom + (12 + Math.random() * 26);
-  }
   const dx = targetX - startX;
   const dy = targetY - startY;
   const travelTime = pitchDurationMs / 1000;
-  const curveAmount = randomRange(-PITCH_TUNING.curveStrength, PITCH_TUNING.curveStrength) + GAME.pitchAim * 40;
+  const baseCurve = (GAME.pitchAim * 48) + randomRange(-18, 18);
+  const curveAmount = baseCurve * selectedPitch.curveScale;
+  const drop = selectedPitch.drop;
   const midControlX = startX + dx * 0.52 + curveAmount;
-  const midControlY = startY + dy * 0.47 + randomRange(-18, 18);
+  const midControlY = startY + dy * 0.47 + drop + randomRange(-10, 10);
 
   pitchBall.active = true;
   pitchBall.visible = true;
@@ -1123,13 +1606,18 @@ function spawnPitch() {
   pitchBall.trailClock = 0;
   GAME.pitchReady = false;
   GAME.pitchTimer = 0;
-  // Preserve buffered swing briefly into next pitch for reliable input feel.
   GAME.swingBuffer = Math.max(0, GAME.swingBuffer);
+  GAME.timingMeter.active = true;
+  GAME.timingMeter.progress = 0;
+  GAME.timingMeter.verdict = "";
+  GAME.timingMeter.life = 0;
   GAME.debugInfo.hitDetected = "false";
   GAME.debugInfo.pitchTarget = `${Math.round(targetX)}, ${Math.round(targetY)}`;
   GAME.debugInfo.strikeZone = `${Math.round(zone.x)},${Math.round(zone.y)} ${Math.round(zone.w)}x${Math.round(zone.h)}`;
   GAME.debugInfo.pitchDuration = `${Math.round(pitchDurationMs)}ms`;
-  pitcher.windup = 0.18;
+  GAME.debugInfo.pitchType = selectedPitch.label;
+  pitcher.windup = 0.22;
+  GameManager.setPhase("pitch_flight", "batting");
 }
 
 function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
@@ -1263,6 +1751,7 @@ function launchBattedBall(type, hitPhysics = null, flightTypeOverride) {
   GAME.debugInfo.assignedFielder = primaryFielder >= 0 ? `${primaryFielder}:${defensiveFielders[primaryFielder]?.role ?? "-"}` : "-";
   GAME.debugInfo.backupFielder = backupFielder >= 0 ? `${backupFielder}:${defensiveFielders[backupFielder]?.role ?? "-"}` : "-";
   GAME.debugInfo.landingPoint = `${Math.round(landing.x)}, ${Math.round(landing.y)}`;
+  GameManager.setPhase("ball_in_play", "fielding");
 }
 
 function resolveSwing(ballX, ballY) {
@@ -1279,9 +1768,15 @@ function resolveSwing(ballX, ballY) {
   const dy = Math.abs(ballY - contactPoint.y);
   const distance = Math.hypot(ballX - contactPoint.x, ballY - contactPoint.y);
   GAME.lastContactOffset = ballX - contactPoint.x;
+  const timingEval = evaluateSwingTiming(ballX, zone);
+  setSwingFeedback(timingEval.label, timingEval.quality);
+  if (timingEval.label === "PERFECT") {
+    GAME.flashTime = 0.12;
+  }
 
   if (distance >= SWING_ASSIST_CONTACT_RADIUS) {
     GAME.debugInfo.hitDetected = "false";
+    setSwingFeedback("MISS", 0);
     return;
   }
   GAME.debugInfo.hitDetected = "true";
@@ -1295,14 +1790,16 @@ function resolveSwing(ballX, ballY) {
     const big = Math.random() < 0.68 + power * 0.25;
     const hitType = big ? "homer" : (Math.random() < 0.45 ? "triple" : "double");
     const hitPhysics = calculateHitPhysics({ ballX, ballY });
+    hitPhysics.exitVelocity *= 1 + timingEval.quality * 0.2;
     launchBattedBall(hitType, hitPhysics);
     createBurst(ballX, ballY, "#ffe27a", 14);
-    resetPitchBall();
+    resetPitchBall({ preservePhase: true });
     return;
   }
 
   if (dx <= goodWindow && dy <= 42 + contact * 16) {
     const hitPhysics = calculateHitPhysics({ ballX, ballY });
+    hitPhysics.exitVelocity *= 0.92 + timingEval.quality * 0.16;
     const outcomeRoll = Math.random();
     if (outcomeRoll < 0.08 + power * 0.18) {
       launchBattedBall("homer", hitPhysics);
@@ -1314,7 +1811,7 @@ function resolveSwing(ballX, ballY) {
       launchBattedBall("single", hitPhysics);
     }
     createBurst(ballX, ballY, "#8fffc8", 10);
-    resetPitchBall();
+    resetPitchBall({ preservePhase: true });
     return;
   }
 
@@ -1327,14 +1824,14 @@ function resolveSwing(ballX, ballY) {
     GAME.pendingPlay.result = "grounder";
     setMessage("Weak grounder in play...");
     createBurst(ballX, ballY, "#eadfbe", 8);
-    resetPitchBall();
+    resetPitchBall({ preservePhase: true });
     return;
   }
   if (weakRoll < 0.7) {
     const hitPhysics = calculateHitPhysics({ ballX, ballY });
     launchBattedBall("single", hitPhysics);
     createBurst(ballX, ballY, "#c6ffd8", 8);
-    resetPitchBall();
+    resetPitchBall({ preservePhase: true });
     return;
   }
   if (weakRoll < 0.92) {
@@ -1355,12 +1852,8 @@ function handleSwingInput() {
   batter.activeSwing = true;
   batter.swingTime = batter.swingDuration;
   pitchBall.swingAttempted = true;
+  GAME.timingMeter.active = true;
   resolveSwing(pitchBall.x, pitchBall.y);
-}
-
-function handlePitchInput() {
-  if (GAME.mode !== "play" || !GAME.pitchReady || GAME.battedBall) return;
-  spawnPitch();
 }
 
 function queueTakenPitchCall(sampleX = pitchBall.plateX, sampleY = pitchBall.plateY) {
@@ -1390,34 +1883,45 @@ function applyPendingPitchCall() {
 }
 
 function updatePitchAim(dt) {
-  let aimInput = 0;
-  if (input.keys.has("ArrowLeft") || input.keys.has("a")) aimInput -= 1;
-  if (input.keys.has("ArrowRight") || input.keys.has("d")) aimInput += 1;
-  GAME.pitchAim += aimInput * dt * 1.6;
-  GAME.pitchAim = Math.max(-1, Math.min(1, GAME.pitchAim));
-  GAME.swingAim += aimInput * dt * 1.6;
-  GAME.swingAim = Math.max(-1, Math.min(1, GAME.swingAim));
+  const batterController = getBattingController();
+  const pitcherController = getFieldingController();
+  const batAim = getPitchAimInputs(batterController);
+  const pitchAim = getPitchAimInputs(pitcherController);
+  GAME.pitchAim = clampValue(GAME.pitchAim + pitchAim.x * dt * 1.6, -1, 1);
+  GAME.pitchAimY = clampValue(GAME.pitchAimY + pitchAim.y * dt * 1.6, -1, 1);
+  GAME.swingAim = clampValue(GAME.swingAim + batAim.x * dt * 1.6, -1, 1);
 }
 
 function updateFieldingInput(dt) {
   if (GAME.mode !== "play") return;
   if (!GAME.battedBall) return;
 
+  const controller = getFieldingController();
   const fielder = defensiveFielders[GAME.controlledFielder];
   if (!fielder) return;
 
   let dx = 0;
   let dy = 0;
-  if (input.keys.has("ArrowUp") || input.keys.has("w")) dy -= 1;
-  if (input.keys.has("ArrowDown") || input.keys.has("s")) dy += 1;
-  if (input.keys.has("ArrowLeft") || input.keys.has("a")) dx -= 1;
-  if (input.keys.has("ArrowRight") || input.keys.has("d")) dx += 1;
+  if (isActionHeld(controller, "moveUp")) dy -= 1;
+  if (isActionHeld(controller, "moveDown")) dy += 1;
+  if (isActionHeld(controller, "moveLeft")) dx -= 1;
+  if (isActionHeld(controller, "moveRight")) dx += 1;
 
   const len = Math.hypot(dx, dy);
   if (len > 0) {
     const speed = fielder.speed * dt;
     fielder.x += (dx / len) * speed;
     fielder.y += (dy / len) * speed;
+  }
+
+  if (GAME.pendingPlay?.awaitingThrow && !GAME.pendingPlay.targetBase) {
+    if (wasActionPressed(controller, "throwFirst")) queueThrowToBase("first");
+    if (wasActionPressed(controller, "throwSecond")) queueThrowToBase("second");
+    if (wasActionPressed(controller, "throwThird")) queueThrowToBase("third");
+    if (wasActionPressed(controller, "throwHome")) queueThrowToBase("home");
+    if (wasActionPressed(controller, "swing")) {
+      queueThrowToBase(nearestBaseKeyFromFielder(fielder));
+    }
   }
 }
 
@@ -1431,9 +1935,9 @@ function getRoleHomeTarget(fielder, ballObj = null) {
   if (role === "first") return { x: FIELD.first.x + 10, y: FIELD.first.y - 10 };
   if (role === "pitcher") return { x: FIELD.mound.x - 8, y: FIELD.mound.y - 12 };
   if (role === "catcher") return { x: FIELD.home.x - 12, y: FIELD.home.y + 8 };
-  if (role === "left") return { x: FIELD.third.x - 98, y: FIELD.second.y - 124 };
-  if (role === "center") return { x: FIELD.second.x - 12, y: FIELD.second.y - 172 };
-  if (role === "right") return { x: FIELD.first.x + 94, y: FIELD.second.y - 124 };
+  if (role === "left") return { x: FIELD.third.x - 156, y: FIELD.second.y - 236 };
+  if (role === "center") return { x: FIELD.second.x - 12, y: FIELD.second.y - 304 };
+  if (role === "right") return { x: FIELD.first.x + 152, y: FIELD.second.y - 236 };
   return { x: fielder.homeX, y: fielder.homeY };
 }
 
@@ -1455,6 +1959,7 @@ function isBallClearingWallInAir(ballObj) {
 function finalizeBattedBallResult(result, reason = "") {
   if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
   GAME.pendingPlay.resolved = true;
+  GAME.pendingPlay.awaitingThrow = false;
   GAME.pendingPlay.result = result;
 
   if (result === "flyOut") {
@@ -1487,9 +1992,11 @@ function finalizeBattedBallResult(result, reason = "") {
 
   GAME.battedBall = null;
   GAME.pendingPlay = null;
+  GAME.throwBall = null;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.afterPlayMin + Math.random() * PITCH_DELAY_TUNING.afterPlayRange;
+  GameManager.setPhase("pitch_setup", "pitching");
 }
 
 function executeFieldedBallResult(fieldingRole, ballObj) {
@@ -1501,26 +2008,39 @@ function executeFieldedBallResult(fieldingRole, ballObj) {
     return;
   }
 
+  ballObj.vx = 0;
+  ballObj.vy = 0;
+  ballObj.vz = 0;
+  ballObj.height = 0;
+  ballObj.landed = true;
+  ballObj.groundY = ballObj.groundY ?? ballObj.y;
+  ballObj.y = ballObj.groundY;
+
   if (GAME.pendingPlay.gapHit) {
     const depth = getBallFieldVector(ballObj.x, ballObj.groundY).forwardDist;
-    finalizeBattedBallResult(
-      depth > 470 ? "triple" : "double",
-      depth > 470 ? "TRIPLE! Splits the outfielders." : "DOUBLE! GAP HIT!"
-    );
+    schedulePendingThrowWindow(depth > 470 ? "triple" : "double");
+    showPlayCallout("MAKE A THROW!", "warn");
+    setMessage(`${role.toUpperCase()} fields in the gap. Choose a base.`);
     return;
   }
 
   const infieldRole = ["pitcher", "catcher", "first", "second", "shortstop", "third"].includes(role);
   if (infieldRole && ballObj.flightType === "grounder") {
-    finalizeBattedBallResult("groundOut", `${role.toUpperCase()} fields and throws to first. GROUND OUT.`);
+    schedulePendingThrowWindow("groundOut");
+    showPlayCallout("THROW TO FIRST!", "warn");
+    setMessage(`${role.toUpperCase()} fields it clean. Throw for the out.`);
     return;
   }
 
   const depth = getBallFieldVector(ballObj.x, ballObj.groundY).forwardDist;
   if (depth > 520 || ballObj.wallReachedOnGround) {
-    finalizeBattedBallResult("double", "Ball rattles the wall. DOUBLE!");
+    schedulePendingThrowWindow("double");
+    showPlayCallout("CUT IT OFF!", "warn");
+    setMessage(`${role.toUpperCase()} plays the wall. Throw to limit runners.`);
   } else {
-    finalizeBattedBallResult("baseHit", `${role.toUpperCase()} fields it late. BASE HIT.`);
+    schedulePendingThrowWindow("baseHit");
+    showPlayCallout("THROW IN!", "warn");
+    setMessage(`${role.toUpperCase()} fields it late. Throw to a base.`);
   }
 }
 
@@ -1591,9 +2111,30 @@ function updateDebugState(dt) {
 }
 
 function resolveThrow(baseKey) {
-  if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
+  if (!GAME.pendingPlay || GAME.pendingPlay.resolved || !GAME.pendingPlay.awaitingThrow) return;
   const result = GAME.pendingPlay.result;
   if (!["groundOut", "baseHit", "double", "triple"].includes(result)) return;
+  const throwTarget = {
+    home: FIELD.home,
+    first: FIELD.first,
+    second: FIELD.second,
+    third: FIELD.third
+  }[baseKey] ?? FIELD.first;
+  const thrower = defensiveFielders[GAME.pendingPlay.assignedFielder] ?? defensiveFielders[GAME.controlledFielder];
+  if (thrower) {
+    GAME.throwBall = {
+      startX: thrower.x,
+      startY: thrower.y - 8,
+      ctrlX: lerp(thrower.x, throwTarget.x, 0.5),
+      ctrlY: Math.min(thrower.y, throwTarget.y) - 55,
+      endX: throwTarget.x,
+      endY: throwTarget.y - 10,
+      x: thrower.x,
+      y: thrower.y,
+      t: 0,
+      travel: 0.34
+    };
+  }
   const defenseTeam = GAME.teams[GAME.fieldingSide];
   const fieldQuality = teamRating(defenseTeam, "fielding");
   const throwChance = 0.44 + fieldQuality * 0.3;
@@ -1601,21 +2142,25 @@ function resolveThrow(baseKey) {
 
   if (!success) {
     GAME.pendingPlay.resolved = true;
+    GAME.pendingPlay.awaitingThrow = false;
     showPlayCallout("SAFE", "safe");
     setMessage(`Throw to ${baseKey} skipped wide. Safe.`);
+    finalizeBattedBallResult(result, `Throw to ${baseKey.toUpperCase()} offline. Safe.`);
     return;
   }
 
   if (result === "groundOut") {
     GAME.pendingPlay.resolved = true;
+    GAME.pendingPlay.awaitingThrow = false;
     showPlayCallout("GROUND OUT", "out");
     addOut(`GROUND OUT at ${baseKey}!`);
     return;
   }
 
   GAME.pendingPlay.resolved = true;
+  GAME.pendingPlay.awaitingThrow = false;
   showPlayCallout("SAFE", "safe");
-  setMessage(`Throw to ${baseKey}. Runner beats it.`);
+  finalizeBattedBallResult(result === "groundOut" ? "baseHit" : result, `Throw to ${baseKey.toUpperCase()}. Runner beats it.`);
 }
 
 function updateBattedBall(dt) {
@@ -1723,8 +2268,17 @@ function updateBattedBall(dt) {
     }
   }
 
+  if (pending?.awaitingThrow) {
+    const fielder = defensiveFielders[pending.assignedFielder] ?? defensiveFielders[GAME.controlledFielder];
+    if (fielder) {
+      ballObj.x = fielder.x;
+      ballObj.groundY = fielder.y - 6;
+      ballObj.y = ballObj.groundY;
+    }
+  }
+
   const movingSpeed = Math.hypot(ballObj.vx, ballObj.vy) + Math.abs(ballObj.vz);
-  if (!ballObj.fielded && ballObj.landed && movingSpeed < 18 && pending && !pending.resolved) {
+  if (!ballObj.fielded && ballObj.landed && movingSpeed < 18 && pending && !pending.resolved && !pending.awaitingThrow) {
     const depth = getBallFieldVector(ballObj.x, ballObj.groundY).forwardDist;
     if (pending.gapHit) {
       finalizeBattedBallResult(
@@ -1804,30 +2358,16 @@ function updateFielders(dt) {
 function update(dt) {
   if (GAME.mode !== "play") {
     updateParticles(dt);
+    InputManager.clearFrame();
     return;
   }
 
-  if (GAME.battedBall) {
-    const followStrength = 0.09;
-    const followBall = GAME.battedBall;
-    const followX = followBall.x;
-    const followY = followBall.groundY ?? followBall.y;
-    const isOutfield = getBallFieldVector(followX, followY).forwardDist > 300;
-    GAME.cameraTargetX = clampValue(followX - FIELD.home.x, -220, 220);
-    GAME.cameraTargetY = clampValue(followY - FIELD.home.y, isOutfield ? -230 : -130, 95);
-    GAME.cameraX += (GAME.cameraTargetX - GAME.cameraX) * followStrength;
-    GAME.cameraY += (GAME.cameraTargetY - GAME.cameraY) * followStrength;
-  } else {
-    GAME.cameraTargetX = 0;
-    GAME.cameraTargetY = 0;
-    GAME.cameraX += (GAME.cameraTargetX - GAME.cameraX) * 0.14;
-    GAME.cameraY += (GAME.cameraTargetY - GAME.cameraY) * 0.14;
-  }
-
+  GameManager.syncControllerRoles();
   updatePitchAim(dt);
-  updateFieldingInput(dt);
-  updateFielders(dt);
-  updateBattedBall(dt);
+  PitchingController.update(dt);
+  BattingController.update(dt);
+  FieldingController.update(dt);
+  BallPhysics.update(dt);
   updateParticles(dt);
 
   if (pitcher.windup > 0) pitcher.windup -= dt;
@@ -1844,11 +2384,38 @@ function update(dt) {
     GAME.playCallout.life -= dt;
     if (GAME.playCallout.life <= 0) GAME.playCallout = null;
   }
+  if (GAME.swingFeedbackLife > 0) {
+    GAME.swingFeedbackLife -= dt;
+    if (GAME.swingFeedbackLife <= 0) {
+      GAME.swingFeedbackLife = 0;
+      GAME.swingFeedback = "";
+    }
+  }
+  if (GAME.timingMeter.life > 0) {
+    GAME.timingMeter.life -= dt;
+    if (GAME.timingMeter.life <= 0) {
+      GAME.timingMeter.life = 0;
+      GAME.timingMeter.verdict = "";
+    }
+  }
   if (GAME.swingBuffer > 0) GAME.swingBuffer -= dt;
 
-  if (GAME.pitchReady && !GAME.battedBall && !pitchBall.active) {
+  if (GAME.pendingPlay?.awaitingThrow && !GAME.pendingPlay.resolved) {
+    GAME.pendingPlay.throwTimer += dt;
+    const autoFinalizeWindow = FIELDING_AI_TUNING.throwDelay + 1.25;
+    if (GAME.pendingPlay.targetBase && GAME.pendingPlay.throwTimer >= FIELDING_AI_TUNING.throwDelay) {
+      resolveThrow(GAME.pendingPlay.targetBase);
+    } else if (!GAME.pendingPlay.targetBase && GAME.pendingPlay.throwTimer >= autoFinalizeWindow) {
+      const result = GAME.pendingPlay.result === "groundOut" ? "baseHit" : GAME.pendingPlay.result;
+      finalizeBattedBallResult(result, "No throw in time. Runner safe.");
+    }
+  }
+
+  if (GAME.pitchReady && !GAME.battedBall && !pitchBall.active && !GAME.pitchCharge.active) {
     GAME.pitchTimer += dt;
-    if (GAME.pitchTimer >= GAME.nextPitchDelay) spawnPitch();
+    if (!GAME.localMultiplayer && GAME.pitchTimer >= GAME.nextPitchDelay) {
+      spawnPitch();
+    }
   }
 
   if (pitchBall.active) {
@@ -1939,7 +2506,9 @@ function update(dt) {
     }
   }
 
+  CameraController.update(dt);
   updateDebugState(dt);
+  InputManager.clearFrame();
 }
 
 function drawBackground() {
@@ -2224,6 +2793,9 @@ function drawPitcher() {
   const baseX = pitcherFielder ? pitcherFielder.x : pitcher.x;
   const baseY = pitcherFielder ? pitcherFielder.y : pitcher.y;
   const wobble = Math.sin(performance.now() * 0.015) * (pitcher.windup > 0 ? 4 : 1.5);
+  const isControlled = GAME.mode === "play"
+    && GAME.controlledRole === "pitcher"
+    && getFieldingController() === "player1";
   drawPlayer(
     baseX + wobble,
     baseY,
@@ -2231,7 +2803,7 @@ function drawPitcher() {
     { skin: pitcherFielder?.skin ?? "#dca37f", hair: pitcherFielder?.hair ?? "#3d2414" },
     1,
     true,
-    false
+    isControlled
   );
 }
 
@@ -2246,12 +2818,15 @@ function drawCatcher() {
     { skin: catcher.skin, hair: catcher.hair },
     1,
     true,
-    GAME.battedBall && defensiveFielders.indexOf(catcher) === GAME.controlledFielder
+    GAME.pendingPlay?.awaitingThrow && defensiveFielders.indexOf(catcher) === GAME.controlledFielder
   );
 }
 
 function drawBatter() {
   const team = GAME.teams[GAME.battingSide];
+  const isControlled = GAME.mode === "play"
+    && GAME.controlledRole === "batter"
+    && getBattingController() === "player1";
   drawPlayer(
     batter.x,
     batter.y,
@@ -2259,7 +2834,7 @@ function drawBatter() {
     { skin: "#f2c7a3", hair: "#2f1c13" },
     -1,
     true,
-    false
+    isControlled
   );
 }
 
@@ -2298,7 +2873,7 @@ function drawFielders() {
       { skin: fielder.skin, hair: fielder.hair },
       1,
       true,
-      GAME.battedBall && index === GAME.controlledFielder
+      GAME.pendingPlay?.awaitingThrow && index === GAME.controlledFielder
     );
   });
 }
@@ -2550,7 +3125,26 @@ function drawParticles() {
 function drawBall() {
   drawBattedBall();
   drawPitchBall();
+  drawThrowBall();
   drawParticles();
+}
+
+function drawThrowBall() {
+  if (!GAME.throwBall) return;
+  const tb = GAME.throwBall;
+  ctx.save();
+  ctx.fillStyle = "rgba(157, 235, 255, 0.28)";
+  ctx.beginPath();
+  ctx.arc(tb.x, tb.y, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#1c2c46";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(tb.x, tb.y, 4.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawHitTrajectory() {
@@ -2576,6 +3170,31 @@ function drawPlayCallout() {
   ctx.restore();
 }
 
+function drawSwingFeedback() {
+  if (!GAME.swingFeedback || GAME.swingFeedbackLife <= 0) return;
+  const alpha = clampValue(GAME.swingFeedbackLife, 0, 1);
+  const popY = 120 - (1 - alpha) * 16;
+  const colorMap = {
+    "VERY EARLY": "#ffb07a",
+    "EARLY": "#ffd17a",
+    "GOOD": "#9ae6ff",
+    "PERFECT": "#9dff9a",
+    "LATE": "#ffd17a",
+    "VERY LATE": "#ffb07a",
+    "MISS": "#ff9ca8"
+  };
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = "bold 24px 'Trebuchet MS', sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(14, 20, 35, 0.82)";
+  ctx.strokeText(GAME.swingFeedback, GAME.width / 2, popY);
+  ctx.fillStyle = colorMap[GAME.swingFeedback] ?? "#dff7ff";
+  ctx.fillText(GAME.swingFeedback, GAME.width / 2, popY);
+  ctx.restore();
+}
+
 function drawAimMeters() {
   const leftPad = 14;
   const bottomPad = 14;
@@ -2589,10 +3208,11 @@ function drawAimMeters() {
   ctx.lineWidth = 2;
   ctx.strokeRect(leftPad, panelY, panelW, panelH);
 
+  const selectedPitch = PITCH_TYPE_CONFIG[GAME.selectedPitchType] ?? PITCH_TYPE_CONFIG.fastball;
   ctx.fillStyle = "#dff7ff";
   ctx.font = "12px 'Trebuchet MS', sans-serif";
-  ctx.fillText("Aim (A/D):", leftPad + 10, panelY + 16);
-  ctx.fillText(`Pitch ${Math.round(GAME.pitchAim * 100)}`, leftPad + 10, panelY + 31);
+  ctx.fillText(`Pitch: ${selectedPitch.label} (${selectedPitch.key})`, leftPad + 10, panelY + 16);
+  ctx.fillText(`Aim X ${Math.round(GAME.pitchAim * 100)}  Y ${Math.round(GAME.pitchAimY * 100)}`, leftPad + 10, panelY + 31);
 
   const meterTrackX = leftPad + 104;
   const meterTrackY = panelY + 24;
@@ -2601,6 +3221,21 @@ function drawAimMeters() {
   ctx.fillRect(meterTrackX, meterTrackY, meterTrackW, 9);
   ctx.fillStyle = "#7de1ff";
   ctx.fillRect(meterTrackX + 2, meterTrackY + 1, (GAME.pitchAim + 1) * ((meterTrackW - 4) / 2), 7);
+
+  if (GAME.pitchCharge.active) {
+    const meterX = leftPad + 10;
+    const meterY = panelY - 15;
+    const meterW = 266;
+    ctx.fillStyle = "rgba(11,24,44,0.9)";
+    ctx.fillRect(meterX, meterY, meterW, 10);
+    ctx.fillStyle = "#ffd86a";
+    ctx.fillRect(meterX + 1, meterY + 1, (meterW - 2) * GAME.pitchCharge.meter, 8);
+    ctx.strokeStyle = "rgba(255,255,255,0.38)";
+    ctx.strokeRect(meterX, meterY, meterW, 10);
+    const perfectX = meterX + meterW * 0.52;
+    ctx.fillStyle = "#7dffb4";
+    ctx.fillRect(perfectX - 8, meterY, 16, 10);
+  }
 
   const rightW = 164;
   const rightH = 36;
@@ -2611,17 +3246,34 @@ function drawAimMeters() {
   ctx.strokeStyle = "rgba(83, 210, 255, 0.58)";
   ctx.strokeRect(rightX, rightY, rightW, rightH);
   ctx.fillStyle = "#dff7ff";
-  ctx.fillText("Contact", rightX + 10, rightY + 14);
-  ctx.fillStyle = "#ffa85e";
-  ctx.fillRect(rightX + 10, rightY + 18, 132, 10);
+  ctx.fillText("Timing Meter", rightX + 10, rightY + 14);
+  const meterLeft = rightX + 10;
+  const meterTop = rightY + 18;
+  const meterWidth = 132;
+  ctx.fillStyle = "#ff9f72";
+  ctx.fillRect(meterLeft, meterTop, meterWidth * 0.18, 10);
+  ctx.fillStyle = "#ffd86a";
+  ctx.fillRect(meterLeft + meterWidth * 0.18, meterTop, meterWidth * 0.24, 10);
   ctx.fillStyle = "#7bffb4";
-  ctx.fillRect(rightX + 56, rightY + 18, 34, 10);
+  ctx.fillRect(meterLeft + meterWidth * 0.42, meterTop, meterWidth * 0.16, 10);
+  ctx.fillStyle = "#ffd86a";
+  ctx.fillRect(meterLeft + meterWidth * 0.58, meterTop, meterWidth * 0.24, 10);
+  ctx.fillStyle = "#ff9f72";
+  ctx.fillRect(meterLeft + meterWidth * 0.82, meterTop, meterWidth * 0.18, 10);
+  const timingPos = GAME.timingMeter.active
+    ? clampValue(GAME.timingMeter.progress, 0, 1)
+    : clampValue((GAME.swingAim + 1) / 2, 0, 1);
   ctx.fillStyle = "#111";
-  ctx.fillRect(rightX + 74 + GAME.swingAim * 34, rightY + 17, 3, 12);
+  ctx.fillRect(meterLeft + timingPos * meterWidth - 1.5, meterTop - 1, 3, 12);
+  if (GAME.timingMeter.verdict) {
+    ctx.fillStyle = "#dff7ff";
+    ctx.fillText(GAME.timingMeter.verdict, rightX + 10, rightY - 3);
+  }
 }
 
 function drawUI() {
   drawPlayCallout();
+  drawSwingFeedback();
   drawAimMeters();
   if (DEBUG_STATE.enabled) {
     drawDebugOverlay();
@@ -2660,26 +3312,27 @@ function render() {
 function throwToNearestBase() {
   const fielder = defensiveFielders[GAME.controlledFielder];
   if (!fielder) return;
-  const nearest = nearestBaseKeyFromFielder(fielder);
-  resolveThrow(nearest);
+  queueThrowToBase(nearestBaseKeyFromFielder(fielder));
 }
 
 function throwToNumber(key) {
-  const map = { "1": "home", "2": "first", "3": "second", "4": "third" };
+  const map = { "1": "first", "2": "second", "3": "third", "4": "home" };
   const base = map[key];
-  if (base) resolveThrow(base);
+  if (base) queueThrowToBase(base);
 }
 
 function handleKeyDown(event) {
-  const key = event.code === "Space"
-    ? "Space"
-    : (event.key.length === 1 ? event.key.toLowerCase() : event.key);
+  const key = normalizeInputKey(event);
+  if (!input.keys.has(key)) {
+    input.justPressed.add(key);
+  }
   input.keys.add(key);
 
   if (key === "`") {
     if (!DEBUG_FIELDING && !DEBUG) return;
     DEBUG_STATE.enabled = !DEBUG_STATE.enabled;
     setMessage(DEBUG_STATE.enabled ? "Debug overlay ON" : "Debug overlay OFF");
+    return;
   }
 
   if (key === "Enter" && (GAME.mode === "start" || GAME.mode === "over")) {
@@ -2687,25 +3340,28 @@ function handleKeyDown(event) {
     return;
   }
 
-  if (key === "Space") {
-    event.preventDefault();
-    if (event.repeat) return;
-    if (pitchBall.active && !GAME.battedBall) {
-      handleSwingInput();
-    } else if (GAME.battedBall) {
-      throwToNearestBase();
-    }
+  if (PITCH_TYPE_BY_KEY[key]) {
+    selectPitchTypeByKey(key);
   }
 
-  if (["1", "2", "3", "4"].includes(key)) {
-    throwToNumber(key);
+  if (key === "Space" || key === "/") {
+    event.preventDefault();
+  }
+
+  if (GAME.mode === "play" && !GAME.battedBall && !pitchBall.active) {
+    const batterController = getBattingController();
+    const batterSwingKeys = (CONTROL_PRESETS[batterController] ?? CONTROL_PRESETS.player1).swing ?? [];
+    if (batterSwingKeys.includes(key)) {
+      GAME.swingBuffer = SWING_BUFFER_WINDOW;
+    }
   }
 }
 
 function handleKeyUp(event) {
-  const key = event.code === "Space"
-    ? "Space"
-    : (event.key.length === 1 ? event.key.toLowerCase() : event.key);
+  const key = normalizeInputKey(event);
+  if (input.keys.has(key)) {
+    input.justReleased.add(key);
+  }
   input.keys.delete(key);
 }
 
