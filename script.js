@@ -572,14 +572,14 @@ function launchBattedBall(type, flightTypeOverride) {
   } else if (type === "double") {
     targetX = 270 + Math.random() * 250;
     targetY = laneBias;
-    arc = 140 + Math.random() * 16;
-    time = 0.9 + Math.random() * 0.12;
+    arc = 54 + Math.random() * 12;
+    time = 0.78 + Math.random() * 0.1;
     flightType = "line";
   } else if (type === "single") {
     targetX = 350 + Math.random() * 250;
     targetY = laneBias;
-    arc = 96 + Math.random() * 14;
-    time = 0.8 + Math.random() * 0.1;
+    arc = 28 + Math.random() * 10;
+    time = 0.68 + Math.random() * 0.08;
     flightType = "line";
   } else if (type === "grounder") {
     targetX = 450 + Math.random() * 210;
@@ -773,41 +773,43 @@ function resolveThrow(baseKey) {
   if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
   const defenseTeam = GAME.teams[GAME.fieldingSide];
   const fieldQuality = teamRating(defenseTeam, "fielding");
-  const throwChance = 0.52 + fieldQuality * 0.35;
+
+  // Most non-grounder hits should stay hits. Throws are only decisive on true
+  // infield grounder-out plays, which improves perceived hit fairness.
+  const isGrounderPlay = GAME.pendingPlay.result === "grounderOut" || GAME.pendingPlay.result === "grounderSafe";
+  if (!isGrounderPlay) {
+    GAME.pendingPlay.resolved = true;
+    showPlayCallout("SAFE", "safe");
+    setMessage(`Throw to ${baseKey}. Too late, runner is safe.`);
+    return;
+  }
+
+  const throwChance = 0.46 + fieldQuality * 0.26;
   const success = Math.random() < throwChance;
   if (!success) {
     GAME.pendingPlay.resolved = true;
+    showPlayCallout("SAFE", "safe");
     setMessage("Throw missed! Safe on the play.");
     return;
   }
 
   if (GAME.pendingPlay.result === "grounderOut") {
     GAME.pendingPlay.resolved = true;
+    showPlayCallout("OUT", "out");
     addOut(`Out at ${baseKey}!`);
     return;
   }
 
   if (GAME.pendingPlay.result === "grounderSafe") {
     GAME.pendingPlay.resolved = true;
+    showPlayCallout("SAFE", "safe");
     setMessage(`Infield single. Throw to ${baseKey} is late.`);
     return;
   }
 
-  // Deep hits are almost always safe by the time the throw arrives.
-  if (GAME.pendingPlay.result === "homer" || GAME.pendingPlay.result === "triple") {
-    GAME.pendingPlay.resolved = true;
-    setMessage(`${GAME.pendingPlay.result === "homer" ? "Home run" : "Triple"} stands. Too deep for a play.`);
-    return;
-  }
-
-  // On other batted balls, throws can still cut off a runner occasionally.
-  if (Math.random() < 0.08 + fieldQuality * 0.1) {
-    GAME.pendingPlay.resolved = true;
-    addOut(`Runner tagged out at ${baseKey}!`);
-  } else {
-    GAME.pendingPlay.resolved = true;
-    setMessage(`Throw to ${baseKey}. Play continues safe.`);
-  }
+  GAME.pendingPlay.resolved = true;
+  showPlayCallout("SAFE", "safe");
+  setMessage(`Throw to ${baseKey}. Play continues safe.`);
 }
 
 function updateBattedBall(dt) {
@@ -817,13 +819,23 @@ function updateBattedBall(dt) {
   const t = Math.min(1, ballObj.elapsed / ballObj.travelTime);
   ballObj.x = ballObj.startX + (ballObj.targetX - ballObj.startX) * t;
   const baseY = ballObj.startY + (ballObj.targetY - ballObj.startY) * t;
-  ballObj.y = baseY - Math.sin(t * Math.PI) * ballObj.arcHeight;
+  if (ballObj.flightType === "grounder") {
+    // Keep grounders visibly low with a tiny bounce.
+    const bounce = Math.sin(t * Math.PI * 4) * Math.max(0, 3 * (1 - t));
+    ballObj.y = baseY - bounce;
+  } else if (ballObj.flightType === "line") {
+    // Line drives stay flatter than fly balls.
+    ballObj.y = baseY - Math.sin(t * Math.PI) * (ballObj.arcHeight * 0.55);
+  } else {
+    ballObj.y = baseY - Math.sin(t * Math.PI) * ballObj.arcHeight;
+  }
 
   if (GAME.pendingPlay && !GAME.pendingPlay.resolved) {
     GAME.pendingPlay.elapsed += dt;
     if (GAME.pendingPlay.elapsed >= GAME.pendingPlay.deadline) {
       GAME.pendingPlay.resolved = true;
       if (GAME.pendingPlay.result === "grounderOut") {
+        showPlayCallout("SAFE", "safe");
         setMessage("No throw made. Infield single!");
       }
     }
@@ -847,8 +859,13 @@ function updateFielders(dt) {
     let tx = f.homeX;
     let ty = f.homeY;
     if (GAME.battedBall && idx !== GAME.controlledFielder) {
-      tx = GAME.battedBall.targetX - 8;
-      ty = GAME.battedBall.targetY + 16;
+      const progress = Math.min(1, GAME.battedBall.elapsed / GAME.battedBall.travelTime);
+      const isAirBall = GAME.battedBall.flightType === "fly" || GAME.battedBall.flightType === "homer";
+      // Delay convergence on deep air balls so every play doesn't look auto-caught.
+      if (!isAirBall || progress > 0.82) {
+        tx = GAME.battedBall.targetX - 8 + (isAirBall ? 14 : 0);
+        ty = GAME.battedBall.targetY + 16 + (isAirBall ? 8 : 0);
+      }
     }
     const dx = tx - f.x;
     const dy = ty - f.y;
@@ -914,6 +931,12 @@ function update(dt) {
   }
   if (GAME.cameraShake > 0) GAME.cameraShake -= dt;
   if (GAME.flashTime > 0) GAME.flashTime -= dt;
+  if (GAME.playCallout) {
+    GAME.playCallout.life -= dt;
+    if (GAME.playCallout.life <= 0) {
+      GAME.playCallout = null;
+    }
+  }
   if (GAME.swingBuffer > 0) {
     GAME.swingBuffer -= dt;
   }
