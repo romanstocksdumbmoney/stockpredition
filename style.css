@@ -30,16 +30,19 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 1rem;
+  padding: 0.45rem;
 }
 
 .game-shell {
   position: relative;
   width: min(1080px, 100%);
-  border: 4px solid var(--accent);
-  background: rgba(8, 14, 28, 0.9);
-  box-shadow: 0 0 30px rgba(83, 210, 255, 0.32);
-  padding: 0.9rem;
+  border: 2px solid rgba(83, 210, 255, 0.88);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(7, 14, 31, 0.97), rgba(4, 9, 20, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(39, 145, 235, 0.42) inset,
+    0 0 34px rgba(83, 210, 255, 0.34);
+  padding: 0.45rem 0.45rem 0.42rem;
 }
 
 .hud {
@@ -47,70 +50,135 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 0.9rem;
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.4rem;
+  padding: 0 0.3rem;
 }
 
 .hud h1 {
   margin: 0;
-  font-size: 1.35rem;
-  letter-spacing: 0.18rem;
-  color: var(--accent);
-  text-shadow: 0 0 10px rgba(83, 210, 255, 0.62);
+  font-size: 2.85rem;
+  line-height: 1;
+  letter-spacing: 0.11rem;
+  color: #7fd4ff;
+  text-shadow:
+    0 0 10px rgba(83, 210, 255, 0.75),
+    0 0 22px rgba(83, 210, 255, 0.35);
 }
 
-.score-block {
+.scoreboard {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  background: rgba(22, 34, 58, 0.84);
-  border: 2px solid rgba(83, 210, 255, 0.32);
-  padding: 0.42rem 0.58rem;
-  border-radius: 6px;
+  gap: 0.52rem;
 }
 
-.score-line {
+.score-chip,
+.stats-chip {
+  min-width: 136px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.92rem;
+  border-radius: 7px;
+  border: 2px solid rgba(79, 188, 255, 0.65);
+  background: linear-gradient(180deg, rgba(9, 25, 60, 0.95), rgba(6, 18, 45, 0.94));
+  box-shadow: 0 0 16px rgba(64, 171, 255, 0.22) inset;
+  overflow: hidden;
 }
 
-.score-line .sep {
-  opacity: 0.65;
+.score-chip {
+  justify-content: space-between;
+  padding: 0.25rem 0.56rem;
 }
 
-.score-line strong {
-  min-width: 1ch;
-}
-
-.stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
+.score-chip .name {
   font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.04rem;
+  text-transform: uppercase;
 }
 
-.stat-item strong {
-  color: #dff7ff;
+.score-chip .score {
+  min-width: 1.6rem;
+  text-align: center;
+  font-size: 1.7rem;
+  line-height: 1;
+  color: #f0f8ff;
 }
 
-.score-line .away {
-  color: #96d2ff;
+.score-chip.away {
+  border-color: rgba(88, 182, 255, 0.72);
 }
 
-.score-line .home {
-  color: #ffbe8e;
+.score-chip.home {
+  border-color: rgba(255, 145, 72, 0.72);
+  background: linear-gradient(180deg, rgba(56, 33, 21, 0.94), rgba(30, 21, 14, 0.92));
+}
+
+.score-chip.away .name {
+  color: #97d6ff;
+}
+
+.score-chip.home .name {
+  color: #ffbf93;
+}
+
+.score-chip.batting {
+  box-shadow:
+    0 0 0 1px rgba(255, 224, 134, 0.72) inset,
+    0 0 20px rgba(255, 171, 99, 0.33);
+}
+
+.stats-chip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 2px solid rgba(93, 199, 255, 0.65);
+  border-radius: 7px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(9, 24, 57, 0.95), rgba(6, 17, 42, 0.93));
+  box-shadow: 0 0 14px rgba(64, 171, 255, 0.18) inset;
+}
+
+.stats-chip .stat {
+  min-width: 2.9rem;
+  padding: 0.22rem 0.52rem 0.26rem;
+  border-right: 1px solid rgba(125, 186, 244, 0.34);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stats-chip .stat:last-child {
+  border-right: 0;
+}
+
+.stats-chip .label {
+  color: #65ccff;
+  font-size: 0.57rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06rem;
+}
+
+.stats-chip .value {
+  color: #e7f3ff;
+  font-size: 1.5rem;
+  line-height: 1.04;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 canvas {
   display: block;
   width: 100%;
   height: auto;
-  border: 3px solid var(--panel-glow);
+  border: 3px solid rgba(61, 164, 255, 0.72);
+  border-radius: 12px;
   background: linear-gradient(#4675be 0 34%, #2f8e5f 34% 100%);
   image-rendering: pixelated;
   margin: 0 auto;
+  box-shadow:
+    0 0 0 2px rgba(37, 134, 216, 0.26) inset,
+    0 0 22px rgba(64, 178, 255, 0.22);
 }
 
 .overlay {
@@ -192,7 +260,7 @@ button:focus-visible {
 
 .message {
   min-height: 1.45rem;
-  margin: 0.55rem auto 0;
+  margin: 0.3rem auto 0;
   padding: 0.35rem 0.55rem;
   border: 2px solid rgba(83, 210, 255, 0.32);
   background: rgba(12, 20, 36, 0.78);
@@ -223,16 +291,17 @@ button:focus-visible {
   }
 
   .hud h1 {
-    font-size: 1.08rem;
+    font-size: 1.35rem;
   }
 
-  .score-block {
+  .scoreboard {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
-  .stats {
-    gap: 0.5rem;
-    font-size: 0.8rem;
+  .score-chip .score,
+  .stats-chip .value {
+    font-size: 1.25rem;
   }
 }

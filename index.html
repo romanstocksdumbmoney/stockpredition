@@ -10,20 +10,21 @@
     <main class="game-shell">
       <header class="hud">
         <h1>NEON SLUGGER DELUXE</h1>
-        <div class="score-block scoreboard-bar">
-          <div class="score-line">
-            <span class="away" id="awayTeamName">Away</span>
-            <strong id="awayScoreValue">0</strong>
-            <span class="sep">|</span>
-            <span class="home" id="homeTeamName">Home</span>
-            <strong id="homeScoreValue">0</strong>
+        <div class="scoreboard">
+          <div class="score-chip away">
+            <span class="name" id="awayTeamName">Away</span>
+            <strong class="score" id="awayScoreValue">0</strong>
           </div>
-          <div class="stats">
-            <span class="stat-item">Inning: <strong id="inningValue">1</strong></span>
-            <span class="stat-item">Half: <strong id="halfValue">top</strong></span>
-            <span class="stat-item">B: <strong id="ballsValue">0</strong></span>
-            <span class="stat-item">S: <strong id="strikesValue">0</strong></span>
-            <span class="stat-item">O: <strong id="outsValue">0</strong></span>
+          <div class="score-chip home">
+            <span class="name" id="homeTeamName">Home</span>
+            <strong class="score" id="homeScoreValue">0</strong>
+          </div>
+          <div class="stats-chip">
+            <span class="stat"><span class="label">INNING</span><strong class="value" id="inningValue">1</strong></span>
+            <span class="stat"><span class="label">HALF</span><strong class="value" id="halfValue">TOP</strong></span>
+            <span class="stat"><span class="label">B</span><strong class="value" id="ballsValue">0</strong></span>
+            <span class="stat"><span class="label">S</span><strong class="value" id="strikesValue">0</strong></span>
+            <span class="stat"><span class="label">O</span><strong class="value" id="outsValue">0</strong></span>
           </div>
         </div>
       </header>
@@ -42,10 +43,10 @@
           </label>
         </div>
         <ul>
-          <li><strong>SPACE</strong>: Swing (when batting) / Throw nearest base (fielding)</li>
-          <li><strong>A / D</strong> or <strong>Left / Right</strong>: Pitch aim and hit direction</li>
-          <li><strong>WASD / Arrows</strong>: Move selected fielder on balls in play</li>
-          <li><strong>1,2,3,4</strong>: Throw to Home, 1st, 2nd, 3rd base</li>
+          <li><strong>WASD / Arrows</strong>: Aim pitch, aim swing, move fielder</li>
+          <li><strong>SPACE</strong>: Throw pitch / Swing / Catch-dive assist</li>
+          <li><strong>1,2,3,4</strong>: Select pitch (Fastball, Changeup, Curveball, Slider)</li>
+          <li><strong>Q / F / E / R</strong>: Throw to 1st / 2nd / 3rd / Home</li>
         </ul>
         <p class="hint">Original art + code only. No copyrighted assets used.</p>
         <button id="startButton" type="button">Start Game</button>

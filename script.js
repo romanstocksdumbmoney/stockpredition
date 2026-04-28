@@ -87,13 +87,13 @@ const PITCH_TUNING = {
 };
 
 const CAMERA_TUNING = {
-  battingDamping: 0.1,
-  pitchingDamping: 0.11,
-  fieldingDamping: 0.12,
-  homerDamping: 0.13,
-  maxX: 310,
-  maxYTop: -320,
-  maxYBottom: 130
+  battingDamping: 0.12,
+  pitchingDamping: 0.13,
+  fieldingDamping: 0.14,
+  homerDamping: 0.15,
+  maxX: 280,
+  maxYTop: -300,
+  maxYBottom: 90
 };
 
 const PITCH_TYPE_CONFIG = {
@@ -148,7 +148,7 @@ const FIELDING_AI_TUNING = {
 
 const DEBUG = false;
 const DEBUG_FIELDING = false;
-const DEBUG_INPUT = true;
+const DEBUG_INPUT = false;
 const PITCH_DURATION_MS = 1150;
 const PITCH_DURATION_RANGE_MS = { min: 1000, max: 1300 };
 const PITCH_MAX_VELOCITY = 980;
@@ -1243,7 +1243,7 @@ function resetPitchBall(options = {}) {
 
 function updateHud() {
   inningValue.textContent = String(GAME.inning);
-  halfValue.textContent = GAME.half;
+  halfValue.textContent = GAME.half.toUpperCase();
   ballsValue.textContent = String(GAME.balls);
   strikesValue.textContent = String(GAME.strikes);
   outsValue.textContent = String(GAME.outs);
@@ -2553,29 +2553,46 @@ function update(dt) {
 
 function drawBackground() {
   const bounds = RENDER_LAYOUT.fieldRect;
-  const top = Math.max(0, bounds.top - 34);
-  const sky = ctx.createLinearGradient(0, 0, 0, bounds.bottom);
-  sky.addColorStop(0, "#8ac9ff");
-  sky.addColorStop(0.42, "#4f84c9");
-  sky.addColorStop(1, "#245a96");
+  const top = Math.max(0, bounds.top - 18);
+  const sky = ctx.createLinearGradient(0, 0, 0, bounds.bottom + 40);
+  sky.addColorStop(0, "#5ec6ff");
+  sky.addColorStop(0.35, "#2f69ae");
+  sky.addColorStop(1, "#10274b");
   ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, GAME.width, bounds.bottom + 30);
+  ctx.fillRect(0, 0, GAME.width, bounds.bottom + 42);
 
-  ctx.fillStyle = "#1d3255";
-  ctx.fillRect(0, top - 20, GAME.width, 24);
-  ctx.fillStyle = "#263f68";
-  ctx.fillRect(0, top + 4, GAME.width, 20);
+  // Cyan horizon glow behind wall.
+  const glow = ctx.createRadialGradient(
+    GAME.width / 2,
+    top + 20,
+    10,
+    GAME.width / 2,
+    top + 52,
+    GAME.width * 0.62
+  );
+  glow.addColorStop(0, "rgba(123,221,255,0.4)");
+  glow.addColorStop(1, "rgba(123,221,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, top - 40, GAME.width, 120);
+
+  ctx.fillStyle = "#0f2551";
+  ctx.fillRect(0, top - 8, GAME.width, 22);
+  ctx.fillStyle = "#153566";
+  ctx.fillRect(0, top + 12, GAME.width, 20);
 
   // Crowd/stadium seats for a fuller 3D arcade backdrop.
   const seatRows = 6;
   for (let row = 0; row < seatRows; row += 1) {
-    const y = top - 10 + row * 7;
-    const shade = 28 + row * 8;
-    ctx.fillStyle = `rgba(${shade},${52 + row * 7},${88 + row * 9},0.92)`;
+    const y = top + 6 + row * 6;
+    const shade = 16 + row * 8;
+    ctx.fillStyle = `rgba(${shade},${36 + row * 6},${72 + row * 10},0.95)`;
     ctx.fillRect(0, y, GAME.width, 6);
-    for (let x = row % 2 === 0 ? 4 : 10; x < GAME.width; x += 16) {
-      ctx.fillStyle = row % 2 === 0 ? "rgba(255,214,128,0.8)" : "rgba(142,226,255,0.78)";
-      ctx.fillRect(x, y + 1, 3, 3);
+    for (let x = row % 2 === 0 ? 5 : 11; x < GAME.width; x += 15) {
+      const crowdColor = row % 2 === 0
+        ? "rgba(244,135,255,0.78)"
+        : (row % 3 === 0 ? "rgba(114,225,255,0.78)" : "rgba(255,203,138,0.72)");
+      ctx.fillStyle = crowdColor;
+      ctx.fillRect(x, y + 1, 2, 2);
     }
   }
 }
@@ -2589,8 +2606,9 @@ function drawField() {
 
   // Outfield grass
   const grass = ctx.createLinearGradient(0, bounds.top, 0, GAME.height);
-  grass.addColorStop(0, "#2f965f");
-  grass.addColorStop(1, "#206d47");
+  grass.addColorStop(0, "#2d975c");
+  grass.addColorStop(0.55, "#2a8f54");
+  grass.addColorStop(1, "#1f6b40");
   ctx.fillStyle = grass;
   ctx.fillRect(0, bounds.top, GAME.width, GAME.height - bounds.top);
 
@@ -2604,20 +2622,23 @@ function drawField() {
   ctx.lineTo(third.x - 330, GAME.height);
   ctx.closePath();
   ctx.clip();
-  for (let x = -160; x < GAME.width + 220; x += 42) {
+  for (let x = -170; x < GAME.width + 260; x += 38) {
     ctx.fillStyle = "rgba(255,255,255,0.065)";
     ctx.beginPath();
     ctx.moveTo(x, bounds.top - 10);
     ctx.lineTo(x + 12, bounds.top - 10);
-    ctx.lineTo(x + 228, GAME.height + 14);
-    ctx.lineTo(x + 196, GAME.height + 14);
+    ctx.lineTo(x + 232, GAME.height + 14);
+    ctx.lineTo(x + 194, GAME.height + 14);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 
   // Infield dirt diamond
-  ctx.fillStyle = "#c99660";
+  const infieldDirt = ctx.createLinearGradient(home.x, second.y, home.x, home.y + 34);
+  infieldDirt.addColorStop(0, "#d7a66f");
+  infieldDirt.addColorStop(1, "#c38b54");
+  ctx.fillStyle = infieldDirt;
   ctx.beginPath();
   ctx.moveTo(home.x, home.y + 30);
   ctx.lineTo(third.x - 70, third.y + 6);
@@ -2625,6 +2646,18 @@ function drawField() {
   ctx.lineTo(first.x + 70, first.y + 6);
   ctx.closePath();
   ctx.fill();
+
+  // Outer base path ring.
+  ctx.strokeStyle = "rgba(226, 194, 147, 0.9)";
+  ctx.lineWidth = 22;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(home.x, home.y + 4);
+  ctx.lineTo(first.x + 10, first.y + 1);
+  ctx.lineTo(second.x, second.y - 20);
+  ctx.lineTo(third.x - 10, third.y + 1);
+  ctx.closePath();
+  ctx.stroke();
 
   // Visible outfield wall + bright top rail for HR reference.
   const wall = getOutfieldWall();
@@ -2674,8 +2707,8 @@ function drawBasesAndLines() {
   const foulRight = safePoint(FIELD.foulBottom, "foul-right", { x: first.x + 320, y: first.y - 360 });
 
   // Base paths
-  ctx.strokeStyle = "#e3c68c";
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = "rgba(232, 202, 158, 0.88)";
+  ctx.lineWidth = 8;
   ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(home.x, home.y);
@@ -2686,8 +2719,8 @@ function drawBasesAndLines() {
   ctx.stroke();
 
   // Foul lines
-  ctx.strokeStyle = "rgba(255,255,255,0.9)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(home.x, home.y);
   ctx.lineTo(foulLeft.x, foulLeft.y);
@@ -2716,18 +2749,18 @@ function drawBasesAndLines() {
 }
 
 function drawBase(x, y) {
-  const s = scaleByY(y) * 0.9;
+  const s = scaleByY(y);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
   ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.fillRect(-9, -7, 18, 18);
-  ctx.fillStyle = "#fff8e8";
-  ctx.fillRect(-9, -9, 18, 18);
-  ctx.strokeStyle = "#d5cbaf";
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillRect(-11, -8, 22, 22);
+  ctx.fillStyle = "#fffef4";
+  ctx.fillRect(-11, -11, 22, 22);
+  ctx.strokeStyle = "#d4d0bf";
   ctx.lineWidth = 2;
-  ctx.strokeRect(-9, -9, 18, 18);
+  ctx.strokeRect(-11, -11, 22, 22);
   ctx.restore();
 }
 
@@ -2750,7 +2783,8 @@ function drawHomePlate(x, y) {
 function drawBatterBox(homeX, homeY) {
   ctx.strokeStyle = "rgba(255,255,255,0.82)";
   ctx.lineWidth = 2;
-  ctx.strokeRect(homeX - 90, homeY - 40, 70, 66);
+  ctx.strokeRect(homeX - 76, homeY - 34, 32, 46);
+  ctx.strokeRect(homeX + 14, homeY - 34, 32, 46);
 }
 
 function drawStrikeZone() {
@@ -2782,8 +2816,12 @@ function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = 
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.scale(scale, scale);
-  ctx.fillStyle = "rgba(0,0,0,0.32)";
-  ctx.fillRect(2, 27, 16, 5);
+
+  // Short shadow to keep players readable without visual clutter.
+  ctx.fillStyle = "rgba(0,0,0,0.26)";
+  ctx.beginPath();
+  ctx.ellipse(10, 27, 11, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.fillStyle = skin;
   ctx.fillRect(3, -7, headSize, 11);
@@ -2795,6 +2833,8 @@ function drawPlayer(x, y, team, look, direction = 1, bigHead = true, selected = 
   ctx.fillRect(3, -9, headSize, 3);
   ctx.fillStyle = palette.cap;
   ctx.fillRect(3, -12, headSize, 4);
+  ctx.fillStyle = "#9dd7ff";
+  ctx.fillRect(5, -11, headSize - 4, 1);
 
   ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(6, -2, 2, 2);
@@ -3236,79 +3276,92 @@ function drawSwingFeedback() {
 }
 
 function drawAimMeters() {
-  const leftPad = 14;
-  const bottomPad = 14;
-  const panelH = 44;
-  const panelW = 292;
+  const leftPad = 18;
+  const bottomPad = 20;
+  const panelH = 102;
+  const panelW = 250;
   const panelY = GAME.height - panelH - bottomPad;
 
-  ctx.fillStyle = "rgba(9, 18, 34, 0.86)";
+  const selectedPitch = PITCH_TYPE_CONFIG[GAME.selectedPitchType] ?? PITCH_TYPE_CONFIG.fastball;
+
+  ctx.fillStyle = "rgba(8, 18, 38, 0.9)";
   ctx.fillRect(leftPad, panelY, panelW, panelH);
-  ctx.strokeStyle = "rgba(83, 210, 255, 0.58)";
+  ctx.strokeStyle = "rgba(85, 214, 255, 0.8)";
   ctx.lineWidth = 2;
   ctx.strokeRect(leftPad, panelY, panelW, panelH);
+  ctx.fillStyle = "#5ad8ff";
+  ctx.font = "bold 24px 'Trebuchet MS', sans-serif";
+  ctx.fillText("PITCH CONTROL", leftPad + 10, panelY + 26);
 
-  const selectedPitch = PITCH_TYPE_CONFIG[GAME.selectedPitchType] ?? PITCH_TYPE_CONFIG.fastball;
-  ctx.fillStyle = "#dff7ff";
-  ctx.font = "12px 'Trebuchet MS', sans-serif";
-  ctx.fillText(`Pitch: ${selectedPitch.label} (${selectedPitch.key})`, leftPad + 10, panelY + 16);
-  ctx.fillText(`Aim X ${Math.round(GAME.pitchAim * 100)}  Y ${Math.round(GAME.pitchAimY * 100)}`, leftPad + 10, panelY + 31);
+  ctx.fillStyle = "#f0f8ff";
+  ctx.font = "22px 'Trebuchet MS', sans-serif";
+  ctx.fillText("Aim (A/D):", leftPad + 16, panelY + 58);
+  const meterX = leftPad + 96;
+  const meterY = panelY + 46;
+  const meterW = 144;
+  const meterH = 16;
+  ctx.fillStyle = "rgba(14, 40, 72, 0.95)";
+  ctx.fillRect(meterX, meterY, meterW, meterH);
+  ctx.fillStyle = "#66d9ff";
+  const pitchAimNorm = clampValue((GAME.pitchAim + 1) / 2, 0, 1);
+  ctx.fillRect(meterX + 1, meterY + 1, (meterW - 2) * pitchAimNorm, meterH - 2);
+  ctx.strokeStyle = "rgba(130, 196, 245, 0.7)";
+  ctx.strokeRect(meterX, meterY, meterW, meterH);
 
-  const meterTrackX = leftPad + 104;
-  const meterTrackY = panelY + 24;
-  const meterTrackW = 172;
-  ctx.fillStyle = "rgba(26, 46, 74, 0.9)";
-  ctx.fillRect(meterTrackX, meterTrackY, meterTrackW, 9);
-  ctx.fillStyle = "#7de1ff";
-  ctx.fillRect(meterTrackX + 2, meterTrackY + 1, (GAME.pitchAim + 1) * ((meterTrackW - 4) / 2), 7);
+  ctx.fillStyle = "#f0f8ff";
+  ctx.font = "30px 'Trebuchet MS', sans-serif";
+  ctx.fillText(`Pitch: ${selectedPitch.key}`, leftPad + 16, panelY + 90);
 
   if (GAME.pitchCharge.active) {
-    const meterX = leftPad + 10;
-    const meterY = panelY - 15;
-    const meterW = 266;
-    ctx.fillStyle = "rgba(11,24,44,0.9)";
-    ctx.fillRect(meterX, meterY, meterW, 10);
+    const chargeX = leftPad + 14;
+    const chargeY = panelY - 14;
+    const chargeW = panelW - 28;
+    ctx.fillStyle = "rgba(8, 18, 38, 0.88)";
+    ctx.fillRect(chargeX, chargeY, chargeW, 10);
     ctx.fillStyle = "#ffd86a";
-    ctx.fillRect(meterX + 1, meterY + 1, (meterW - 2) * GAME.pitchCharge.meter, 8);
-    ctx.strokeStyle = "rgba(255,255,255,0.38)";
-    ctx.strokeRect(meterX, meterY, meterW, 10);
-    const perfectX = meterX + meterW * 0.52;
+    ctx.fillRect(chargeX + 1, chargeY + 1, (chargeW - 2) * GAME.pitchCharge.meter, 8);
+    const perfectX = chargeX + chargeW * 0.52;
     ctx.fillStyle = "#7dffb4";
-    ctx.fillRect(perfectX - 8, meterY, 16, 10);
+    ctx.fillRect(perfectX - 7, chargeY, 14, 10);
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.strokeRect(chargeX, chargeY, chargeW, 10);
   }
 
-  const rightW = 164;
-  const rightH = 36;
+  const rightW = 230;
+  const rightH = 102;
   const rightX = GAME.width - rightW - leftPad;
   const rightY = GAME.height - rightH - bottomPad;
-  ctx.fillStyle = "rgba(9, 18, 34, 0.86)";
+  ctx.fillStyle = "rgba(8, 18, 38, 0.9)";
   ctx.fillRect(rightX, rightY, rightW, rightH);
-  ctx.strokeStyle = "rgba(83, 210, 255, 0.58)";
+  ctx.strokeStyle = "rgba(85, 214, 255, 0.8)";
   ctx.strokeRect(rightX, rightY, rightW, rightH);
-  ctx.fillStyle = "#dff7ff";
-  ctx.fillText("Timing Meter", rightX + 10, rightY + 14);
-  const meterLeft = rightX + 10;
-  const meterTop = rightY + 18;
-  const meterWidth = 132;
-  ctx.fillStyle = "#ff9f72";
-  ctx.fillRect(meterLeft, meterTop, meterWidth * 0.18, 10);
-  ctx.fillStyle = "#ffd86a";
-  ctx.fillRect(meterLeft + meterWidth * 0.18, meterTop, meterWidth * 0.24, 10);
-  ctx.fillStyle = "#7bffb4";
-  ctx.fillRect(meterLeft + meterWidth * 0.42, meterTop, meterWidth * 0.16, 10);
-  ctx.fillStyle = "#ffd86a";
-  ctx.fillRect(meterLeft + meterWidth * 0.58, meterTop, meterWidth * 0.24, 10);
-  ctx.fillStyle = "#ff9f72";
-  ctx.fillRect(meterLeft + meterWidth * 0.82, meterTop, meterWidth * 0.18, 10);
+  ctx.fillStyle = "#5ad8ff";
+  ctx.font = "bold 24px 'Trebuchet MS', sans-serif";
+  ctx.fillText("CONTACT", rightX + 62, rightY + 26);
+
+  const meterLeft = rightX + 14;
+  const meterTop = rightY + 44;
+  const meterWidth = rightW - 28;
+  const meterHeight = 22;
+  ctx.fillStyle = "#df6e2f";
+  ctx.fillRect(meterLeft, meterTop, meterWidth * 0.32, meterHeight);
+  ctx.fillStyle = "#49e398";
+  ctx.fillRect(meterLeft + meterWidth * 0.32, meterTop, meterWidth * 0.36, meterHeight);
+  ctx.fillStyle = "#4ab8ff";
+  ctx.fillRect(meterLeft + meterWidth * 0.68, meterTop, meterWidth * 0.32, meterHeight);
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.strokeRect(meterLeft, meterTop, meterWidth, meterHeight);
+
   const timingPos = GAME.timingMeter.active
     ? clampValue(GAME.timingMeter.progress, 0, 1)
     : clampValue((GAME.swingAim + 1) / 2, 0, 1);
-  ctx.fillStyle = "#111";
-  ctx.fillRect(meterLeft + timingPos * meterWidth - 1.5, meterTop - 1, 3, 12);
-  if (GAME.timingMeter.verdict) {
-    ctx.fillStyle = "#dff7ff";
-    ctx.fillText(GAME.timingMeter.verdict, rightX + 10, rightY - 3);
-  }
+  ctx.fillStyle = "#09111f";
+  ctx.fillRect(meterLeft + timingPos * meterWidth - 2, meterTop - 2, 4, meterHeight + 4);
+  ctx.fillStyle = "#f0f8ff";
+  ctx.font = "18px 'Trebuchet MS', sans-serif";
+  ctx.fillText("WEAK", meterLeft + 6, rightY + 90);
+  ctx.fillText("GOOD", meterLeft + meterWidth * 0.4, rightY + 90);
+  ctx.fillText("PERFECT", meterLeft + meterWidth * 0.76, rightY + 90);
 }
 
 function drawUI() {
