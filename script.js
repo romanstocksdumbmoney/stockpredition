@@ -1252,6 +1252,13 @@ function updateHud() {
   homeTeamName.textContent = GAME.teams.home.name;
   awayScoreValue.textContent = String(GAME.scores.away);
   homeScoreValue.textContent = String(GAME.scores.home);
+
+  const awayChip = awayTeamName?.closest(".score-chip");
+  const homeChip = homeTeamName?.closest(".score-chip");
+  awayChip?.classList.remove("batting");
+  homeChip?.classList.remove("batting");
+  if (GAME.battingSide === "away") awayChip?.classList.add("batting");
+  else homeChip?.classList.add("batting");
 }
 
 function startGame() {
