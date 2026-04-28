@@ -12,8 +12,7 @@
     />
     <style>
       :root {
-        --header-h: 80px;
-        --bottom-h: 55px;
+        --header-h: 88px;
       }
 
       html,
@@ -33,23 +32,26 @@
 
       #root {
         display: grid;
-        grid-template-rows: var(--header-h) 1fr var(--bottom-h);
+        grid-template-rows: var(--header-h) 1fr;
         background: #7ecbff;
       }
 
       .top-header {
-        display: grid;
-        grid-template-columns: 1fr auto;
+        position: relative;
+        display: flex;
         align-items: center;
-        padding: 8px 18px;
+        justify-content: center;
+        padding: 8px 14px;
         background: linear-gradient(#8ad2ff, #70c5ff);
         border-bottom: 4px solid #2d6f9f;
       }
 
       .title {
+        position: absolute;
+        left: 16px;
         color: #ffffff;
         text-shadow: 3px 3px 0 #1a4e74;
-        font-size: clamp(16px, 1.7vw, 24px);
+        font-size: clamp(11px, 1.2vw, 17px);
         letter-spacing: 1px;
       }
 
@@ -57,19 +59,19 @@
         background: #ffffff;
         border: 4px solid #3a89b5;
         border-radius: 16px;
-        padding: 8px 14px;
+        padding: 8px 16px;
         display: grid;
-        gap: 8px;
-        min-width: 530px;
+        gap: 6px;
+        min-width: min(780px, 92vw);
         box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
       }
 
       .score-row,
       .count-row {
         display: flex;
-        justify-content: space-between;
+        justify-content: center;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
       }
 
       .team {
@@ -98,6 +100,24 @@
         font-size: 18px;
       }
 
+      .score-num.red-num {
+        color: #d33131;
+      }
+
+      .score-num.blue-num {
+        color: #2f57f0;
+      }
+
+      .score-mid {
+        font-size: 10px;
+        color: #13354f;
+      }
+
+      .score-divider {
+        color: #3f6f93;
+        font-size: 14px;
+      }
+
       .mini {
         font-size: 10px;
         color: #13354f;
@@ -120,38 +140,12 @@
         box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15);
       }
 
-      .action-banner {
-        position: absolute;
-        left: 50%;
-        bottom: 68px;
-        transform: translateX(-50%);
-        min-width: min(760px, 88%);
-        background: #ffffff;
-        border: 4px solid #3a89b5;
-        border-radius: 14px;
-        padding: 10px 14px;
-        text-align: center;
-        pointer-events: none;
-        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
-      }
-
-      .action-title {
-        font-size: clamp(12px, 1.4vw, 20px);
-        margin: 0 0 8px;
-      }
-
-      .action-sub {
-        font-size: clamp(8px, 0.9vw, 12px);
-        color: #234863;
-        margin: 0;
-      }
-
       .mobile-swing {
         position: absolute;
         right: 18px;
         bottom: 18px;
-        width: 94px;
-        height: 94px;
+        width: 90px;
+        height: 90px;
         border-radius: 50%;
         border: 4px solid #111;
         background: radial-gradient(circle at 35% 30%, #fff6ac, #f5a623);
@@ -160,22 +154,28 @@
         font-size: 13px;
         box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
         touch-action: manipulation;
+        transition: transform 120ms ease, opacity 140ms ease;
       }
 
       .mobile-swing:active {
         transform: translateY(2px);
       }
 
-      .bottom-bar {
-        background: #ffffff;
-        border-top: 4px solid #3a89b5;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #123;
-        font-size: clamp(9px, 1.1vw, 13px);
-        text-align: center;
-        padding: 0 12px;
+      .mobile-swing.active {
+        animation: swingPulse 1.05s ease-in-out infinite;
+        opacity: 1;
+      }
+
+      .mobile-swing.locked {
+        opacity: 0.38;
+        filter: grayscale(0.58);
+        pointer-events: none;
+      }
+
+      @keyframes swingPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+        100% { transform: scale(1); }
       }
 
       .game-over {
@@ -209,14 +209,18 @@
 
       @media (max-width: 900px) {
         .top-header {
-          grid-template-columns: 1fr;
-          gap: 8px;
-          align-content: center;
+          justify-content: center;
+          padding: 6px 8px;
         }
 
         .scoreboard {
           min-width: 0;
-          width: 100%;
+          width: min(96vw, 760px);
+        }
+
+        .title {
+          position: static;
+          margin-right: 10px;
         }
       }
     </style>
@@ -229,18 +233,21 @@
           <div class="score-row">
             <div class="team">
               <span class="chip red">COMETS</span>
-              <span id="scoreComets" class="score-num">0</span>
+              <span id="scoreComets" class="score-num red-num">0</span>
             </div>
-            <div class="mini"><span id="inning">INNING 1</span> • <span id="half">TOP</span></div>
+            <span class="score-divider">—</span>
+            <div class="score-mid"><span id="inning">INNING 1</span> • <span id="half">TOP</span></div>
+            <span class="score-divider">—</span>
             <div class="team">
+              <span id="scoreFoxes" class="score-num blue-num">0</span>
               <span class="chip blue">FOXES</span>
-              <span id="scoreFoxes" class="score-num">0</span>
             </div>
           </div>
           <div class="count-row mini">
             <span>B: <strong id="balls">0</strong></span>
             <span>S: <strong id="strikes">0</strong></span>
             <span>O: <strong id="outs">0</strong></span>
+            <span>|</span>
             <span>PITCH: <strong id="pitchType">FASTBALL</strong></span>
           </div>
         </div>
@@ -249,11 +256,6 @@
       <section class="field-wrap" id="fieldWrap">
         <canvas id="gameCanvas" width="1280" height="720" aria-label="Neon Slugger Deluxe"></canvas>
 
-        <div class="action-banner" id="actionBanner">
-          <p class="action-title" id="actionTitle">PITCH NOW</p>
-          <p class="action-sub" id="actionSub">A/D aim • 1-4 pitch type • SPACE throw</p>
-        </div>
-
         <button id="swingButton" class="mobile-swing" type="button">SWING</button>
 
         <div id="gameOver" class="game-over">
@@ -261,18 +263,12 @@
           <button id="restartButton" type="button">PLAY AGAIN</button>
         </div>
       </section>
-
-      <footer class="bottom-bar" id="statusBar">
-        PITCH NOW: CPU throwing • Press SPACE (or SWING) to bat.
-      </footer>
     </div>
 
     <script>
       (() => {
         const VIRTUAL_WIDTH = 1280;
         const VIRTUAL_HEIGHT = 720;
-        const HEADER_H = 80;
-        const BOTTOM_H = 55;
         const FIELD = {
           left: 80,
           right: 1200,
@@ -301,11 +297,7 @@
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const fieldWrap = document.getElementById("fieldWrap");
-        const statusBar = document.getElementById("statusBar");
         const swingButton = document.getElementById("swingButton");
-        const actionTitle = document.getElementById("actionTitle");
-        const actionSub = document.getElementById("actionSub");
-        const actionBanner = document.getElementById("actionBanner");
         const gameOverOverlay = document.getElementById("gameOver");
         const winnerText = document.getElementById("winnerText");
         const restartButton = document.getElementById("restartButton");
@@ -344,6 +336,7 @@
           phaseTimer: 0,
           lockInput: false,
           transitionText: "",
+          statusText: "",
           pitchType: "FASTBALL",
           pitchAim: 0,
           swingUsed: false,
@@ -424,15 +417,10 @@
         }
 
         function setStatus(text) {
-          statusBar.textContent = text;
+          game.statusText = text;
         }
 
-        function setAction(title, sub, color = "#23b7ff") {
-          actionTitle.textContent = title;
-          actionSub.textContent = sub;
-          actionTitle.style.color = color;
-          actionBanner.style.borderColor = color;
-        }
+        function setAction(_title, _sub, _color = "#23b7ff") {}
 
         function updateScoreboard() {
           scoreComets.textContent = String(game.score.comets);
@@ -689,13 +677,32 @@
           game.lockInput = true;
           game.phaseTimer = 0;
           setStatus(message);
-          setAction("PLAY RESULT", message, "#ffb36d");
           game.lastAction = message;
+          spawnPopup(playResultCallout(message), "#ffffff", {
+            kind: "result",
+            duration: 1.4,
+            size: 72
+          });
 
           game.playResultTimeout = setTimeout(() => {
             game.playResultTimeout = null;
             resetForNextPitch();
           }, 1000);
+        }
+
+        function playResultCallout(message) {
+          const m = (message || "").toLowerCase();
+          if (m.includes("home run")) return "HOME RUN!";
+          if (m.includes("strike")) return "STRIKE!";
+          if (m.includes("ball four") || m.includes("walk")) return "WALK";
+          if (m === "ball." || m.startsWith("ball")) return "BALL";
+          if (m.includes("foul")) return "FOUL";
+          if (m.includes("safe")) return "SAFE!";
+          if (m.includes("out")) return "OUT!";
+          if (m.includes("dead")) return "DEAD BALL";
+          if (m.includes("ended")) return "PLAY OVER";
+          if (m.includes("hit")) return "HIT!";
+          return String(message || "PLAY").toUpperCase();
         }
 
         function resetForNextPitch() {
@@ -777,13 +784,17 @@
           };
         }
 
-        function spawnPopup(text, color) {
+        function spawnPopup(text, color, options = {}) {
+          const kind = options.kind || "float";
           game.popupTexts.push({
             text,
             color,
-            x: VIRTUAL_WIDTH * 0.5,
-            y: VIRTUAL_HEIGHT * 0.44,
-            life: 1.0
+            x: options.x ?? (VIRTUAL_WIDTH * 0.5),
+            y: options.y ?? (VIRTUAL_HEIGHT * 0.48),
+            kind,
+            size: options.size ?? (kind === "result" ? 72 : 36),
+            age: 0,
+            duration: options.duration ?? (kind === "result" ? 1.4 : 1.0)
           });
         }
 
@@ -1027,9 +1038,9 @@
         function updatePopups(dt) {
           for (let i = game.popupTexts.length - 1; i >= 0; i -= 1) {
             const p = game.popupTexts[i];
-            p.life -= dt;
-            p.y -= 26 * dt;
-            if (p.life <= 0) game.popupTexts.splice(i, 1);
+            p.age += dt;
+            if (p.kind !== "result") p.y -= 26 * dt;
+            if (p.age >= p.duration) game.popupTexts.splice(i, 1);
           }
         }
 
@@ -1061,17 +1072,19 @@
         function draw() {
           const shakeX = game.shake > 0 ? (Math.random() - 0.5) * 10 : 0;
           const shakeY = game.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
-          ctx.save();
-          ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-          ctx.translate(shakeX, shakeY);
+          const cameraYOffset = 24;
 
+          ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+          ctx.save();
+          ctx.translate(shakeX, shakeY + cameraYOffset);
           drawBackground();
           drawField();
           drawPlayers();
           drawBall();
           drawRunnerAnimations();
           drawParticlesLayer();
-          drawCanvasPanels();
+          ctx.restore();
+
           drawPopups();
           drawTransitionText();
           drawDebug();
@@ -1080,8 +1093,6 @@
             ctx.fillStyle = `rgba(255,255,255,${game.flashAlpha})`;
             ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
           }
-
-          ctx.restore();
         }
 
         function drawBackground() {
@@ -1359,50 +1370,40 @@
           }
           ctx.globalAlpha = 1;
         }
-
-        function drawCanvasPanels() {
-          // Pitch panel
-          const pitchActive = game.phase === PHASE.NEXT_BATTER || game.phase === PHASE.PITCHING;
-          drawPanel(30, 610, 380, 84, pitchActive ? 1 : 0.45);
-          drawPanelText(48, 634, pitchActive ? "PITCH CONTROL - ACTIVE" : "PITCH CONTROL - LOCKED", "#228fd0", 12);
-          drawPanelText(48, 660, "A/D AIM • 1-4 TYPE", "#163e5b", 10);
-
-          // Contact panel
-          const contactActive = game.phase === PHASE.PITCH_FLIGHT || game.phase === PHASE.BATTING_WINDOW;
-          drawPanel(870, 610, 380, 84, contactActive ? 1 : 0.45);
-          drawPanelText(888, 634, contactActive ? "CONTACT - SWING NOW" : "CONTACT - WAITING", "#df7d1e", 12);
-          drawPanelText(888, 660, "SPACE / TAP SWING", "#163e5b", 10);
-        }
-
-        function drawPanel(x, y, w, h, alpha) {
-          ctx.save();
-          ctx.globalAlpha = alpha;
-          ctx.fillStyle = "#fff";
-          ctx.strokeStyle = "#2d8ab9";
-          ctx.lineWidth = 4;
-          roundRect(ctx, x, y, w, h, 10);
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        function drawPanelText(x, y, text, color, size) {
-          ctx.fillStyle = color;
-          ctx.font = `${size}px "Press Start 2P"`;
-          ctx.fillText(text, x, y);
-        }
-
         function drawPopups() {
           for (const p of game.popupTexts) {
-            const alpha = Math.max(0, p.life);
-            ctx.globalAlpha = alpha;
+            const progress = Math.min(1, p.age / p.duration);
+            let alpha = 1 - progress;
+            let scale = 1;
+
+            if (p.kind === "result") {
+              if (progress < 0.18) {
+                scale = 0.5 + (1.2 - 0.5) * (progress / 0.18);
+              } else if (progress < 0.34) {
+                scale = 1.2 + (1.0 - 1.2) * ((progress - 0.18) / 0.16);
+              }
+
+              if (progress < 0.08) {
+                alpha = 0.78 * (progress / 0.08);
+              } else if (progress < 0.86) {
+                alpha = 0.78;
+              } else {
+                alpha = 0.78 * (1 - ((progress - 0.86) / 0.14));
+              }
+            }
+
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.scale(scale, scale);
+            ctx.globalAlpha = Math.max(0, alpha);
             ctx.fillStyle = p.color;
-            ctx.strokeStyle = "#111";
-            ctx.lineWidth = 4;
-            ctx.font = '36px "Press Start 2P"';
-            const textW = ctx.measureText(p.text).width;
-            ctx.strokeText(p.text, p.x - textW / 2, p.y);
-            ctx.fillText(p.text, p.x - textW / 2, p.y);
+            ctx.font = `${p.size}px "Press Start 2P"`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.shadowColor = "rgba(0, 0, 0, 0.88)";
+            ctx.shadowBlur = 12;
+            ctx.fillText(p.text, 0, 0);
+            ctx.restore();
           }
           ctx.globalAlpha = 1;
         }
@@ -1451,20 +1452,11 @@
           context.closePath();
         }
 
-        function updateActionBanner() {
-          if (game.phase === PHASE.NEXT_BATTER || game.phase === PHASE.PITCHING) {
-            setAction("PITCH NOW", "CPU pitching • SPACE / SWING to bat", "#28b7ff");
-          } else if (game.phase === PHASE.PITCH_FLIGHT || game.phase === PHASE.BATTING_WINDOW) {
-            setAction("SWING NOW", "SPACE swing", "#ffb542");
-          } else if (game.phase === PHASE.FIELDING) {
-            setAction("FIELD THE BALL", "WASD move • Q/F/E/R throw", "#56d58a");
-          } else if (game.phase === PHASE.RESULT) {
-            setAction("PLAY RESULT", statusBar.textContent, "#ffbe7f");
-          } else if (game.phase === PHASE.INNING_TRANSITION) {
-            setAction("INNING CHANGE", game.transitionText, "#95a9c9");
-          } else if (game.phase === PHASE.GAME_OVER) {
-            setAction("GAME OVER", game.winner, "#f79393");
-          }
+        function updateSwingButtonState() {
+          const battingTurn = game.phase === PHASE.PITCH_FLIGHT || game.phase === PHASE.BATTING_WINDOW;
+          swingButton.classList.toggle("active", battingTurn);
+          swingButton.classList.toggle("locked", !battingTurn);
+          swingButton.setAttribute("aria-disabled", battingTurn ? "false" : "true");
         }
 
         function update(dt) {
@@ -1511,7 +1503,7 @@
           updateRunnerAnims(dt);
           updateParticles(dt);
           updatePopups(dt);
-          updateActionBanner();
+          updateSwingButtonState();
           draw();
           clearInputFlags();
         }
@@ -1693,6 +1685,7 @@
           gameOverOverlay.style.display = "none";
           setStatus("PITCH NOW: Press SPACE or SWING to bat.");
           setAction("PITCH NOW", "CPU preparing next pitch", "#28b7ff");
+          updateSwingButtonState();
           initPlayers();
           updateScoreboard();
         }
@@ -1713,6 +1706,7 @@
         updateScoreboard();
         setAction("PITCH NOW", "CPU preparing next pitch", "#28b7ff");
         setStatus("PITCH NOW: Press SPACE or SWING to bat.");
+        updateSwingButtonState();
         requestAnimationFrame(frame);
       })();
     </script>
