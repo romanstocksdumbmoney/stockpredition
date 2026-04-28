@@ -35,15 +35,15 @@ const finalScoreText = document.getElementById("finalScoreText");
 // Centralized render geometry. Every field/actor draw uses this system.
 const FIELD_LAYOUT_RATIOS = {
   // Bigger, deeper isometric playfield so pitcher/fielders are not cramped.
-  homeY: 0.89,
-  secondY: 0.22,
-  baseSpread: 0.33,
+  homeY: 0.87,
+  secondY: 0.26,
+  baseSpread: 0.29,
   hudHeight: 70,
   bottomBarHeight: 60
 };
 
 const FIELD_DEPTH_TUNING = {
-  moundDepthRatio: 0.64
+  moundDepthRatio: 0.56
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -87,13 +87,13 @@ const PITCH_TUNING = {
 };
 
 const CAMERA_TUNING = {
-  battingDamping: 0.12,
-  pitchingDamping: 0.13,
-  fieldingDamping: 0.14,
-  homerDamping: 0.15,
-  maxX: 280,
-  maxYTop: -300,
-  maxYBottom: 90
+  battingDamping: 0.16,
+  pitchingDamping: 0.16,
+  fieldingDamping: 0.15,
+  homerDamping: 0.16,
+  maxX: 240,
+  maxYTop: -260,
+  maxYBottom: 70
 };
 
 const PITCH_TYPE_CONFIG = {
@@ -2560,10 +2560,10 @@ function update(dt) {
 
 function drawBackground() {
   const bounds = RENDER_LAYOUT.fieldRect;
-  const top = Math.max(0, bounds.top - 18);
+  const top = Math.max(0, bounds.top - 24);
   const sky = ctx.createLinearGradient(0, 0, 0, bounds.bottom + 40);
   sky.addColorStop(0, "#5ec6ff");
-  sky.addColorStop(0.35, "#2f69ae");
+  sky.addColorStop(0.4, "#2f69ae");
   sky.addColorStop(1, "#10274b");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, GAME.width, bounds.bottom + 42);
@@ -2587,10 +2587,35 @@ function drawBackground() {
   ctx.fillStyle = "#153566";
   ctx.fillRect(0, top + 12, GAME.width, 20);
 
-  // Crowd/stadium seats for a fuller 3D arcade backdrop.
-  const seatRows = 6;
+  // Curved dark wall backdrop + crowd rows.
+  const wall = getOutfieldWall();
+  ctx.beginPath();
+  for (let x = wall.xLeft; x <= wall.xRight; x += 8) {
+    const y = wall.yAt(x) - 18;
+    if (x === wall.xLeft) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  for (let x = wall.xRight; x >= wall.xLeft; x -= 8) {
+    const y = wall.yAt(x) + 20;
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "rgba(16, 46, 88, 0.92)";
+  ctx.fill();
+
+  ctx.beginPath();
+  for (let x = wall.xLeft; x <= wall.xRight; x += 8) {
+    const y = wall.yAt(x) - 18;
+    if (x === wall.xLeft) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = "rgba(88, 206, 255, 0.92)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  const seatRows = 5;
   for (let row = 0; row < seatRows; row += 1) {
-    const y = top + 6 + row * 6;
+    const y = top + 4 + row * 6;
     const shade = 16 + row * 8;
     ctx.fillStyle = `rgba(${shade},${36 + row * 6},${72 + row * 10},0.95)`;
     ctx.fillRect(0, y, GAME.width, 6);
@@ -2613,9 +2638,9 @@ function drawField() {
 
   // Outfield grass
   const grass = ctx.createLinearGradient(0, bounds.top, 0, GAME.height);
-  grass.addColorStop(0, "#2d975c");
-  grass.addColorStop(0.55, "#2a8f54");
-  grass.addColorStop(1, "#1f6b40");
+  grass.addColorStop(0, "#2c995b");
+  grass.addColorStop(0.55, "#26874f");
+  grass.addColorStop(1, "#1b6039");
   ctx.fillStyle = grass;
   ctx.fillRect(0, bounds.top, GAME.width, GAME.height - bounds.top);
 
@@ -2629,11 +2654,11 @@ function drawField() {
   ctx.lineTo(third.x - 330, GAME.height);
   ctx.closePath();
   ctx.clip();
-  for (let x = -170; x < GAME.width + 260; x += 38) {
-    ctx.fillStyle = "rgba(255,255,255,0.065)";
+  for (let x = -170; x < GAME.width + 260; x += 34) {
+    ctx.fillStyle = "rgba(255,255,255,0.075)";
     ctx.beginPath();
     ctx.moveTo(x, bounds.top - 10);
-    ctx.lineTo(x + 12, bounds.top - 10);
+    ctx.lineTo(x + 14, bounds.top - 10);
     ctx.lineTo(x + 232, GAME.height + 14);
     ctx.lineTo(x + 194, GAME.height + 14);
     ctx.closePath();
@@ -2643,8 +2668,8 @@ function drawField() {
 
   // Infield dirt diamond
   const infieldDirt = ctx.createLinearGradient(home.x, second.y, home.x, home.y + 34);
-  infieldDirt.addColorStop(0, "#d7a66f");
-  infieldDirt.addColorStop(1, "#c38b54");
+  infieldDirt.addColorStop(0, "#d9a56a");
+  infieldDirt.addColorStop(1, "#be7f43");
   ctx.fillStyle = infieldDirt;
   ctx.beginPath();
   ctx.moveTo(home.x, home.y + 30);
@@ -2655,8 +2680,8 @@ function drawField() {
   ctx.fill();
 
   // Outer base path ring.
-  ctx.strokeStyle = "rgba(226, 194, 147, 0.9)";
-  ctx.lineWidth = 22;
+  ctx.strokeStyle = "rgba(228, 195, 148, 0.94)";
+  ctx.lineWidth = 24;
   ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(home.x, home.y + 4);

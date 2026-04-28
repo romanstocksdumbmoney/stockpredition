@@ -56,9 +56,9 @@ body {
 
 .hud h1 {
   margin: 0;
-  font-size: 2.85rem;
+  font-size: 2.2rem;
   line-height: 1;
-  letter-spacing: 0.11rem;
+  letter-spacing: 0.07rem;
   color: #7fd4ff;
   text-shadow:
     0 0 10px rgba(83, 210, 255, 0.75),
