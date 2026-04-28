@@ -98,58 +98,153 @@ UPLOAD_HTML = """{% extends "base.html" %}
 <h2>Upload Receipt</h2>
 <p class="small">Supported formats: JPG, PNG, PDF</p>
 <div class="card">
+  <h3>Upload from file</h3>
   <form id="uploadForm" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".jpg,.jpeg,.png,.pdf" required />
+    <input id="fileInput" type="file" name="file" accept=".jpg,.jpeg,.png,.pdf,image/*" />
     <div style="margin-top:10px;" class="inline">
-      <label><input type="checkbox" name="allow_duplicate" value="true" /> Allow duplicate upload</label>
+      <label><input id="allowDuplicateInput" type="checkbox" name="allow_duplicate" value="true" /> Allow duplicate upload</label>
       <button type="submit">Upload</button>
     </div>
   </form>
+
+  <h3 class="section-title">Take photo and scan</h3>
+  <p class="small">Use your device camera to photograph a receipt and send it directly to OCR.</p>
+  <div class="inline">
+    <button id="startCameraBtn" type="button" class="secondary">Start Camera</button>
+    <button id="captureBtn" type="button" disabled>Capture & Scan</button>
+    <button id="stopCameraBtn" type="button" class="secondary" disabled>Stop Camera</button>
+  </div>
+  <video id="cameraPreview" autoplay playsinline style="margin-top:10px;max-width:420px;display:none;border:1px solid #d9e0ea;border-radius:8px;"></video>
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+
   <p id="result" class="small"></p>
   <img id="previewImage" style="margin-top:10px;max-width:420px;display:none;" alt="receipt preview" />
   <embed id="previewPdf" type="application/pdf" style="margin-top:10px;width:100%;height:420px;display:none;" />
 </div>
 <script>
 const form = document.getElementById("uploadForm");
+const fileInput = document.getElementById("fileInput");
+const allowDuplicateInput = document.getElementById("allowDuplicateInput");
 const result = document.getElementById("result");
 const previewImage = document.getElementById("previewImage");
 const previewPdf = document.getElementById("previewPdf");
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(form);
-  const allowDuplicate = form.querySelector('input[name="allow_duplicate"]').checked;
+const startCameraBtn = document.getElementById("startCameraBtn");
+const captureBtn = document.getElementById("captureBtn");
+const stopCameraBtn = document.getElementById("stopCameraBtn");
+const cameraPreview = document.getElementById("cameraPreview");
+const captureCanvas = document.getElementById("captureCanvas");
+
+let cameraStream = null;
+
+function setResult(message, isError = false) {
+  result.className = isError ? "error" : "small";
+  result.textContent = message;
+}
+
+function renderPreview(file) {
+  const url = URL.createObjectURL(file);
+  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    previewPdf.style.display = "block";
+    previewImage.style.display = "none";
+    previewPdf.src = url;
+    return;
+  }
+  previewImage.style.display = "block";
+  previewPdf.style.display = "none";
+  previewImage.src = url;
+}
+
+async function uploadAndRunOcr(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const allowDuplicate = allowDuplicateInput.checked;
   const query = allowDuplicate ? "?allow_duplicate=true" : "";
   const resp = await fetch(`/api/receipts/upload${query}`, { method: "POST", body: formData });
   const payload = await resp.json();
   if (!resp.ok) {
-    result.textContent = payload.error || "Upload failed";
-    result.className = "error";
+    setResult(payload.error || "Upload failed", true);
     return;
   }
-  result.className = "small";
-  result.textContent = `Uploaded receipt ${payload.receipt_id}. Running OCR...`;
+  setResult(`Uploaded receipt ${payload.receipt_id}. Running OCR...`);
   const ocrResp = await fetch(`/api/receipts/${payload.receipt_id}/ocr`, { method: "POST" });
   const ocrPayload = await ocrResp.json();
   if (!ocrResp.ok) {
-    result.textContent = ocrPayload.error || "OCR failed";
-    result.className = "error";
+    setResult(ocrPayload.error || "OCR failed", true);
     return;
   }
-  result.textContent = `OCR complete. Status: ${ocrPayload.status}. Open review queue to verify fields.`;
-  const file = form.querySelector('input[name="file"]').files[0];
-  if (file) {
-    const url = URL.createObjectURL(file);
-    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      previewPdf.style.display = "block";
-      previewImage.style.display = "none";
-      previewPdf.src = url;
-    } else {
-      previewImage.style.display = "block";
-      previewPdf.style.display = "none";
-      previewImage.src = url;
-    }
+  setResult(`OCR complete. Status: ${ocrPayload.status}. Open review queue to verify fields.`);
+  renderPreview(file);
+}
+
+function stopCamera() {
+  if (!cameraStream) {
+    return;
+  }
+  cameraStream.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  cameraPreview.srcObject = null;
+  cameraPreview.style.display = "none";
+  captureBtn.disabled = true;
+  stopCameraBtn.disabled = true;
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) {
+    setResult("Please select a receipt file or use camera capture.", true);
+    return;
+  }
+  await uploadAndRunOcr(file);
+});
+
+startCameraBtn.addEventListener("click", async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setResult("Camera capture is not supported in this browser.", true);
+    return;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    });
+    cameraPreview.srcObject = cameraStream;
+    cameraPreview.style.display = "block";
+    captureBtn.disabled = false;
+    stopCameraBtn.disabled = false;
+    setResult("Camera ready. Position receipt, then click Capture & Scan.");
+  } catch (error) {
+    setResult("Unable to access camera. Check camera permissions and retry.", true);
   }
 });
+
+captureBtn.addEventListener("click", () => {
+  if (!cameraStream) {
+    setResult("Start the camera before capturing.", true);
+    return;
+  }
+  const width = cameraPreview.videoWidth || 1280;
+  const height = cameraPreview.videoHeight || 720;
+  captureCanvas.width = width;
+  captureCanvas.height = height;
+  const context = captureCanvas.getContext("2d");
+  if (!context) {
+    setResult("Camera capture failed: canvas context unavailable.", true);
+    return;
+  }
+  context.drawImage(cameraPreview, 0, 0, width, height);
+  captureCanvas.toBlob(async (blob) => {
+    if (!blob) {
+      setResult("Camera capture failed: no image data returned.", true);
+      return;
+    }
+    const captured = new File([blob], `camera-receipt-${Date.now()}.jpg`, { type: "image/jpeg" });
+    await uploadAndRunOcr(captured);
+  }, "image/jpeg", 0.95);
+});
+
+stopCameraBtn.addEventListener("click", stopCamera);
+window.addEventListener("beforeunload", stopCamera);
 </script>
 {% endblock %}
 """
@@ -321,5 +416,6 @@ def ensure_templates(settings: AppSettings) -> None:
     }
     for filename, content in files.items():
         path = settings.templates_dir / filename
-        if not path.exists():
+        existing = path.read_text(encoding="utf-8") if path.exists() else None
+        if existing != content:
             path.write_text(content, encoding="utf-8")

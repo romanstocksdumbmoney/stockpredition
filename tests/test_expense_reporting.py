@@ -173,6 +173,16 @@ def test_ocr_parser_flags_missing_and_low_confidence_fields() -> None:
     assert "total" in parsed.low_confidence_fields or "merchant" in parsed.low_confidence_fields
 
 
+def test_upload_page_exposes_camera_capture_flow(client) -> None:
+    response = client.get("/upload")
+    assert response.status_code == 200
+    html = response.text
+    assert "Take photo and scan" in html
+    assert "Start Camera" in html
+    assert "Capture & Scan" in html
+    assert "navigator.mediaDevices.getUserMedia" in html
+
+
 def test_final_acceptance_flow(client) -> None:
     upload = client.post(
         "/api/receipts/upload",
