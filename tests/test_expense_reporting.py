@@ -20,24 +20,26 @@ def test_money_math_in_cents_is_decimal_safe() -> None:
 
 def test_subtotal_tax_tip_must_equal_total_before_approval(service) -> None:
     record = service.upload_receipt("receipt.png", b"fake-image")
-    record = service.update_review(
-        record.receipt_id,
-        ReviewUpdateInput(
-            merchant="Cafe",
-            receipt_date=date(2026, 4, 9),
-            department="Sales",
-            location="Store 1",
-            category="Meals",
-            subtotal_cents=1000,
-            tax_cents=80,
-            tip_cents=100,
-            total_cents=1000,
-            approve=True,
-            confirm_low_confidence_review=True,
-        ),
-    )
-    assert record.status != "Approved"
-    assert record.verification_error == "Mismatch detected: subtotal + tax + tip does not equal total."
+    with pytest.raises(ValidationError):
+        service.update_review(
+            record.receipt_id,
+            ReviewUpdateInput(
+                merchant="Cafe",
+                receipt_date=date(2026, 4, 9),
+                department="Sales",
+                location="Store 1",
+                category="Meals",
+                subtotal_cents=1000,
+                tax_cents=80,
+                tip_cents=100,
+                total_cents=1000,
+                approve=True,
+                confirm_low_confidence_review=True,
+            ),
+        )
+
+    pending = service.get_receipt(record.receipt_id)
+    assert pending.status == "Uploaded"
 
 
 def test_duplicate_detection_by_hash_blocks_default_upload(service) -> None:

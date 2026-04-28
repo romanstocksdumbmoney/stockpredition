@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from fastapi.templating import Jinja2Templates
 
 from expense_reporting.app import app
 from expense_reporting.service import ExpenseService
@@ -31,11 +32,11 @@ def client(service: ExpenseService) -> TestClient:
     import expense_reporting.app as app_module
 
     original_service = app_module.service
-    original_templates_dir = app_module.templates.directory
+    original_templates = app_module.templates
     app_module.service = service
-    app_module.templates.directory = str(service.settings.templates_dir)
+    app_module.templates = Jinja2Templates(directory=str(service.settings.templates_dir))
     try:
         yield TestClient(app)
     finally:
         app_module.service = original_service
-        app_module.templates.directory = original_templates_dir
+        app_module.templates = original_templates
