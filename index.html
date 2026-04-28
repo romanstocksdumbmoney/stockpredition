@@ -61,7 +61,7 @@
     }
 
     #click-flash {
-      background: rgba(244, 168, 0, 0.15);
+      background: rgba(255, 70, 70, 0.18);
     }
 
     #he-flash {
@@ -216,10 +216,19 @@
       padding-inline: 12px;
     }
 
+    .click-label {
+      color: var(--terminal-green);
+      font-size: 0.92rem;
+      letter-spacing: 1.4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.35);
+    }
+
     .bomb-button {
       position: relative;
-      width: min(35vw, 330px);
-      aspect-ratio: 1 / 1;
+      width: min(48vw, 220px);
+      height: min(48vw, 220px);
       border: none;
       border-radius: 18px;
       background: transparent;
@@ -227,15 +236,20 @@
       transition: transform 0.18s ease, filter 0.22s ease;
       filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.65));
       outline: none;
+      padding: 0;
     }
 
     .bomb-button:hover {
-      transform: scale(1.03);
-      filter: drop-shadow(0 14px 28px rgba(240, 165, 0, 0.3));
+      transform: scale(1.02);
+      filter: drop-shadow(0 14px 28px rgba(0, 200, 255, 0.4));
     }
 
     .bomb-button.pulse {
       animation: bombPulse 180ms ease-out;
+    }
+
+    .bomb-button.shake {
+      animation: bombShake 180ms ease-out;
     }
 
     @keyframes bombPulse {
@@ -244,83 +258,30 @@
       100% { transform: scale(1.05); }
     }
 
-    .bomb-shell {
+    @keyframes bombShake {
+      0% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      50% { transform: translateX(4px); }
+      75% { transform: translateX(-2px); }
+      100% { transform: translateX(0); }
+    }
+
+    .bomb-canvas-wrap {
       width: 100%;
       height: 100%;
       border-radius: 16px;
-      background: linear-gradient(145deg, #151515, #222);
-      border: 2px solid #2d2d2d;
-      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 6px rgba(255, 255, 255, 0.06);
+      background: radial-gradient(circle at 30% 20%, #1b1f26, #111216 62%);
+      border: 2px solid #2f3338;
       position: relative;
       overflow: hidden;
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 0, 0, 0.4);
     }
 
-    .bomb-screen {
-      position: absolute;
-      top: 18%;
-      left: 14%;
-      right: 14%;
-      height: 28%;
-      border: 1px solid #365836;
-      border-radius: 8px;
-      background: radial-gradient(circle at top, rgba(84, 164, 86, 0.4), rgba(16, 43, 18, 0.7));
-      color: #8bff8f;
-      font-size: clamp(1.1rem, 2.8vw, 1.7rem);
-      font-weight: 700;
-      display: grid;
-      place-items: center;
-      text-shadow: 0 0 8px rgba(63, 255, 70, 0.7);
-      letter-spacing: 2px;
-    }
-
-    .keypad {
-      position: absolute;
-      left: 14%;
-      right: 14%;
-      bottom: 16%;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-    }
-
-    .key {
-      height: 16px;
-      border-radius: 3px;
-      background: linear-gradient(180deg, #303030, #1c1c1c);
-      border: 1px solid #404040;
-    }
-
-    .wire {
-      position: absolute;
-      width: 44%;
-      height: 4px;
-      border-radius: 99px;
-      top: 54%;
-      left: 10%;
-      transform: rotate(-10deg);
-      background: linear-gradient(90deg, #963d3d, #d34d4d);
-      box-shadow: 0 0 8px rgba(220, 70, 70, 0.35);
-    }
-
-    .wire.yellow {
-      top: 58%;
-      left: 44%;
-      transform: rotate(8deg);
-      background: linear-gradient(90deg, #8b772f, #f6cd3f);
-      box-shadow: 0 0 8px rgba(240, 205, 60, 0.35);
-    }
-
-    .led {
-      position: absolute;
-      right: 9%;
-      top: 12%;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #5c0f0f;
-      border: 1px solid #7a2c2c;
-      animation: ledBlink var(--led-speed) infinite;
-      box-shadow: 0 0 6px rgba(255, 55, 55, 0.35);
+    #bomb-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 14px;
     }
 
     @keyframes ledBlink {
@@ -351,6 +312,37 @@
       white-space: nowrap;
     }
 
+    .float-cps {
+      position: absolute;
+      color: #7bf58f;
+      font-size: 1rem;
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(84, 255, 132, 0.75);
+      animation: floatUp 900ms ease-out forwards;
+      white-space: nowrap;
+    }
+
+    .bomb-spark {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #72d8ff;
+      box-shadow: 0 0 10px rgba(114, 216, 255, 0.8);
+      animation: bombSpark 480ms ease-out forwards;
+    }
+
+    @keyframes bombSpark {
+      from {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: translate(var(--dx), var(--dy)) scale(0.4);
+      }
+    }
+
     @keyframes floatUp {
       from { opacity: 1; transform: translate(-50%, 0); }
       to { opacity: 0; transform: translate(-50%, -54px); }
@@ -379,6 +371,14 @@
       flex-direction: column;
       gap: 8px;
       padding-bottom: 14px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .shop-surface {
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
     }
 
     .shop-tabs {
@@ -430,6 +430,7 @@
       inset: 0;
       background: linear-gradient(90deg, rgba(76, 175, 80, 0.13), transparent 55%);
       opacity: 0;
+      pointer-events: none;
       transition: opacity 0.15s ease;
     }
 
@@ -1202,17 +1203,10 @@
 
   <main class="arena">
     <section class="center-zone">
+      <div class="click-label">CLICK TO EARN</div>
       <button id="bomb-button" class="bomb-button" aria-label="Click bomb to earn money">
-        <div class="bomb-shell">
-          <div class="led" id="bomb-led"></div>
-          <div class="bomb-screen">C4</div>
-          <div class="wire"></div>
-          <div class="wire yellow"></div>
-          <div class="keypad">
-            <div class="key"></div><div class="key"></div><div class="key"></div><div class="key"></div>
-            <div class="key"></div><div class="key"></div><div class="key"></div><div class="key"></div>
-            <div class="key"></div><div class="key"></div><div class="key"></div><div class="key"></div>
-          </div>
+        <div class="bomb-canvas-wrap">
+          <canvas id="bomb-canvas" width="220" height="220" aria-hidden="true"></canvas>
         </div>
       </button>
       <div id="equipped-knife-display" class="equipped-knife-display">
@@ -1340,7 +1334,8 @@
       inventorySkins: [],
       knifeInventory: [],
       equippedKnifeId: null,
-      caseAnimating: false
+      caseAnimating: false,
+      bombFlashUntil: 0
     };
 
     const el = {
@@ -1354,6 +1349,7 @@
       rankMulti: document.getElementById("rank-multi"),
       prestigeBtn: document.getElementById("prestige-btn"),
       bombBtn: document.getElementById("bomb-button"),
+      bombCanvas: document.getElementById("bomb-canvas"),
       clickFlash: document.getElementById("click-flash"),
       heFlash: document.getElementById("he-flash"),
       knifeFlash: document.getElementById("knife-flash"),
@@ -1371,6 +1367,23 @@
     };
 
     let audioCtx = null;
+    let bombCtx = null;
+    let bombHover = false;
+
+    function roundedRectPath(ctx, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
 
     function initAudio() {
       if (!audioCtx) {
@@ -1504,6 +1517,33 @@
       setTimeout(() => note.remove(), 920);
     }
 
+    function spawnPurchaseFloat(fromButton, text) {
+      if (!fromButton) return;
+      const rect = fromButton.getBoundingClientRect();
+      const note = document.createElement("div");
+      note.className = "float-cps";
+      note.textContent = text;
+      note.style.left = `${rect.left + rect.width / 2}px`;
+      note.style.top = `${rect.top - 2}px`;
+      el.floatingLayer.appendChild(note);
+      setTimeout(() => note.remove(), 900);
+    }
+
+    function spawnSparkBurst(x, y, color = "#72d8ff", count = 12) {
+      for (let i = 0; i < count; i += 1) {
+        const spark = document.createElement("div");
+        spark.className = "bomb-spark";
+        spark.style.left = `${x}px`;
+        spark.style.top = `${y}px`;
+        spark.style.background = color;
+        spark.style.boxShadow = `0 0 10px ${color}`;
+        spark.style.setProperty("--dx", `${(Math.random() - 0.5) * 80}px`);
+        spark.style.setProperty("--dy", `${(Math.random() - 0.5) * 70}px`);
+        el.floatingLayer.appendChild(spark);
+        setTimeout(() => spark.remove(), 500);
+      }
+    }
+
     function showKillFeed(text) {
       const row = document.createElement("div");
       row.className = "kill-entry";
@@ -1528,6 +1568,89 @@
         speed = 0.16 + (state.timeLeft / 30) * 0.64;
       }
       document.documentElement.style.setProperty("--led-speed", `${speed.toFixed(2)}s`);
+    }
+
+    function drawBombDevice(ts = 0) {
+      if (!bombCtx) return;
+      const ctx = bombCtx;
+      const canvas = el.bombCanvas;
+      const w = canvas.width;
+      const h = canvas.height;
+      const pulse = 0.5 + 0.5 * Math.sin(ts / 1000 * Math.PI);
+      const wireWiggle = Math.sin(ts / 280) * 4;
+
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.fillStyle = "rgba(14, 18, 22, 0.95)";
+      roundedRectPath(ctx, 20, 28, 180, 164, 16);
+      ctx.fill();
+
+      const glow = bombHover ? 0.55 : 0.22 + pulse * 0.1;
+      ctx.strokeStyle = `rgba(120, 232, 255, ${glow})`;
+      ctx.lineWidth = 2.2;
+      roundedRectPath(ctx, 20, 28, 180, 164, 16);
+      ctx.stroke();
+
+      ctx.fillStyle = "#2a2a2a";
+      roundedRectPath(ctx, 36, 48, 148, 108, 10);
+      ctx.fill();
+      ctx.strokeStyle = "#3b3b3b";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.strokeStyle = "#4caf50";
+      ctx.lineWidth = 1.3;
+      for (let i = 0; i < 5; i += 1) {
+        const y = 62 + i * 16;
+        ctx.beginPath();
+        ctx.moveTo(50, y);
+        ctx.lineTo(170 - (i % 2) * 14, y);
+        ctx.stroke();
+      }
+
+      const ledRateMs = state.timeLeft <= 30 ? 180 : 520;
+      const ledOn = Math.floor(ts / ledRateMs) % 2 === 0;
+      ctx.beginPath();
+      ctx.arc(171, 56, 6, 0, Math.PI * 2);
+      ctx.fillStyle = ledOn ? "#ff3f3f" : "#611313";
+      ctx.shadowColor = ledOn ? "rgba(255, 72, 72, 0.95)" : "transparent";
+      ctx.shadowBlur = ledOn ? 13 : 0;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = "#0d1b0f";
+      roundedRectPath(ctx, 58, 59, 84, 28, 5);
+      ctx.fill();
+      ctx.strokeStyle = "#345d36";
+      ctx.stroke();
+      ctx.fillStyle = "#90ff9a";
+      ctx.font = "700 16px Rajdhani, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatTime(state.timeLeft), 100, 78);
+
+      for (let i = 0; i < 9; i += 1) {
+        const x = 39 + i * 18;
+        ctx.fillStyle = i % 2 ? "#161616" : "#d0b041";
+        ctx.fillRect(x, 143, 12, 13);
+      }
+
+      const wires = ["#d24f4f", "#f2d14d", "#58c776", "#f5f5f5"];
+      wires.forEach((color, idx) => {
+        const y = 72 + idx * 17;
+        const sway = Math.sin(ts / 320 + idx) * 5 + wireWiggle * 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(36, y);
+        ctx.bezierCurveTo(20 + sway, y - 7, 8 - sway, y + 10, 4, y + sway * 0.8);
+        ctx.stroke();
+      });
+
+      if (Date.now() < state.bombFlashUntil) {
+        ctx.fillStyle = "rgba(255, 70, 70, 0.24)";
+        roundedRectPath(ctx, 20, 28, 180, 164, 16);
+        ctx.fill();
+      }
     }
 
     function randomFrom(arr) {
@@ -1748,9 +1871,9 @@
 
       return `
         <div class="case-box">
-          <div class="case-row"><span class="label">Case Price</span><strong>$${formatMoney(caseCost)}</strong></div>
-          <div class="case-row"><span class="label">Cases Owned</span><strong>${state.caseInventory}</strong></div>
-          <div class="case-row"><span class="label">Cases Opened</span><strong>${state.casesOpened}</strong></div>
+          <div class="case-row"><span class="label">Case Price</span><strong data-case-price>$${formatMoney(caseCost)}</strong></div>
+          <div class="case-row"><span class="label">Cases Owned</span><strong data-case-owned>${state.caseInventory}</strong></div>
+          <div class="case-row"><span class="label">Cases Opened</span><strong data-case-opened>${state.casesOpened}</strong></div>
           <button class="buy-case-btn" data-buy-case="1" ${canBuyCase ? "" : "disabled"}>Buy Case</button>
           <button class="open-case-btn" data-open-case="1" ${canOpen ? "" : "disabled"}>Open Case</button>
         </div>
@@ -1842,6 +1965,58 @@
       else content = renderInventoryTab();
 
       el.shop.innerHTML = `${renderShopTabs()}<div class="tab-content">${content}</div>`;
+      updateShopButtons();
+    }
+
+    function updateShopButtons() {
+      const money = state.money;
+
+      for (const btn of el.shop.querySelectorAll("[data-buy-upgrade]")) {
+        const item = upgrades.find((u) => u.id === btn.dataset.buyUpgrade);
+        if (!item) continue;
+        const affordable = money >= item.cost;
+        btn.disabled = !affordable;
+        const card = btn.closest(".shop-item");
+        if (card) {
+          card.classList.toggle("locked", !affordable);
+          const ownedEl = card.querySelector(".shop-owned");
+          if (ownedEl) ownedEl.textContent = `Owned: ${state.upgradesOwned[item.id]}`;
+        }
+      }
+
+      const flashBtn = el.shop.querySelector("[data-activate-flash]");
+      if (flashBtn) {
+        const now = Date.now();
+        const cooldownLeft = Math.max(0, state.flashCooldownUntil - now);
+        const clickMultActive = now < state.flashActiveUntil;
+        const canActivate = state.upgradesOwned.flash > 0 && cooldownLeft === 0;
+        flashBtn.disabled = !canActivate;
+        flashBtn.textContent = clickMultActive
+          ? `Active ${Math.ceil((state.flashActiveUntil - now) / 1000)}s`
+          : cooldownLeft > 0
+            ? `Cooldown ${Math.ceil(cooldownLeft / 1000)}s`
+            : "Activate";
+      }
+
+      const caseBuy = el.shop.querySelector("[data-buy-case]");
+      if (caseBuy) {
+        caseBuy.disabled = money < getCaseCost() || state.caseAnimating;
+      }
+      const caseOpen = el.shop.querySelector("[data-open-case]");
+      if (caseOpen) {
+        caseOpen.disabled = state.caseInventory <= 0 || state.caseAnimating;
+      }
+      const casePrice = el.shop.querySelector("[data-case-price]");
+      if (casePrice) casePrice.textContent = `$${formatMoney(getCaseCost())}`;
+      const caseOwned = el.shop.querySelector("[data-case-owned]");
+      if (caseOwned) caseOwned.textContent = `${state.caseInventory}`;
+      const caseOpened = el.shop.querySelector("[data-case-opened]");
+      if (caseOpened) caseOpened.textContent = `${state.casesOpened}`;
+
+      for (const btn of el.shop.querySelectorAll("[data-buy-knife]")) {
+        const price = directKnifePrices[btn.dataset.buyKnife];
+        btn.disabled = !price || money < price || state.caseAnimating;
+      }
     }
 
     function grantDrop(drop, sourceLabel) {
@@ -1945,28 +2120,30 @@
       renderShopView();
     }
 
-    function buyCase() {
+    function buyCase(sourceButton = null) {
       const cost = getCaseCost();
       if (state.money < cost || state.caseAnimating) return;
       initAudio();
       playPurchaseSound();
       addMoney(-cost);
       state.caseInventory += 1;
+      spawnPurchaseFloat(sourceButton, "+1 CASE");
       showKillFeed(`<span class="weapon">CASE</span> purchased <span class="event">$${formatMoney(cost)}</span>`);
       updatePrestigeHud();
-      renderShopView();
+      updateShopButtons();
     }
 
-    function buyKnifeDirect(knifeId) {
+    function buyKnifeDirect(knifeId, sourceButton = null) {
       const price = directKnifePrices[knifeId];
       if (!price || state.money < price || state.caseAnimating) return;
       initAudio();
       playPurchaseSound();
       addMoney(-price);
+      spawnPurchaseFloat(sourceButton, "KNIFE ROLL");
       const drop = createKnifeDrop(knifeId);
       startCaseReveal(drop, "Knife Purchase");
       updatePrestigeHud();
-      renderShopView();
+      updateShopButtons();
     }
 
     function updateRoundHud() {
@@ -1992,13 +2169,15 @@
         : `Prestige (Need $${formatMoney(price)})`;
     }
 
-    function purchaseUpgrade(id) {
+    function purchaseUpgrade(id, sourceButton = null) {
       const item = upgrades.find((u) => u.id === id);
       if (!item || state.money < item.cost) return;
       initAudio();
       addMoney(-item.cost);
       state.upgradesOwned[id] += 1;
       playPurchaseSound();
+      const cpsText = item.cps > 0 ? `+${item.cps.toFixed(1)} CPS` : "+UTILITY";
+      spawnPurchaseFloat(sourceButton, cpsText);
 
       if (id === "he") {
         flashOverlay(el.heFlash);
@@ -2006,10 +2185,10 @@
 
       showKillFeed(`<span class="weapon">${item.name}</span> bought <span class="event">+${item.cps || "utility"}</span>`);
       updatePrestigeHud();
-      renderShopView();
+      updateShopButtons();
     }
 
-    function activateFlash() {
+    function activateFlash(sourceButton = null) {
       const now = Date.now();
       if (state.upgradesOwned.flash <= 0 || now < state.flashCooldownUntil) return;
       state.upgradesOwned.flash -= 1;
@@ -2018,8 +2197,9 @@
       initAudio();
       playTone(1300, 0.05, "triangle", 0.05);
       playTone(1600, 0.05, "triangle", 0.045, 0.05);
+      spawnPurchaseFloat(sourceButton, "2X CLICKS");
       showKillFeed(`<span class="weapon">Flashbang</span> popped<span class="event"> 2x click power</span>`);
-      renderShopView();
+      updateShopButtons();
     }
 
     function onBombClick(evt) {
@@ -2033,10 +2213,16 @@
       const x = evt.clientX || rect.left + rect.width / 2;
       const y = evt.clientY || rect.top + rect.height / 2;
       spawnFloatingMoney(x, y, gain);
+      spawnSparkBurst(x, y, "#73ddff", 12);
+      spawnSparkBurst(rect.left + rect.width * 0.2, rect.top + rect.height * 0.46, "#8ff4ff", 8);
+      state.bombFlashUntil = Date.now() + 130;
 
       el.bombBtn.classList.remove("pulse");
       void el.bombBtn.offsetWidth;
       el.bombBtn.classList.add("pulse");
+      el.bombBtn.classList.remove("shake");
+      void el.bombBtn.offsetWidth;
+      el.bombBtn.classList.add("shake");
     }
 
     function tryPrestige() {
@@ -2085,13 +2271,14 @@
 
       updateRoundHud();
       updatePrestigeHud();
-      renderShopView();
+      updateShopButtons();
       updateEquippedKnifeHud();
+      drawBombDevice(performance.now());
     }
 
     function handleShopClick(event) {
       const button = event.target.closest("button");
-      if (!button) return;
+      if (!button || !el.shop.contains(button)) return;
 
       if (button.dataset.tab) {
         state.activeTab = button.dataset.tab;
@@ -2100,17 +2287,17 @@
       }
 
       if (button.dataset.buyUpgrade) {
-        purchaseUpgrade(button.dataset.buyUpgrade);
+        purchaseUpgrade(button.dataset.buyUpgrade, button);
         return;
       }
 
       if (button.dataset.activateFlash) {
-        activateFlash();
+        activateFlash(button);
         return;
       }
 
       if (button.dataset.buyCase) {
-        buyCase();
+        buyCase(button);
         return;
       }
 
@@ -2120,7 +2307,7 @@
       }
 
       if (button.dataset.buyKnife) {
-        buyKnifeDirect(button.dataset.buyKnife);
+        buyKnifeDirect(button.dataset.buyKnife, button);
       }
     }
 
@@ -2136,6 +2323,8 @@
         const t = evt.changedTouches[0];
         if (t) onBombClick(t);
       }, { passive: false });
+      el.bombBtn.addEventListener("pointerenter", () => { bombHover = true; });
+      el.bombBtn.addEventListener("pointerleave", () => { bombHover = false; });
 
       el.prestigeBtn.addEventListener("click", tryPrestige);
       el.shop.addEventListener("click", handleShopClick);
@@ -2147,6 +2336,14 @@
       updatePrestigeHud();
       updateEquippedKnifeHud();
       renderShopView();
+      if (el.bombCanvas) {
+        bombCtx = el.bombCanvas.getContext("2d");
+        const drawLoop = (ts) => {
+          drawBombDevice(ts);
+          requestAnimationFrame(drawLoop);
+        };
+        requestAnimationFrame(drawLoop);
+      }
       initEvents();
       animateMoneyHud();
 
