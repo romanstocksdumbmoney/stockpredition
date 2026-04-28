@@ -318,10 +318,10 @@
         };
 
         const pitchTypes = {
-          FASTBALL: { speed: 900, curve: 0, color: "#ffffff" },
-          CURVEBALL: { speed: 760, curve: -72, color: "#fff6d2" },
-          CHANGEUP: { speed: 630, curve: 18, color: "#e8ffff" },
-          SLIDER: { speed: 700, curve: 58, color: "#fef6ff" }
+          FASTBALL: { targetDuration: 0.7, curveAmount: 0, curveStyle: "none", color: "#ffffff" },
+          CHANGEUP: { targetDuration: 1.1, curveAmount: 0, curveStyle: "none", color: "#e8ffff" },
+          CURVEBALL: { targetDuration: 0.9, curveAmount: -92, curveStyle: "arc", color: "#fff6d2" },
+          SLIDER: { targetDuration: 0.85, curveAmount: 74, curveStyle: "late", color: "#fef6ff" }
         };
         const pitchTypeKeys = ["FASTBALL", "CURVEBALL", "CHANGEUP", "SLIDER"];
 
@@ -463,7 +463,8 @@
           const endX = BASES.home.x + game.pitchAim * 54;
           const endY = BASES.home.y - 12;
           const dist = Math.hypot(endX - startX, endY - startY);
-          const duration = dist / cfg.speed;
+          const duration = cfg.targetDuration;
+          const pitchSpeed = dist / duration;
           game.pitchBall = {
             x: startX,
             y: startY,
@@ -474,7 +475,9 @@
             endY,
             t: 0,
             duration,
-            curve: cfg.curve,
+            speed: pitchSpeed,
+            curveAmount: cfg.curveAmount,
+            curveStyle: cfg.curveStyle,
             color: cfg.color,
             trail: []
           };
@@ -835,7 +838,13 @@
           const b = game.pitchBall;
           b.t += dt / b.duration;
           const t = Math.min(1, b.t);
-          const curveOffset = Math.sin(Math.PI * t) * b.curve;
+          let curveOffset = 0;
+          if (b.curveStyle === "arc") {
+            curveOffset = Math.sin(Math.PI * t) * b.curveAmount;
+          } else if (b.curveStyle === "late") {
+            const lateBreak = Math.max(0, (t - 0.58) / 0.42);
+            curveOffset = (Math.sin(Math.PI * t) * 0.12 + lateBreak * lateBreak) * b.curveAmount;
+          }
           b.x = b.startX + (b.endX - b.startX) * t + curveOffset;
           b.y = b.startY + (b.endY - b.startY) * t;
           b.z = Math.sin(Math.PI * t) * 24 + 4;
@@ -1096,7 +1105,7 @@
         }
 
         function drawBackground() {
-          ctx.fillStyle = "#87d4ff";
+          ctx.fillStyle = "#87CEEB";
           ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
           ctx.fillStyle = "#ffca42";
@@ -1126,78 +1135,118 @@
         }
 
         function drawField() {
-          ctx.fillStyle = "#3bc15a";
-          ctx.fillRect(FIELD.left - 40, FIELD.top - 10, FIELD.right - FIELD.left + 80, FIELD.bottom - FIELD.top + 80);
+          const wallTop = FIELD.wallY + 24;
+          const wallHeight = 18;
+          const warningTrackTop = wallTop + wallHeight;
+          const warningTrackHeight = 14;
+          const grassTop = warningTrackTop + warningTrackHeight;
 
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(FIELD.left, FIELD.bottom);
-          ctx.lineTo(BASES.third.x - 250, FIELD.wallY + 20);
-          ctx.lineTo(BASES.first.x + 250, FIELD.wallY + 20);
-          ctx.lineTo(FIELD.right, FIELD.bottom);
-          ctx.closePath();
-          ctx.clip();
-          for (let i = -220; i < 1400; i += 38) {
-            ctx.fillStyle = i % 76 === 0 ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.05)";
-            ctx.fillRect(i, FIELD.top, 20, VIRTUAL_HEIGHT);
+          // 1) sky is drawn in drawBackground (keeps existing sun/clouds)
+
+          // 2) outfield wall
+          ctx.fillStyle = "#2f5b2f";
+          ctx.fillRect(0, wallTop, VIRTUAL_WIDTH, wallHeight);
+          ctx.strokeStyle = "#466f46";
+          ctx.lineWidth = 2;
+          for (let x = 14; x < VIRTUAL_WIDTH; x += 32) {
+            ctx.beginPath();
+            ctx.moveTo(x, wallTop + 3);
+            ctx.lineTo(x, wallTop + wallHeight - 3);
+            ctx.stroke();
           }
-          ctx.restore();
 
-          ctx.strokeStyle = "#2f6f9f";
-          ctx.lineWidth = 6;
+          // 3) warning track
+          ctx.fillStyle = "#C4A882";
+          ctx.fillRect(0, warningTrackTop, VIRTUAL_WIDTH, warningTrackHeight);
+
+          // 4) outfield grass + mowing stripes
+          ctx.fillStyle = "#4CAF50";
+          ctx.fillRect(0, grassTop, VIRTUAL_WIDTH, VIRTUAL_HEIGHT - grassTop);
+          for (let x = 0; x < VIRTUAL_WIDTH; x += 56) {
+            ctx.fillStyle = (Math.floor(x / 56) % 2 === 0) ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.05)";
+            ctx.fillRect(x, grassTop, 28, VIRTUAL_HEIGHT - grassTop);
+          }
+
+          const dirtHome = { x: BASES.home.x, y: BASES.home.y + 22 };
+          const dirtFirst = { x: BASES.first.x + 84, y: BASES.first.y + 6 };
+          const dirtSecond = { x: BASES.second.x, y: BASES.second.y - 70 };
+          const dirtThird = { x: BASES.third.x - 84, y: BASES.third.y + 6 };
+          const infieldCenter = { x: BASES.mound.x, y: BASES.mound.y + 18 };
+
+          // 5) infield dirt diamond
+          ctx.fillStyle = "#C49A6C";
           ctx.beginPath();
-          ctx.arc(BASES.second.x, FIELD.wallY + 46, 410, Math.PI * 0.05, Math.PI * 0.95, true);
-          ctx.stroke();
-          ctx.fillStyle = "#3f88d6";
-          ctx.beginPath();
-          ctx.arc(BASES.second.x, FIELD.wallY + 52, 410, Math.PI * 0.05, Math.PI * 0.95, true);
-          ctx.lineTo(BASES.third.x - 252, FIELD.wallY + 86);
-          ctx.lineTo(BASES.first.x + 252, FIELD.wallY + 86);
+          ctx.moveTo(dirtHome.x, dirtHome.y);
+          ctx.lineTo(dirtFirst.x, dirtFirst.y);
+          ctx.lineTo(dirtSecond.x, dirtSecond.y);
+          ctx.lineTo(dirtThird.x, dirtThird.y);
           ctx.closePath();
           ctx.fill();
 
-          ctx.fillStyle = "#d29a61";
+          // 6) infield grass triangles
+          ctx.fillStyle = "#3F9A50";
           ctx.beginPath();
-          ctx.moveTo(BASES.home.x, BASES.home.y + 22);
-          ctx.lineTo(BASES.third.x - 84, BASES.third.y + 4);
-          ctx.lineTo(BASES.second.x, BASES.second.y - 66);
-          ctx.lineTo(BASES.first.x + 84, BASES.first.y + 4);
+          ctx.moveTo(infieldCenter.x, infieldCenter.y);
+          ctx.lineTo(BASES.home.x, BASES.home.y);
+          ctx.lineTo(BASES.first.x, BASES.first.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(infieldCenter.x, infieldCenter.y);
+          ctx.lineTo(BASES.first.x, BASES.first.y);
+          ctx.lineTo(BASES.second.x, BASES.second.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(infieldCenter.x, infieldCenter.y);
+          ctx.lineTo(BASES.second.x, BASES.second.y);
+          ctx.lineTo(BASES.third.x, BASES.third.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(infieldCenter.x, infieldCenter.y);
+          ctx.lineTo(BASES.third.x, BASES.third.y);
+          ctx.lineTo(BASES.home.x, BASES.home.y);
           ctx.closePath();
           ctx.fill();
 
-          ctx.strokeStyle = "#f5e0bd";
-          ctx.lineWidth = 20;
+          // 7) base paths
+          ctx.strokeStyle = "#B88A5A";
+          ctx.lineWidth = 18;
           ctx.lineJoin = "round";
           ctx.beginPath();
-          ctx.moveTo(BASES.home.x, BASES.home.y + 4);
+          ctx.moveTo(BASES.home.x, BASES.home.y + 2);
           ctx.lineTo(BASES.first.x, BASES.first.y);
           ctx.lineTo(BASES.second.x, BASES.second.y);
           ctx.lineTo(BASES.third.x, BASES.third.y);
           ctx.closePath();
           ctx.stroke();
 
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(BASES.home.x, BASES.home.y);
-          ctx.lineTo(170, 248);
-          ctx.moveTo(BASES.home.x, BASES.home.y);
-          ctx.lineTo(1110, 248);
-          ctx.stroke();
-
+          // 8) bases
           drawBase(BASES.first.x, BASES.first.y);
           drawBase(BASES.second.x, BASES.second.y);
           drawBase(BASES.third.x, BASES.third.y);
           drawHomePlate(BASES.home.x, BASES.home.y);
 
-          ctx.fillStyle = "#bb8652";
+          // 9) pitcher's mound
+          ctx.fillStyle = "#B98A5A";
           ctx.beginPath();
-          ctx.ellipse(BASES.mound.x, BASES.mound.y + 26, 58, 22, 0, 0, Math.PI * 2);
+          ctx.arc(BASES.mound.x, BASES.mound.y + 18, 42, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = "#d6a26a";
+          ctx.fillStyle = "#CDA172";
           ctx.beginPath();
-          ctx.ellipse(BASES.mound.x, BASES.mound.y + 20, 54, 20, 0, 0, Math.PI * 2);
+          ctx.arc(BASES.mound.x, BASES.mound.y + 16, 34, 0, Math.PI * 2);
           ctx.fill();
+
+          // 10) foul lines
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(BASES.home.x, BASES.home.y);
+          ctx.lineTo(1088, wallTop + wallHeight + warningTrackHeight);
+          ctx.moveTo(BASES.home.x, BASES.home.y);
+          ctx.lineTo(192, wallTop + wallHeight + warningTrackHeight);
+          ctx.stroke();
         }
 
         function drawBase(x, y) {
