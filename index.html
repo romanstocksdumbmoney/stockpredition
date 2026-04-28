@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS:GO Clicker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #1a1a1a;
+      --bg-deep: #0f0f0f;
+      --hud-green: #4caf50;
+      --terminal-green: #00ff41;
+      --money: #f0a500;
+      --panel-border: #2e2e2e;
+      --led-speed: 1.2s;
+      --danger: #ff4545;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      font-family: "Rajdhani", sans-serif;
+      background: radial-gradient(circle at center, #242424 0%, var(--bg-main) 45%, var(--bg-deep) 100%);
+      color: #d7d7d7;
+      overflow: hidden;
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg stroke='%2300ff41' stroke-width='2' fill='none' stroke-linecap='square'%3E%3Cline x1='16' y1='2' x2='16' y2='11'/%3E%3Cline x1='16' y1='21' x2='16' y2='30'/%3E%3Cline x1='2' y1='16' x2='11' y2='16'/%3E%3Cline x1='21' y1='16' x2='30' y2='16'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3C/g%3E%3C/svg%3E") 16 16, crosshair;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.01) 0px,
+        rgba(255, 255, 255, 0.01) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      mix-blend-mode: soft-light;
+    }
+
+    .screen-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 120;
+    }
+
+    #click-flash {
+      background: rgba(244, 168, 0, 0.15);
+    }
+
+    #he-flash {
+      background: rgba(0, 255, 65, 0.22);
+    }
+
+    .screen-flash.active {
+      animation: fadeflash 170ms ease-out;
+    }
+
+    @keyframes fadeflash {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    .hud-top {
+      position: fixed;
+      top: 12px;
+      left: 14px;
+      right: 14px;
+      height: 86px;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .hud-card {
+      background: linear-gradient(180deg, rgba(24, 24, 24, 0.95), rgba(11, 11, 11, 0.95));
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      box-shadow: 0 0 18px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      padding: 8px 12px;
+    }
+
+    .money-wrap {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .money-label {
+      color: #9f9f9f;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-size: 0.8rem;
+    }
+
+    .money-value {
+      color: var(--money);
+      font-size: clamp(1.8rem, 3.6vw, 2.2rem);
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(240, 165, 0, 0.4);
+      line-height: 1;
+    }
+
+    .round-wrap {
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .round-title {
+      color: var(--terminal-green);
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .round-time {
+      font-size: clamp(1.6rem, 3vw, 2rem);
+      font-weight: 700;
+      color: #f1f1f1;
+    }
+
+    .round-num {
+      color: #a9a9a9;
+      font-size: 1rem;
+      letter-spacing: 0.8px;
+    }
+
+    .stats-wrap {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 40px;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+
+    .bar-row span:first-child {
+      color: #9f9f9f;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+
+    .bar {
+      height: 9px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 100%;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .health .bar-fill {
+      background: linear-gradient(90deg, #1d8f1f, #45d74c);
+      color: #45d74c;
+    }
+
+    .armor .bar-fill {
+      background: linear-gradient(90deg, #2f67d1, #59a8ff);
+      color: #59a8ff;
+    }
+
+    .bar-val {
+      text-align: right;
+      color: #f0f0f0;
+      font-size: 0.95rem;
+    }
+
+    .arena {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: 1fr minmax(280px, 350px);
+      padding-top: 112px;
+    }
+
+    .center-zone {
+      position: relative;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .bomb-button {
+      position: relative;
+      width: min(35vw, 330px);
+      aspect-ratio: 1 / 1;
+      border: none;
+      border-radius: 18px;
+      background: transparent;
+      cursor: inherit;
+      transition: transform 0.18s ease, filter 0.22s ease;
+      filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.65));
+      outline: none;
+    }
+
+    .bomb-button:hover {
+      transform: scale(1.03);
+      filter: drop-shadow(0 14px 28px rgba(240, 165, 0, 0.3));
+    }
+
+    .bomb-button.pulse {
+      animation: bombPulse 180ms ease-out;
+    }
+
+    @keyframes bombPulse {
+      0% { transform: scale(1); }
+      45% { transform: scale(0.93); }
+      100% { transform: scale(1.05); }
+    }
+
+    .bomb-shell {
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #151515, #222);
+      border: 2px solid #2d2d2d;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 6px rgba(255, 255, 255, 0.06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bomb-screen {
+      position: absolute;
+      top: 18%;
+      left: 14%;
+      right: 14%;
+      height: 28%;
+      border: 1px solid #365836;
+      border-radius: 8px;
+      background: radial-gradient(circle at top, rgba(84, 164, 86, 0.4), rgba(16, 43, 18, 0.7));
+      color: #8bff8f;
+      font-size: clamp(1.1rem, 2.8vw, 1.7rem);
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+      text-shadow: 0 0 8px rgba(63, 255, 70, 0.7);
+      letter-spacing: 2px;
+    }
+
+    .keypad {
+      position: absolute;
+      left: 14%;
+      right: 14%;
+      bottom: 16%;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .key {
+      height: 16px;
+      border-radius: 3px;
+      background: linear-gradient(180deg, #303030, #1c1c1c);
+      border: 1px solid #404040;
+    }
+
+    .wire {
+      position: absolute;
+      width: 44%;
+      height: 4px;
+      border-radius: 99px;
+      top: 54%;
+      left: 10%;
+      transform: rotate(-10deg);
+      background: linear-gradient(90deg, #963d3d, #d34d4d);
+      box-shadow: 0 0 8px rgba(220, 70, 70, 0.35);
+    }
+
+    .wire.yellow {
+      top: 58%;
+      left: 44%;
+      transform: rotate(8deg);
+      background: linear-gradient(90deg, #8b772f, #f6cd3f);
+      box-shadow: 0 0 8px rgba(240, 205, 60, 0.35);
+    }
+
+    .led {
+      position: absolute;
+      right: 9%;
+      top: 12%;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #5c0f0f;
+      border: 1px solid #7a2c2c;
+      animation: ledBlink var(--led-speed) infinite;
+      box-shadow: 0 0 6px rgba(255, 55, 55, 0.35);
+    }
+
+    @keyframes ledBlink {
+      0%, 35%, 100% {
+        background: #611313;
+        box-shadow: 0 0 7px rgba(255, 55, 55, 0.35);
+      }
+      45%, 62% {
+        background: #ff3d3d;
+        box-shadow: 0 0 14px rgba(255, 70, 70, 0.95);
+      }
+    }
+
+    .floating-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 70;
+    }
+
+    .float-money {
+      position: absolute;
+      color: var(--money);
+      font-size: 1.3rem;
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(240, 165, 0, 0.8);
+      animation: floatUp 900ms ease-out forwards;
+      white-space: nowrap;
+    }
+
+    @keyframes floatUp {
+      from { opacity: 1; transform: translate(-50%, 0); }
+      to { opacity: 0; transform: translate(-50%, -54px); }
+    }
+
+    .buy-panel {
+      border-left: 1px solid #2f2f2f;
+      background: linear-gradient(180deg, rgba(18, 18, 18, 0.95), rgba(9, 9, 9, 0.95));
+      padding: 14px 12px 12px;
+      overflow-y: auto;
+      box-shadow: inset 8px 0 25px rgba(0, 0, 0, 0.35);
+    }
+
+    .buy-title {
+      margin: 0 0 8px;
+      color: #f0f0f0;
+      letter-spacing: 1px;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border-bottom: 1px solid #2d2d2d;
+      padding-bottom: 6px;
+    }
+
+    .shop-items {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-bottom: 14px;
+    }
+
+    .shop-item {
+      background: linear-gradient(180deg, rgba(31, 31, 31, 0.9), rgba(14, 14, 14, 0.9));
+      border: 1px solid #2f2f2f;
+      border-left: 2px solid #484848;
+      border-radius: 4px;
+      padding: 8px;
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .shop-item::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(76, 175, 80, 0.13), transparent 55%);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .shop-item:hover {
+      transform: translateX(-3px);
+      border-color: #5a5a5a;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .shop-item:hover::before {
+      opacity: 1;
+    }
+
+    .shop-item.locked {
+      opacity: 0.62;
+      border-left-color: #3d3d3d;
+    }
+
+    .shop-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .shop-name {
+      color: #efefef;
+      font-size: 1.06rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .shop-owned {
+      color: #9f9f9f;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .shop-effect {
+      color: #8be38e;
+      margin-top: 3px;
+      font-size: 0.92rem;
+      letter-spacing: 0.2px;
+    }
+
+    .shop-actions {
+      margin-top: 7px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .buy-btn,
+    .activate-btn {
+      border: 1px solid #3d3d3d;
+      background: #191919;
+      color: #dadada;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: inherit;
+      transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+    }
+
+    .buy-btn:hover:not(:disabled),
+    .activate-btn:hover:not(:disabled) {
+      background: #213523;
+      color: #c9ffd2;
+      transform: translateY(-1px);
+    }
+
+    .buy-btn:disabled,
+    .activate-btn:disabled {
+      color: #777;
+      background: #121212;
+      cursor: not-allowed;
+      opacity: 0.8;
+    }
+
+    .kill-feed {
+      position: fixed;
+      top: 108px;
+      right: 16px;
+      z-index: 60;
+      width: min(340px, 44vw);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .kill-entry {
+      align-self: flex-end;
+      background: rgba(8, 8, 8, 0.82);
+      border: 1px solid #2f2f2f;
+      border-right: 2px solid var(--terminal-green);
+      color: #f1f1f1;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.92rem;
+      animation: killFade 4.8s forwards;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.38);
+    }
+
+    .kill-entry .weapon {
+      color: #ffca45;
+      font-weight: 700;
+    }
+
+    .kill-entry .event {
+      color: #9edca0;
+      font-weight: 600;
+      margin-left: 5px;
+    }
+
+    @keyframes killFade {
+      0% { opacity: 0; transform: translateX(18px); }
+      10%, 70% { opacity: 1; transform: translateX(0); }
+      100% { opacity: 0; transform: translateX(16px); }
+    }
+
+    .bottom-strip {
+      position: fixed;
+      left: 14px;
+      right: 14px;
+      bottom: 12px;
+      min-height: 92px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 30;
+      align-items: stretch;
+    }
+
+    .side-indicator,
+    .prestige-box {
+      background: linear-gradient(180deg, rgba(19, 19, 19, 0.95), rgba(10, 10, 10, 0.95));
+      border: 1px solid #2d2d2d;
+      border-radius: 4px;
+      padding: 10px 12px;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .side-indicator {
+      min-width: 178px;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      letter-spacing: 1.3px;
+      font-weight: 700;
+      color: #d8d8d8;
+    }
+
+    .side-indicator .side-value {
+      margin-top: 3px;
+      color: var(--terminal-green);
+      font-size: 1.25rem;
+    }
+
+    .prestige-box {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.3fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .rank-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rank-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid #696969;
+      display: grid;
+      place-items: center;
+      color: #f6f6f6;
+      font-weight: 700;
+      font-size: 0.86rem;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+      letter-spacing: 0.6px;
+    }
+
+    .rank-0 { background: radial-gradient(circle at 30% 30%, #8b8f93, #4f5459); border-color: #b9bec4; }
+    .rank-1 { background: radial-gradient(circle at 30% 30%, #73a1c9, #2d5578); border-color: #8ec7ff; }
+    .rank-2 { background: radial-gradient(circle at 30% 30%, #d56a4f, #8a2f1c); border-color: #f4a087; }
+    .rank-3 { background: radial-gradient(circle at 30% 30%, #baa55a, #746437); border-color: #f0d67c; }
+    .rank-4 { background: radial-gradient(circle at 30% 30%, #cdb0ff, #6b4f9a); border-color: #efe1ff; }
+
+    .rank-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .rank-name {
+      font-size: 1.18rem;
+      color: #f2f2f2;
+      font-weight: 700;
+    }
+
+    .rank-multi {
+      color: #9ddb9e;
+      font-size: 0.95rem;
+      letter-spacing: 0.4px;
+    }
+
+    .prestige-btn {
+      align-self: center;
+      border: 1px solid #446546;
+      background: linear-gradient(180deg, #203723, #122013);
+      color: #cbffd2;
+      border-radius: 4px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.98rem;
+      letter-spacing: 0.4px;
+      padding: 9px 12px;
+      min-width: 180px;
+      cursor: inherit;
+      transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+    }
+
+    .prestige-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 15px rgba(68, 130, 72, 0.45);
+      filter: brightness(1.06);
+    }
+
+    .prestige-btn:disabled {
+      border-color: #343434;
+      background: #171717;
+      color: #6e6e6e;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 980px) {
+      .arena {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+      }
+
+      .buy-panel {
+        max-height: 38vh;
+      }
+
+      .hud-top {
+        grid-template-columns: 1fr;
+        height: auto;
+        gap: 8px;
+      }
+
+      .kill-feed {
+        width: min(300px, 76vw);
+      }
+
+      .bottom-strip {
+        flex-direction: column;
+        right: 12px;
+      }
+
+      .side-indicator {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="click-flash" class="screen-flash"></div>
+  <div id="he-flash" class="screen-flash"></div>
+  <div id="floating-layer" class="floating-layer"></div>
+
+  <header class="hud-top">
+    <section class="hud-card money-wrap">
+      <span class="money-label">Money</span>
+      <span class="money-value" id="money-value">$0.00</span>
+    </section>
+    <section class="hud-card round-wrap">
+      <div class="round-title">Round Timer</div>
+      <div class="round-time" id="round-time">1:55</div>
+      <div class="round-num" id="round-number">Round 1</div>
+    </section>
+    <section class="hud-card stats-wrap">
+      <div class="bar-row health">
+        <span>Health</span>
+        <div class="bar"><div class="bar-fill"></div></div>
+        <span class="bar-val">100</span>
+      </div>
+      <div class="bar-row armor">
+        <span>Armor</span>
+        <div class="bar"><div class="bar-fill"></div></div>
+        <span class="bar-val">100</span>
+      </div>
+    </section>
+  </header>
+
+  <aside id="kill-feed" class="kill-feed" aria-live="polite"></aside>
+
+  <main class="arena">
+    <section class="center-zone">
+      <button id="bomb-button" class="bomb-button" aria-label="Click bomb to earn money">
+        <div class="bomb-shell">
+          <div class="led" id="bomb-led"></div>
+          <div class="bomb-screen">C4</div>
+          <div class="wire"></div>
+          <div class="wire yellow"></div>
+          <div class="keypad">
+            <div class="key"></div><div class="key"></div><div class="key"></div><div class="key"></div>
+            <div class="key"></div><div class="key"></div><div class="key"></div><div class="key"></div>
+            <div class="key"></div><div class="key"></div><div class="key"></div><div class="key"></div>
+          </div>
+        </div>
+      </button>
+    </section>
+
+    <section class="buy-panel">
+      <h2 class="buy-title">Buy Menu</h2>
+      <div id="shop-items" class="shop-items"></div>
+    </section>
+  </main>
+
+  <footer class="bottom-strip">
+    <section class="side-indicator">
+      <div>YOU ARE</div>
+      <div class="side-value" id="side-value">CT</div>
+    </section>
+    <section class="prestige-box">
+      <div class="rank-wrap">
+        <div id="rank-icon" class="rank-icon rank-0">S1</div>
+        <div class="rank-text">
+          <div id="rank-name" class="rank-name">Silver</div>
+          <div id="rank-multi" class="rank-multi">Earnings Multiplier x1.00</div>
+        </div>
+      </div>
+      <button id="prestige-btn" class="prestige-btn">Prestige (Need $5000)</button>
+    </section>
+  </footer>
+
+  <script>
+    const upgrades = [
+      { id: "knife", name: "Knife", cost: 50, cps: 0.1, effect: "+0.1 clicks/sec" },
+      { id: "glock", name: "Glock-18", cost: 150, cps: 0.5, effect: "+0.5 clicks/sec" },
+      { id: "ak47", name: "AK-47", cost: 500, cps: 2, effect: "+2 clicks/sec" },
+      { id: "awp", name: "AWP", cost: 1200, cps: 5, effect: "+5 clicks/sec" },
+      { id: "m4a4", name: "M4A4", cost: 800, cps: 3, effect: "+3 clicks/sec" },
+      { id: "he", name: "HE Grenade", cost: 300, cps: 1, effect: "+1 click/sec" },
+      { id: "flash", name: "Flashbang", cost: 250, cps: 0, effect: "Activate: 2x click value for 10s (30s cooldown)" },
+      { id: "deagle", name: "Deagle", cost: 400, cps: 1.5, effect: "+1.5 clicks/sec" }
+    ];
+
+    const ranks = [
+      { name: "Silver", short: "S1" },
+      { name: "Gold Nova", short: "GN" },
+      { name: "AK", short: "AK" },
+      { name: "Eagle", short: "EGL" },
+      { name: "Global Elite", short: "GE" }
+    ];
+
+    const funnyVictims = ["Economy", "Poverty", "Budget Build", "No Armor", "Eco Rush", "Save Round"];
+    const killEvents = ["killed", "headshot", "one-tapped", "wallbanged", "deleted"];
+
+    const state = {
+      money: 0,
+      displayedMoney: 0,
+      round: 1,
+      timeLeft: 115,
+      side: "CT",
+      prestigeLevel: 0,
+      prestigeMultiplier: 1,
+      clickBase: 1,
+      flashActiveUntil: 0,
+      flashCooldownUntil: 0,
+      upgradesOwned: Object.fromEntries(upgrades.map((u) => [u.id, 0]))
+    };
+
+    const el = {
+      money: document.getElementById("money-value"),
+      roundTime: document.getElementById("round-time"),
+      roundNum: document.getElementById("round-number"),
+      shop: document.getElementById("shop-items"),
+      side: document.getElementById("side-value"),
+      rankIcon: document.getElementById("rank-icon"),
+      rankName: document.getElementById("rank-name"),
+      rankMulti: document.getElementById("rank-multi"),
+      prestigeBtn: document.getElementById("prestige-btn"),
+      bombBtn: document.getElementById("bomb-button"),
+      clickFlash: document.getElementById("click-flash"),
+      heFlash: document.getElementById("he-flash"),
+      floatingLayer: document.getElementById("floating-layer"),
+      killFeed: document.getElementById("kill-feed")
+    };
+
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq = 600, duration = 0.08, type = "square", volume = 0.06, delay = 0) {
+      if (!audioCtx) return;
+      const t0 = audioCtx.currentTime + delay;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.01);
+    }
+
+    function playClickSound() {
+      playTone(920, 0.05, "square", 0.045);
+    }
+
+    function playPurchaseSound() {
+      playTone(520, 0.09, "triangle", 0.06);
+      playTone(780, 0.07, "triangle", 0.05, 0.08);
+    }
+
+    function playRoundEndSound() {
+      playTone(520, 0.08, "sawtooth", 0.07);
+      playTone(660, 0.09, "sawtooth", 0.07, 0.12);
+      playTone(860, 0.11, "sawtooth", 0.08, 0.24);
+    }
+
+    function getPrestigeCost() {
+      return 5000 * (state.prestigeLevel + 1);
+    }
+
+    function getCurrentRankIndex() {
+      return Math.min(state.prestigeLevel, ranks.length - 1);
+    }
+
+    function getCps() {
+      let total = 0;
+      for (const item of upgrades) {
+        total += (item.cps || 0) * state.upgradesOwned[item.id];
+      }
+      return total * state.prestigeMultiplier;
+    }
+
+    function getClickValue() {
+      let value = state.clickBase * state.prestigeMultiplier;
+      if (Date.now() < state.flashActiveUntil) value *= 2;
+      return value;
+    }
+
+    function formatMoney(value) {
+      return value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = seconds % 60;
+      return `${min}:${String(sec).padStart(2, "0")}`;
+    }
+
+    function flashOverlay(overlayEl) {
+      overlayEl.classList.remove("active");
+      void overlayEl.offsetWidth;
+      overlayEl.classList.add("active");
+    }
+
+    function addMoney(amount) {
+      state.money += amount;
+      if (state.money < 0) state.money = 0;
+    }
+
+    function animateMoneyHud() {
+      const delta = state.money - state.displayedMoney;
+      state.displayedMoney += delta * 0.18;
+      if (Math.abs(delta) < 0.01) {
+        state.displayedMoney = state.money;
+      }
+      el.money.textContent = `$${formatMoney(state.displayedMoney)}`;
+      requestAnimationFrame(animateMoneyHud);
+    }
+
+    function spawnFloatingMoney(x, y, amount) {
+      const note = document.createElement("div");
+      note.className = "float-money";
+      note.textContent = `+$${formatMoney(amount)}`;
+      note.style.left = `${x}px`;
+      note.style.top = `${y}px`;
+      el.floatingLayer.appendChild(note);
+      setTimeout(() => note.remove(), 920);
+    }
+
+    function showKillFeed(text) {
+      const row = document.createElement("div");
+      row.className = "kill-entry";
+      row.innerHTML = text;
+      el.killFeed.prepend(row);
+      while (el.killFeed.children.length > 6) {
+        el.killFeed.lastElementChild.remove();
+      }
+      setTimeout(() => row.remove(), 5000);
+    }
+
+    function randomKillMessage() {
+      const w = upgrades[Math.floor(Math.random() * upgrades.length)].name;
+      const victim = funnyVictims[Math.floor(Math.random() * funnyVictims.length)];
+      const event = killEvents[Math.floor(Math.random() * killEvents.length)];
+      return `<span class="weapon">${w}</span> ${event} ${victim}`;
+    }
+
+    function updateLedSpeed() {
+      let speed = 1.2;
+      if (state.timeLeft <= 30) {
+        speed = 0.16 + (state.timeLeft / 30) * 0.64;
+      }
+      document.documentElement.style.setProperty("--led-speed", `${speed.toFixed(2)}s`);
+    }
+
+    function endRound() {
+      initAudio();
+      playRoundEndSound();
+      const bonus = (300 + state.round * 25) * state.prestigeMultiplier;
+      addMoney(bonus);
+      showKillFeed(`<span class="weapon">ROUND BONUS</span> +$${formatMoney(bonus)}<span class="event"> objective complete</span>`);
+      state.round += 1;
+      state.timeLeft = 115;
+      state.side = state.side === "CT" ? "T" : "CT";
+      el.side.textContent = state.side;
+    }
+
+    function renderShop() {
+      const now = Date.now();
+      const clickMultActive = now < state.flashActiveUntil;
+      const cooldownLeft = Math.max(0, state.flashCooldownUntil - now);
+
+      el.shop.innerHTML = upgrades.map((item) => {
+        const owned = state.upgradesOwned[item.id];
+        const affordable = state.money >= item.cost;
+        const lockedClass = affordable ? "" : "locked";
+        const buyDisabled = affordable ? "" : "disabled";
+
+        let extraAction = "";
+        if (item.id === "flash") {
+          const canActivate = owned > 0 && cooldownLeft === 0;
+          const label = clickMultActive
+            ? `Active ${Math.ceil((state.flashActiveUntil - now) / 1000)}s`
+            : cooldownLeft > 0
+              ? `Cooldown ${Math.ceil(cooldownLeft / 1000)}s`
+              : "Activate";
+          extraAction = `
+            <button class="activate-btn" data-activate="flash" ${canActivate ? "" : "disabled"}>
+              ${label}
+            </button>
+          `;
+        }
+
+        return `
+          <article class="shop-item ${lockedClass}">
+            <div class="shop-head">
+              <div class="shop-name">${item.name}</div>
+              <div class="shop-owned">Owned: ${owned}</div>
+            </div>
+            <div class="shop-effect">${item.effect}</div>
+            <div class="shop-actions">
+              <button class="buy-btn" data-buy="${item.id}" ${buyDisabled}>
+                Buy ($${item.cost})
+              </button>
+              ${extraAction}
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      for (const btn of el.shop.querySelectorAll("[data-buy]")) {
+        btn.addEventListener("click", () => purchaseUpgrade(btn.dataset.buy));
+      }
+      for (const btn of el.shop.querySelectorAll("[data-activate]")) {
+        btn.addEventListener("click", () => activateFlash());
+      }
+    }
+
+    function updateRoundHud() {
+      el.roundTime.textContent = formatTime(state.timeLeft);
+      el.roundNum.textContent = `Round ${state.round}`;
+      el.side.textContent = state.side;
+      updateLedSpeed();
+    }
+
+    function updatePrestigeHud() {
+      const rankIndex = getCurrentRankIndex();
+      const rank = ranks[rankIndex];
+      el.rankIcon.className = `rank-icon rank-${rankIndex}`;
+      el.rankIcon.textContent = rank.short;
+      el.rankName.textContent = rank.name;
+      el.rankMulti.textContent = `Earnings Multiplier x${state.prestigeMultiplier.toFixed(2)}`;
+
+      const price = getPrestigeCost();
+      const canPrestige = state.money >= price;
+      el.prestigeBtn.disabled = !canPrestige;
+      el.prestigeBtn.textContent = canPrestige
+        ? `Prestige Ready ($${formatMoney(price)})`
+        : `Prestige (Need $${formatMoney(price)})`;
+    }
+
+    function purchaseUpgrade(id) {
+      const item = upgrades.find((u) => u.id === id);
+      if (!item || state.money < item.cost) return;
+      initAudio();
+      addMoney(-item.cost);
+      state.upgradesOwned[id] += 1;
+      playPurchaseSound();
+
+      if (id === "he") {
+        flashOverlay(el.heFlash);
+      }
+
+      showKillFeed(`<span class="weapon">${item.name}</span> bought <span class="event">+$${item.cps || "utility"}</span>`);
+      renderShop();
+      updatePrestigeHud();
+    }
+
+    function activateFlash() {
+      const now = Date.now();
+      if (state.upgradesOwned.flash <= 0) return;
+      if (now < state.flashCooldownUntil) return;
+      state.upgradesOwned.flash -= 1;
+      state.flashActiveUntil = now + 10000;
+      state.flashCooldownUntil = now + 30000;
+      initAudio();
+      playTone(1300, 0.05, "triangle", 0.05);
+      playTone(1600, 0.05, "triangle", 0.045, 0.05);
+      showKillFeed(`<span class="weapon">Flashbang</span> popped<span class="event"> 2x click power</span>`);
+      renderShop();
+    }
+
+    function onBombClick(evt) {
+      initAudio();
+      const gain = getClickValue();
+      addMoney(gain);
+      playClickSound();
+      flashOverlay(el.clickFlash);
+
+      const rect = el.bombBtn.getBoundingClientRect();
+      const x = evt.clientX || rect.left + rect.width / 2;
+      const y = evt.clientY || rect.top + rect.height / 2;
+      spawnFloatingMoney(x, y, gain);
+
+      el.bombBtn.classList.remove("pulse");
+      void el.bombBtn.offsetWidth;
+      el.bombBtn.classList.add("pulse");
+    }
+
+    function tryPrestige() {
+      const cost = getPrestigeCost();
+      if (state.money < cost) return;
+      initAudio();
+      playTone(390, 0.1, "triangle", 0.06);
+      playTone(590, 0.12, "triangle", 0.055, 0.1);
+      playTone(860, 0.16, "triangle", 0.05, 0.22);
+
+      state.prestigeLevel += 1;
+      state.prestigeMultiplier = 1 + state.prestigeLevel * 0.75;
+      state.money = 0;
+      state.displayedMoney = 0;
+      state.round = 1;
+      state.timeLeft = 115;
+      state.side = "CT";
+      state.flashActiveUntil = 0;
+      state.flashCooldownUntil = 0;
+      for (const key of Object.keys(state.upgradesOwned)) {
+        state.upgradesOwned[key] = 0;
+      }
+      showKillFeed(`<span class="weapon">Prestige</span> promoted to <span class="event">${ranks[getCurrentRankIndex()].name}</span>`);
+      renderShop();
+      updateRoundHud();
+      updatePrestigeHud();
+    }
+
+    function gameTick() {
+      const passive = getCps();
+      if (passive > 0) {
+        addMoney(passive);
+      }
+
+      state.timeLeft -= 1;
+      if (state.timeLeft <= 0) {
+        endRound();
+      }
+
+      updateRoundHud();
+      updatePrestigeHud();
+      renderShop();
+    }
+
+    function initEvents() {
+      document.addEventListener("pointerdown", initAudio, { once: true });
+      el.bombBtn.addEventListener("pointerdown", (evt) => {
+        evt.preventDefault();
+        onBombClick(evt);
+      });
+
+      el.bombBtn.addEventListener("touchstart", (evt) => {
+        evt.preventDefault();
+        const t = evt.changedTouches[0];
+        if (t) {
+          onBombClick(t);
+        }
+      }, { passive: false });
+
+      el.prestigeBtn.addEventListener("click", tryPrestige);
+    }
+
+    function init() {
+      updateRoundHud();
+      updatePrestigeHud();
+      renderShop();
+      initEvents();
+      animateMoneyHud();
+
+      setInterval(gameTick, 1000);
+      setInterval(() => {
+        showKillFeed(randomKillMessage());
+      }, 5600);
+    }
+
+    init();
+  </script>
+</body>
+</html>
