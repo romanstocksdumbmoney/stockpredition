@@ -208,8 +208,12 @@
     .center-zone {
       position: relative;
       display: grid;
-      place-items: center;
+      grid-template-rows: auto auto;
+      align-content: center;
+      justify-items: center;
+      gap: 14px;
       overflow: hidden;
+      padding-inline: 12px;
     }
 
     .bomb-button {
@@ -377,6 +381,38 @@
       padding-bottom: 14px;
     }
 
+    .shop-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .shop-tab {
+      border: 1px solid #2f2f2f;
+      background: #141414;
+      color: #a8a8a8;
+      border-radius: 3px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.88rem;
+      letter-spacing: 0.3px;
+      padding: 6px 4px;
+      cursor: inherit;
+      text-transform: uppercase;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+    }
+
+    .shop-tab.active {
+      color: #d9ffd9;
+      border-color: #4e844f;
+      background: linear-gradient(180deg, #223424, #152117);
+    }
+
+    .tab-content {
+      min-height: 260px;
+    }
+
     .shop-item {
       background: linear-gradient(180deg, rgba(31, 31, 31, 0.9), rgba(14, 14, 14, 0.9));
       border: 1px solid #2f2f2f;
@@ -410,6 +446,454 @@
     .shop-item.locked {
       opacity: 0.62;
       border-left-color: #3d3d3d;
+    }
+
+    .mini-note {
+      color: #9e9e9e;
+      font-size: 0.88rem;
+      letter-spacing: 0.2px;
+      margin: 0 0 8px;
+    }
+
+    .case-box {
+      background: linear-gradient(180deg, rgba(30, 30, 30, 0.94), rgba(13, 13, 13, 0.94));
+      border: 1px solid #313131;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .case-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #e2e2e2;
+      font-size: 0.98rem;
+      margin-bottom: 6px;
+    }
+
+    .case-row .label {
+      color: #9f9f9f;
+      text-transform: uppercase;
+      font-size: 0.83rem;
+      letter-spacing: 0.8px;
+    }
+
+    .open-case-btn,
+    .buy-case-btn,
+    .knife-buy-btn {
+      border: 1px solid #3d3d3d;
+      background: linear-gradient(180deg, #1b1b1b, #131313);
+      color: #ececec;
+      border-radius: 4px;
+      font-family: inherit;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      padding: 8px 10px;
+      width: 100%;
+      cursor: inherit;
+      transition: transform 0.14s ease, border-color 0.14s ease, filter 0.14s ease;
+      margin-top: 6px;
+      text-align: left;
+    }
+
+    .open-case-btn {
+      background: linear-gradient(180deg, #2a412d, #1a261b);
+      border-color: #4a8f4e;
+      color: #d4ffd8;
+      text-transform: uppercase;
+      font-size: 1.01rem;
+      animation: openCasePulse 1.5s ease-in-out infinite alternate;
+    }
+
+    .open-case-btn:hover:not(:disabled),
+    .buy-case-btn:hover:not(:disabled),
+    .knife-buy-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .open-case-btn:disabled,
+    .buy-case-btn:disabled,
+    .knife-buy-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+      animation: none;
+    }
+
+    @keyframes openCasePulse {
+      from { box-shadow: 0 0 0 rgba(76, 175, 80, 0.15); }
+      to { box-shadow: 0 0 14px rgba(76, 175, 80, 0.42); }
+    }
+
+    .subsection-title {
+      color: #f1f1f1;
+      border-top: 1px solid #2a2a2a;
+      margin-top: 12px;
+      padding-top: 10px;
+      margin-bottom: 6px;
+      font-size: 0.97rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .knife-collection,
+    .inventory-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-bottom: 8px;
+    }
+
+    .knife-card,
+    .inv-card {
+      background: linear-gradient(180deg, rgba(30, 30, 30, 0.9), rgba(14, 14, 14, 0.9));
+      border: 1px solid #323232;
+      border-radius: 5px;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      position: relative;
+    }
+
+    .knife-glyph,
+    .knife-mini-icon {
+      width: 32px;
+      height: 18px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #a4a4a4, #ececec);
+      clip-path: polygon(0 42%, 48% 42%, 70% 12%, 100% 50%, 70% 88%, 48% 58%, 0 58%);
+      box-shadow: 0 0 7px rgba(255, 255, 255, 0.3);
+    }
+
+    .knife-mini-icon {
+      width: 24px;
+      height: 14px;
+    }
+
+    .knife-main {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+
+    .knife-main .name {
+      color: #f0f0f0;
+      font-size: 0.97rem;
+      font-weight: 700;
+    }
+
+    .knife-main .finish {
+      color: #d3d3d3;
+      font-size: 0.85rem;
+    }
+
+    .knife-main .cps {
+      color: #9ee6a2;
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+
+    .equipped-badge {
+      color: #ffee88;
+      border: 1px solid #907b2d;
+      background: rgba(112, 95, 21, 0.24);
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .no-items {
+      border: 1px dashed #3c3c3c;
+      border-radius: 5px;
+      color: #8e8e8e;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.92rem;
+    }
+
+    .rarity-consumer { border-left: 3px solid #8e8e8e; }
+    .rarity-industrial { border-left: 3px solid #8db3d9; }
+    .rarity-milspec { border-left: 3px solid #4b69ff; }
+    .rarity-restricted { border-left: 3px solid #8847ff; }
+    .rarity-classified { border-left: 3px solid #d32ce6; }
+    .rarity-covert { border-left: 3px solid #eb4b4b; }
+    .rarity-knife {
+      border-left: 3px solid #e4ae39;
+      box-shadow: inset 0 0 0 1px rgba(228, 174, 57, 0.22);
+      animation: knifeGlow 1.35s ease-in-out infinite alternate;
+    }
+
+    @keyframes knifeGlow {
+      from { box-shadow: inset 0 0 0 1px rgba(228, 174, 57, 0.22), 0 0 0 rgba(228, 174, 57, 0.1); }
+      to { box-shadow: inset 0 0 0 1px rgba(228, 174, 57, 0.33), 0 0 12px rgba(228, 174, 57, 0.35); }
+    }
+
+    .inv-main {
+      line-height: 1.1;
+    }
+
+    .inv-name {
+      color: #f2f2f2;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .inv-sub {
+      color: #bcbcbc;
+      font-size: 0.82rem;
+      margin-top: 3px;
+    }
+
+    .inv-val {
+      color: #f0a500;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .collection-summary {
+      margin-bottom: 10px;
+      color: #d9d9d9;
+      font-size: 0.95rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #2f2f2f;
+      border-radius: 4px;
+      padding: 8px;
+      background: rgba(18, 18, 18, 0.88);
+    }
+
+    .collection-summary strong {
+      color: var(--money);
+      font-size: 1.02rem;
+    }
+
+    .equipped-knife-display {
+      min-width: min(440px, 86%);
+      background: linear-gradient(180deg, rgba(18, 18, 18, 0.92), rgba(8, 8, 8, 0.92));
+      border: 1px solid #2f2f2f;
+      border-radius: 5px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      color: #e3e3e3;
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+    }
+
+    .equipped-knife-display .label {
+      color: #9e9e9e;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-size: 0.8rem;
+    }
+
+    .equipped-knife-display .knife-name {
+      color: #f3cf6e;
+      font-weight: 700;
+    }
+
+    .case-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      background: rgba(0, 0, 0, 0.78);
+      display: grid;
+      place-items: center;
+      padding: 16px;
+    }
+
+    .case-modal.hidden {
+      display: none;
+    }
+
+    .case-modal-card {
+      width: min(1320px, 94vw);
+      border: 1px solid #383838;
+      border-radius: 6px;
+      background: linear-gradient(180deg, rgba(22, 22, 22, 0.98), rgba(8, 8, 8, 0.98));
+      padding: 12px 12px 16px;
+      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+    }
+
+    .case-modal-title {
+      color: #f1f1f1;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      font-size: 1.05rem;
+    }
+
+    .reel-window {
+      position: relative;
+      border: 1px solid #343434;
+      background: #0e0e0e;
+      border-radius: 5px;
+      overflow: hidden;
+      height: 120px;
+      padding-block: 10px;
+    }
+
+    .reel-track {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      padding-inline: 20px;
+      transform: translateX(0px);
+      transition: transform 4.8s cubic-bezier(0.33, 1, 0.68, 1);
+      will-change: transform;
+    }
+
+    .reel-item {
+      flex: 0 0 64px;
+      border: 1px solid #353535;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #242424, #121212);
+      padding: 6px 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      text-align: center;
+      color: #ddd;
+      font-size: 0.68rem;
+      line-height: 1.05;
+      position: relative;
+    }
+
+    .reel-item .tiny {
+      font-size: 0.62rem;
+      color: #bcbcbc;
+      margin-top: 4px;
+    }
+
+    .reel-item.winner {
+      border-color: #ffd76a;
+      box-shadow: 0 0 16px rgba(255, 205, 68, 0.65);
+      animation: winnerPulse 700ms ease-in-out infinite alternate;
+    }
+
+    @keyframes winnerPulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.03); }
+    }
+
+    .reel-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, transparent 0%, #e9be53 22%, #e9be53 78%, transparent 100%);
+      box-shadow: 0 0 8px rgba(231, 190, 80, 0.55);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .drop-banner {
+      margin-top: 10px;
+      font-size: 1.25rem;
+      color: #ffe19a;
+      letter-spacing: 2.3px;
+      font-weight: 700;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.22s ease;
+      text-align: center;
+    }
+
+    .drop-banner.show {
+      opacity: 1;
+    }
+
+    .case-close-btn {
+      margin-top: 10px;
+      border: 1px solid #4f7f52;
+      background: linear-gradient(180deg, #203322, #131f14);
+      color: #d7ffd9;
+      border-radius: 4px;
+      font-family: inherit;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 8px 12px;
+      min-width: 140px;
+      display: block;
+      margin-inline: auto;
+      cursor: inherit;
+      opacity: 0.9;
+    }
+
+    .knife-flash {
+      position: fixed;
+      inset: 0;
+      background: rgba(228, 174, 57, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 118;
+    }
+
+    .knife-flash.active {
+      animation: fadeflash 420ms ease-out;
+    }
+
+    .knife-drop-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 119;
+      pointer-events: none;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+    }
+
+    .knife-drop-overlay.show {
+      animation: knifeDropShow 1.1s ease-out;
+    }
+
+    .knife-drop-text {
+      color: #ffd56b;
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-shadow: 0 0 14px rgba(255, 215, 100, 0.85);
+      text-transform: uppercase;
+    }
+
+    @keyframes knifeDropShow {
+      0% { opacity: 0; transform: scale(0.9); }
+      25% { opacity: 1; transform: scale(1.05); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+
+    .knife-particle-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 117;
+      pointer-events: none;
+    }
+
+    .knife-particle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffd56c;
+      box-shadow: 0 0 9px rgba(255, 213, 108, 0.8);
+      animation: knifeParticle 900ms ease-out forwards;
+    }
+
+    @keyframes knifeParticle {
+      from { opacity: 1; transform: translate(0, 0) scale(1); }
+      to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
     }
 
     .shop-head {
@@ -646,6 +1130,10 @@
         max-height: 38vh;
       }
 
+      .shop-tabs {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
       .hud-top {
         grid-template-columns: 1fr;
         height: auto;
@@ -664,12 +1152,26 @@
       .side-indicator {
         width: 100%;
       }
+
+      .equipped-knife-display {
+        min-width: 92%;
+      }
+
+      .reel-item {
+        flex-basis: 56px;
+        font-size: 0.61rem;
+      }
     }
   </style>
 </head>
 <body>
   <div id="click-flash" class="screen-flash"></div>
   <div id="he-flash" class="screen-flash"></div>
+  <div id="knife-flash" class="knife-flash"></div>
+  <div id="knife-particle-layer" class="knife-particle-layer"></div>
+  <div id="knife-drop-overlay" class="knife-drop-overlay">
+    <div class="knife-drop-text">KNIFE DROPPED</div>
+  </div>
   <div id="floating-layer" class="floating-layer"></div>
 
   <header class="hud-top">
@@ -713,6 +1215,12 @@
           </div>
         </div>
       </button>
+      <div id="equipped-knife-display" class="equipped-knife-display">
+        <span class="label">Equipped Knife</span>
+        <span class="knife-mini-icon"></span>
+        <span id="equipped-knife-name" class="knife-name">None</span>
+        <span id="equipped-knife-cps" class="knife-cps">(+0.0 CPS)</span>
+      </div>
     </section>
 
     <section class="buy-panel">
@@ -738,6 +1246,18 @@
     </section>
   </footer>
 
+  <div id="case-modal" class="case-modal hidden" aria-hidden="true">
+    <div class="case-modal-card">
+      <div id="case-modal-title" class="case-modal-title">Case Opening</div>
+      <div class="reel-window">
+        <div class="reel-marker"></div>
+        <div id="reel-track" class="reel-track"></div>
+      </div>
+      <div id="drop-banner" class="drop-banner">ITEM DROPPED</div>
+      <button id="case-close-btn" class="case-close-btn" style="display:none;">Continue</button>
+    </div>
+  </div>
+
   <script>
     const upgrades = [
       { id: "knife", name: "Knife", cost: 50, cps: 0.1, effect: "+0.1 clicks/sec" },
@@ -758,6 +1278,47 @@
       { name: "Global Elite", short: "GE" }
     ];
 
+    const skinPools = {
+      milspec: ["Glock | Night Raid", "P250 | Hazard Zone", "MP9 | Static Field"],
+      restricted: ["AK-47 | Ember Core", "M4A4 | Fractured", "USP-S | Dark Signal"],
+      classified: ["AWP | Void Walker", "AK-47 | Neon Siege", "M4A4 | Ghost Protocol"],
+      covert: ["AWP | Dragon's Eye", "AK-47 | Crimson Throne"],
+      consumer: ["Dual Berettas | Dust Trail", "Nova | Factory Prime", "PP-Bizon | Carbon Rush"],
+      industrial: ["FAMAS | Arctic Bus", "MAC-10 | Night Grid", "UMP-45 | Circuit Line"]
+    };
+
+    const knifeTypes = [
+      { id: "bayonet", name: "Bayonet", cps: 5 },
+      { id: "karambit", name: "Karambit", cps: 8 },
+      { id: "butterfly", name: "Butterfly Knife", cps: 10 },
+      { id: "m9", name: "M9 Bayonet", cps: 7 },
+      { id: "huntsman", name: "Huntsman Knife", cps: 6 },
+      { id: "falchion", name: "Falchion Knife", cps: 5 },
+      { id: "shadow", name: "Shadow Daggers", cps: 4 },
+      { id: "navaja", name: "Navaja Knife", cps: 3 },
+      { id: "stiletto", name: "Stiletto Knife", cps: 6 },
+      { id: "talon", name: "Talon Knife", cps: 9 }
+    ];
+
+    const directKnifePrices = {
+      bayonet: 15000,
+      karambit: 25000,
+      butterfly: 30000,
+      m9: 20000,
+      huntsman: 18000,
+      talon: 28000
+    };
+
+    const rarityMeta = {
+      consumer: { label: "Consumer Grade", css: "rarity-consumer", color: "#8e8e8e", value: 10, order: 0 },
+      industrial: { label: "Industrial", css: "rarity-industrial", color: "#8db3d9", value: 50, order: 1 },
+      milspec: { label: "Mil-Spec", css: "rarity-milspec", color: "#4b69ff", value: 50, order: 2 },
+      restricted: { label: "Restricted", css: "rarity-restricted", color: "#8847ff", value: 200, order: 3 },
+      classified: { label: "Classified", css: "rarity-classified", color: "#d32ce6", value: 500, order: 4 },
+      covert: { label: "Covert", css: "rarity-covert", color: "#eb4b4b", value: 1500, order: 5 },
+      knife: { label: "Contraband", css: "rarity-knife", color: "#e4ae39", value: 5000, order: 6 }
+    };
+
     const funnyVictims = ["Economy", "Poverty", "Budget Build", "No Armor", "Eco Rush", "Save Round"];
     const killEvents = ["killed", "headshot", "one-tapped", "wallbanged", "deleted"];
 
@@ -772,7 +1333,14 @@
       clickBase: 1,
       flashActiveUntil: 0,
       flashCooldownUntil: 0,
-      upgradesOwned: Object.fromEntries(upgrades.map((u) => [u.id, 0]))
+      upgradesOwned: Object.fromEntries(upgrades.map((u) => [u.id, 0])),
+      activeTab: "shop",
+      caseInventory: 0,
+      casesOpened: 0,
+      inventorySkins: [],
+      knifeInventory: [],
+      equippedKnifeId: null,
+      caseAnimating: false
     };
 
     const el = {
@@ -788,8 +1356,18 @@
       bombBtn: document.getElementById("bomb-button"),
       clickFlash: document.getElementById("click-flash"),
       heFlash: document.getElementById("he-flash"),
+      knifeFlash: document.getElementById("knife-flash"),
       floatingLayer: document.getElementById("floating-layer"),
-      killFeed: document.getElementById("kill-feed")
+      killFeed: document.getElementById("kill-feed"),
+      equippedKnifeName: document.getElementById("equipped-knife-name"),
+      equippedKnifeCps: document.getElementById("equipped-knife-cps"),
+      knifeParticleLayer: document.getElementById("knife-particle-layer"),
+      knifeDropOverlay: document.getElementById("knife-drop-overlay"),
+      caseModal: document.getElementById("case-modal"),
+      caseModalTitle: document.getElementById("case-modal-title"),
+      reelTrack: document.getElementById("reel-track"),
+      dropBanner: document.getElementById("drop-banner"),
+      caseCloseBtn: document.getElementById("case-close-btn")
     };
 
     let audioCtx = null;
@@ -834,6 +1412,18 @@
       playTone(860, 0.11, "sawtooth", 0.08, 0.24);
     }
 
+    function playCaseSpinSound() {
+      playTone(350, 0.05, "square", 0.03);
+      playTone(460, 0.05, "square", 0.03, 0.06);
+      playTone(560, 0.05, "square", 0.03, 0.12);
+    }
+
+    function playKnifeDropSound() {
+      playTone(630, 0.08, "triangle", 0.06);
+      playTone(830, 0.1, "triangle", 0.06, 0.1);
+      playTone(1120, 0.12, "triangle", 0.065, 0.22);
+    }
+
     function getPrestigeCost() {
       return 5000 * (state.prestigeLevel + 1);
     }
@@ -842,11 +1432,25 @@
       return Math.min(state.prestigeLevel, ranks.length - 1);
     }
 
+    function getCaseCost() {
+      return 500 + Math.floor(state.casesOpened / 10) * 100;
+    }
+
+    function getEquippedKnife() {
+      return state.knifeInventory.find((knife) => knife.id === state.equippedKnifeId) || null;
+    }
+
+    function getKnifeCpsBonus() {
+      const knife = getEquippedKnife();
+      return knife ? knife.cps : 0;
+    }
+
     function getCps() {
       let total = 0;
       for (const item of upgrades) {
         total += (item.cps || 0) * state.upgradesOwned[item.id];
       }
+      total += getKnifeCpsBonus();
       return total * state.prestigeMultiplier;
     }
 
@@ -926,6 +1530,138 @@
       document.documentElement.style.setProperty("--led-speed", `${speed.toFixed(2)}s`);
     }
 
+    function randomFrom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function createSkinDrop(rarity) {
+      return {
+        kind: "skin",
+        rarity,
+        name: randomFrom(skinPools[rarity]),
+        finish: "",
+        cps: 0
+      };
+    }
+
+    function getRandomKnifeType() {
+      return randomFrom(knifeTypes);
+    }
+
+    function rollKnifeFinish() {
+      const weighted = [
+        { name: "Case Hardened", w: 16 },
+        { name: "Doppler Phase 1", w: 9 },
+        { name: "Doppler Phase 2", w: 9 },
+        { name: "Doppler Phase 3", w: 4 },
+        { name: "Doppler Phase 4", w: 9 },
+        { name: "Fade", w: 4 },
+        { name: "Marble Fade", w: 8 },
+        { name: "Tiger Tooth", w: 9 },
+        { name: "Slaughter", w: 9 },
+        { name: "Crimson Web", w: 9 },
+        { name: "Night", w: 10 },
+        { name: "Blue Steel", w: 8 },
+        { name: "Stained", w: 8 }
+      ];
+      const total = weighted.reduce((sum, item) => sum + item.w, 0);
+      let roll = Math.random() * total;
+      for (const item of weighted) {
+        roll -= item.w;
+        if (roll <= 0) return item.name;
+      }
+      return weighted[0].name;
+    }
+
+    function createKnifeDrop(forcedKnifeId = null) {
+      const type = forcedKnifeId
+        ? knifeTypes.find((knife) => knife.id === forcedKnifeId) || getRandomKnifeType()
+        : getRandomKnifeType();
+      const finish = rollKnifeFinish();
+      const extra = finish === "Doppler Phase 3" || finish === "Fade" ? 2 : 0;
+      return {
+        kind: "knife",
+        rarity: "knife",
+        knifeId: type.id,
+        name: type.name,
+        finish,
+        cps: type.cps + extra
+      };
+    }
+
+    function randomFillerDrop() {
+      const roll = Math.random();
+      if (roll < 0.34) return createSkinDrop("consumer");
+      if (roll < 0.58) return createSkinDrop("industrial");
+      if (roll < 0.85) return createSkinDrop("milspec");
+      if (roll < 0.95) return createSkinDrop("restricted");
+      if (roll < 0.99) return createSkinDrop("classified");
+      if (roll < 0.997) return createSkinDrop("covert");
+      return createKnifeDrop();
+    }
+
+    function rollDrop() {
+      const r = Math.random();
+      if (r < 0.79) return createSkinDrop("milspec");
+      if (r < 0.94) return createSkinDrop("restricted");
+      if (r < 0.98) return createSkinDrop("classified");
+      if (r < 0.99) return createSkinDrop("covert");
+      return createKnifeDrop();
+    }
+
+    function getDropDisplayName(drop) {
+      return drop.kind === "knife" ? `${drop.name} | ${drop.finish}` : drop.name;
+    }
+
+    function getItemValue(item) {
+      const base = rarityMeta[item.rarity].value;
+      if (item.kind === "knife") {
+        return base + Math.round(item.cps * 120);
+      }
+      return base;
+    }
+
+    function updateEquippedKnife() {
+      if (state.knifeInventory.length === 0) {
+        state.equippedKnifeId = null;
+        return;
+      }
+      let best = state.knifeInventory[0];
+      for (const knife of state.knifeInventory) {
+        if (knife.cps > best.cps) best = knife;
+      }
+      state.equippedKnifeId = best.id;
+    }
+
+    function updateEquippedKnifeHud() {
+      const knife = getEquippedKnife();
+      if (!knife) {
+        el.equippedKnifeName.textContent = "None";
+        el.equippedKnifeCps.textContent = "(+0.0 CPS)";
+        return;
+      }
+      el.equippedKnifeName.textContent = `${knife.name} | ${knife.finish}`;
+      el.equippedKnifeCps.textContent = `(+${knife.cps.toFixed(1)} CPS)`;
+    }
+
+    function showKnifeDropCelebration() {
+      flashOverlay(el.knifeFlash);
+      el.knifeDropOverlay.classList.remove("show");
+      void el.knifeDropOverlay.offsetWidth;
+      el.knifeDropOverlay.classList.add("show");
+      for (let i = 0; i < 26; i += 1) {
+        const p = document.createElement("div");
+        p.className = "knife-particle";
+        p.style.left = `${50 + (Math.random() - 0.5) * 20}%`;
+        p.style.top = `${50 + (Math.random() - 0.5) * 14}%`;
+        p.style.setProperty("--dx", `${(Math.random() - 0.5) * 280}px`);
+        p.style.setProperty("--dy", `${(Math.random() - 0.5) * 210}px`);
+        el.knifeParticleLayer.appendChild(p);
+        setTimeout(() => p.remove(), 930);
+      }
+      setTimeout(() => el.knifeDropOverlay.classList.remove("show"), 1120);
+    }
+
     function endRound() {
       initAudio();
       playRoundEndSound();
@@ -938,16 +1674,37 @@
       el.side.textContent = state.side;
     }
 
-    function renderShop() {
+    function renderShopTabs() {
+      return `
+        <div class="shop-tabs">
+          <button class="shop-tab ${state.activeTab === "shop" ? "active" : ""}" data-tab="shop">Shop</button>
+          <button class="shop-tab ${state.activeTab === "cases" ? "active" : ""}" data-tab="cases">Cases</button>
+          <button class="shop-tab ${state.activeTab === "knives" ? "active" : ""}" data-tab="knives">Knives</button>
+          <button class="shop-tab ${state.activeTab === "inventory" ? "active" : ""}" data-tab="inventory">Inventory</button>
+        </div>
+      `;
+    }
+
+    function renderMainShopTab() {
       const now = Date.now();
       const clickMultActive = now < state.flashActiveUntil;
       const cooldownLeft = Math.max(0, state.flashCooldownUntil - now);
+      const directRows = knifeTypes
+        .filter((knife) => directKnifePrices[knife.id])
+        .map((knife) => {
+          const price = directKnifePrices[knife.id];
+          const canBuy = state.money >= price && !state.caseAnimating;
+          return `
+            <button class="knife-buy-btn" data-buy-knife="${knife.id}" ${canBuy ? "" : "disabled"}>
+              ${knife.name} ($${formatMoney(price)})
+            </button>
+          `;
+        }).join("");
 
-      el.shop.innerHTML = upgrades.map((item) => {
+      const upgradesHtml = upgrades.map((item) => {
         const owned = state.upgradesOwned[item.id];
         const affordable = state.money >= item.cost;
         const lockedClass = affordable ? "" : "locked";
-        const buyDisabled = affordable ? "" : "disabled";
 
         let extraAction = "";
         if (item.id === "flash") {
@@ -958,7 +1715,7 @@
               ? `Cooldown ${Math.ceil(cooldownLeft / 1000)}s`
               : "Activate";
           extraAction = `
-            <button class="activate-btn" data-activate="flash" ${canActivate ? "" : "disabled"}>
+            <button class="activate-btn" data-activate-flash="1" ${canActivate ? "" : "disabled"}>
               ${label}
             </button>
           `;
@@ -972,7 +1729,7 @@
             </div>
             <div class="shop-effect">${item.effect}</div>
             <div class="shop-actions">
-              <button class="buy-btn" data-buy="${item.id}" ${buyDisabled}>
+              <button class="buy-btn" data-buy-upgrade="${item.id}" ${affordable ? "" : "disabled"}>
                 Buy ($${item.cost})
               </button>
               ${extraAction}
@@ -981,12 +1738,235 @@
         `;
       }).join("");
 
-      for (const btn of el.shop.querySelectorAll("[data-buy]")) {
-        btn.addEventListener("click", () => purchaseUpgrade(btn.dataset.buy));
+      return `${upgradesHtml}<div class="subsection-title">Buy Knives</div>${directRows}`;
+    }
+
+    function renderCasesTab() {
+      const caseCost = getCaseCost();
+      const canBuyCase = state.money >= caseCost;
+      const canOpen = state.caseInventory > 0 && !state.caseAnimating;
+
+      return `
+        <div class="case-box">
+          <div class="case-row"><span class="label">Case Price</span><strong>$${formatMoney(caseCost)}</strong></div>
+          <div class="case-row"><span class="label">Cases Owned</span><strong>${state.caseInventory}</strong></div>
+          <div class="case-row"><span class="label">Cases Opened</span><strong>${state.casesOpened}</strong></div>
+          <button class="buy-case-btn" data-buy-case="1" ${canBuyCase ? "" : "disabled"}>Buy Case</button>
+          <button class="open-case-btn" data-open-case="1" ${canOpen ? "" : "disabled"}>Open Case</button>
+        </div>
+        <p class="mini-note">Drop table: 79% Mil-Spec, 15% Restricted, 4% Classified, 1% Covert, 1% Knife.</p>
+      `;
+    }
+
+    function renderKnivesTab() {
+      if (state.knifeInventory.length === 0) {
+        return `<div class="no-items">No knives yet. Open cases or buy one directly.</div>`;
       }
-      for (const btn of el.shop.querySelectorAll("[data-activate]")) {
-        btn.addEventListener("click", () => activateFlash());
+      const equippedId = state.equippedKnifeId;
+      const sorted = [...state.knifeInventory].sort((a, b) => b.cps - a.cps);
+      const totalKnifeCps = sorted.reduce((sum, knife) => sum + knife.cps, 0);
+      const equipped = getEquippedKnife();
+
+      return `
+        <div class="mini-note">Best knife auto-equips. Equipped bonus: +${(equipped ? equipped.cps : 0).toFixed(1)} CPS (owned pool: +${totalKnifeCps.toFixed(1)}).</div>
+        <div class="knife-collection">
+          ${sorted.map((knife) => `
+            <article class="knife-card rarity-knife">
+              <div class="knife-glyph"></div>
+              <div class="knife-main">
+                <span class="name">${knife.name}</span>
+                <span class="finish">${knife.finish}</span>
+                <span class="cps">+${knife.cps.toFixed(1)} CPS</span>
+              </div>
+              ${knife.id === equippedId ? `<span class="equipped-badge">Equipped</span>` : ""}
+            </article>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderInventoryTab() {
+      const entries = [
+        ...state.inventorySkins,
+        ...state.knifeInventory
+      ].sort((a, b) => {
+        const rarityDelta = rarityMeta[b.rarity].order - rarityMeta[a.rarity].order;
+        if (rarityDelta !== 0) return rarityDelta;
+        return getDropDisplayName(a).localeCompare(getDropDisplayName(b));
+      });
+
+      const totalValue = entries.reduce((sum, entry) => sum + getItemValue(entry), 0);
+
+      if (entries.length === 0) {
+        return `
+          <div class="collection-summary">
+            <span>Total Collection Value</span>
+            <strong>$0.00</strong>
+          </div>
+          <div class="no-items">Inventory empty. Start opening cases.</div>
+        `;
       }
+
+      return `
+        <div class="collection-summary">
+          <span>Total Collection Value</span>
+          <strong>$${formatMoney(totalValue)}</strong>
+        </div>
+        <div class="inventory-list">
+          ${entries.map((entry) => {
+            const meta = rarityMeta[entry.rarity];
+            const name = getDropDisplayName(entry);
+            const sub = entry.kind === "knife"
+              ? `${meta.label} • +${entry.cps.toFixed(1)} CPS`
+              : meta.label;
+            return `
+              <article class="inv-card ${meta.css}">
+                ${entry.kind === "knife" ? `<div class="knife-glyph"></div>` : `<div style="width:32px;height:18px;border-radius:3px;background:${meta.color};opacity:0.75;"></div>`}
+                <div class="inv-main">
+                  <div class="inv-name">${name}</div>
+                  <div class="inv-sub">${sub}</div>
+                </div>
+                <div class="inv-val">$${formatMoney(getItemValue(entry))}</div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderShopView() {
+      let content = "";
+      if (state.activeTab === "shop") content = renderMainShopTab();
+      else if (state.activeTab === "cases") content = renderCasesTab();
+      else if (state.activeTab === "knives") content = renderKnivesTab();
+      else content = renderInventoryTab();
+
+      el.shop.innerHTML = `${renderShopTabs()}<div class="tab-content">${content}</div>`;
+    }
+
+    function grantDrop(drop, sourceLabel) {
+      if (drop.kind === "knife") {
+        const knife = {
+          ...drop,
+          id: `${drop.knifeId}-${Date.now()}-${Math.floor(Math.random() * 100000)}`
+        };
+        state.knifeInventory.push(knife);
+        updateEquippedKnife();
+        updateEquippedKnifeHud();
+        showKnifeDropCelebration();
+        playKnifeDropSound();
+        showKillFeed(`<span class="weapon">KNIFE DROPPED</span> ${knife.name}<span class="event"> ${knife.finish}</span>`);
+      } else {
+        state.inventorySkins.push({
+          ...drop,
+          id: `skin-${Date.now()}-${Math.floor(Math.random() * 100000)}`
+        });
+        const sourceLabelSafe = sourceLabel.replace(/[<>]/g, "");
+        showKillFeed(`<span class="weapon">${sourceLabelSafe}</span> ${drop.name}<span class="event"> ${rarityMeta[drop.rarity].label}</span>`);
+      }
+      updatePrestigeHud();
+      renderShopView();
+    }
+
+    function buildReel(drop) {
+      const items = [];
+      const winnerIndex = 28;
+      const count = 38;
+      for (let i = 0; i < count; i += 1) {
+        items.push(i === winnerIndex ? drop : randomFillerDrop());
+      }
+      return { items, winnerIndex };
+    }
+
+    function startCaseReveal(drop, titleText = "Case Opening") {
+      state.caseAnimating = true;
+      initAudio();
+      playCaseSpinSound();
+
+      const { items, winnerIndex } = buildReel(drop);
+      el.caseModalTitle.textContent = titleText;
+      el.dropBanner.classList.remove("show");
+      el.dropBanner.textContent = "ITEM DROPPED";
+      el.caseCloseBtn.style.display = "none";
+      el.caseModal.classList.remove("hidden");
+      el.caseModal.setAttribute("aria-hidden", "false");
+
+      el.reelTrack.innerHTML = items.map((item, index) => {
+        const meta = rarityMeta[item.rarity];
+        const name = getDropDisplayName(item);
+        return `
+          <div class="reel-item ${meta.css}" data-reel-index="${index}">
+            <div>${name}</div>
+            <div class="tiny">${meta.label}</div>
+          </div>
+        `;
+      }).join("");
+
+      el.reelTrack.style.transition = "none";
+      el.reelTrack.style.transform = "translateX(0px)";
+      void el.reelTrack.offsetWidth;
+
+      requestAnimationFrame(() => {
+        el.reelTrack.style.transition = "transform 4.8s cubic-bezier(0.33, 1, 0.68, 1)";
+        const reelWindow = el.reelTrack.parentElement;
+        const winnerEl = el.reelTrack.children[winnerIndex];
+        const markerX = reelWindow.clientWidth / 2;
+        const winnerCenter = winnerEl.offsetLeft + winnerEl.offsetWidth / 2;
+        const jitter = (Math.random() - 0.5) * 14;
+        const target = markerX - winnerCenter + jitter;
+        el.reelTrack.style.transform = `translateX(${target}px)`;
+      });
+
+      setTimeout(() => {
+        const winnerEl = el.reelTrack.children[winnerIndex];
+        winnerEl.classList.add("winner");
+        el.dropBanner.textContent = drop.kind === "knife"
+          ? `KNIFE DROPPED: ${drop.name} | ${drop.finish}`
+          : `ITEM DROPPED: ${drop.name}`;
+        el.dropBanner.classList.add("show");
+        el.caseCloseBtn.style.display = "block";
+        grantDrop(drop, titleText.toUpperCase());
+      }, 4950);
+    }
+
+    function closeCaseModal() {
+      el.caseModal.classList.add("hidden");
+      el.caseModal.setAttribute("aria-hidden", "true");
+      state.caseAnimating = false;
+      renderShopView();
+    }
+
+    function openCase() {
+      if (state.caseAnimating || state.caseInventory <= 0) return;
+      state.caseInventory -= 1;
+      state.casesOpened += 1;
+      const drop = rollDrop();
+      startCaseReveal(drop, "Case Opening");
+      renderShopView();
+    }
+
+    function buyCase() {
+      const cost = getCaseCost();
+      if (state.money < cost || state.caseAnimating) return;
+      initAudio();
+      playPurchaseSound();
+      addMoney(-cost);
+      state.caseInventory += 1;
+      showKillFeed(`<span class="weapon">CASE</span> purchased <span class="event">$${formatMoney(cost)}</span>`);
+      updatePrestigeHud();
+      renderShopView();
+    }
+
+    function buyKnifeDirect(knifeId) {
+      const price = directKnifePrices[knifeId];
+      if (!price || state.money < price || state.caseAnimating) return;
+      initAudio();
+      playPurchaseSound();
+      addMoney(-price);
+      const drop = createKnifeDrop(knifeId);
+      startCaseReveal(drop, "Knife Purchase");
+      updatePrestigeHud();
+      renderShopView();
     }
 
     function updateRoundHud() {
@@ -1024,15 +2004,14 @@
         flashOverlay(el.heFlash);
       }
 
-      showKillFeed(`<span class="weapon">${item.name}</span> bought <span class="event">+$${item.cps || "utility"}</span>`);
-      renderShop();
+      showKillFeed(`<span class="weapon">${item.name}</span> bought <span class="event">+${item.cps || "utility"}</span>`);
       updatePrestigeHud();
+      renderShopView();
     }
 
     function activateFlash() {
       const now = Date.now();
-      if (state.upgradesOwned.flash <= 0) return;
-      if (now < state.flashCooldownUntil) return;
+      if (state.upgradesOwned.flash <= 0 || now < state.flashCooldownUntil) return;
       state.upgradesOwned.flash -= 1;
       state.flashActiveUntil = now + 10000;
       state.flashCooldownUntil = now + 30000;
@@ -1040,7 +2019,7 @@
       playTone(1300, 0.05, "triangle", 0.05);
       playTone(1600, 0.05, "triangle", 0.045, 0.05);
       showKillFeed(`<span class="weapon">Flashbang</span> popped<span class="event"> 2x click power</span>`);
-      renderShop();
+      renderShopView();
     }
 
     function onBombClick(evt) {
@@ -1062,7 +2041,7 @@
 
     function tryPrestige() {
       const cost = getPrestigeCost();
-      if (state.money < cost) return;
+      if (state.money < cost || state.caseAnimating) return;
       initAudio();
       playTone(390, 0.1, "triangle", 0.06);
       playTone(590, 0.12, "triangle", 0.055, 0.1);
@@ -1077,11 +2056,18 @@
       state.side = "CT";
       state.flashActiveUntil = 0;
       state.flashCooldownUntil = 0;
+      state.caseInventory = 0;
+      state.casesOpened = 0;
+      state.inventorySkins = [];
+      state.knifeInventory = [];
+      state.equippedKnifeId = null;
+      state.activeTab = "shop";
       for (const key of Object.keys(state.upgradesOwned)) {
         state.upgradesOwned[key] = 0;
       }
       showKillFeed(`<span class="weapon">Prestige</span> promoted to <span class="event">${ranks[getCurrentRankIndex()].name}</span>`);
-      renderShop();
+      updateEquippedKnifeHud();
+      renderShopView();
       updateRoundHud();
       updatePrestigeHud();
     }
@@ -1099,7 +2085,43 @@
 
       updateRoundHud();
       updatePrestigeHud();
-      renderShop();
+      renderShopView();
+      updateEquippedKnifeHud();
+    }
+
+    function handleShopClick(event) {
+      const button = event.target.closest("button");
+      if (!button) return;
+
+      if (button.dataset.tab) {
+        state.activeTab = button.dataset.tab;
+        renderShopView();
+        return;
+      }
+
+      if (button.dataset.buyUpgrade) {
+        purchaseUpgrade(button.dataset.buyUpgrade);
+        return;
+      }
+
+      if (button.dataset.activateFlash) {
+        activateFlash();
+        return;
+      }
+
+      if (button.dataset.buyCase) {
+        buyCase();
+        return;
+      }
+
+      if (button.dataset.openCase) {
+        openCase();
+        return;
+      }
+
+      if (button.dataset.buyKnife) {
+        buyKnifeDirect(button.dataset.buyKnife);
+      }
     }
 
     function initEvents() {
@@ -1112,18 +2134,19 @@
       el.bombBtn.addEventListener("touchstart", (evt) => {
         evt.preventDefault();
         const t = evt.changedTouches[0];
-        if (t) {
-          onBombClick(t);
-        }
+        if (t) onBombClick(t);
       }, { passive: false });
 
       el.prestigeBtn.addEventListener("click", tryPrestige);
+      el.shop.addEventListener("click", handleShopClick);
+      el.caseCloseBtn.addEventListener("click", closeCaseModal);
     }
 
     function init() {
       updateRoundHud();
       updatePrestigeHud();
-      renderShop();
+      updateEquippedKnifeHud();
+      renderShopView();
       initEvents();
       animateMoneyHud();
 
@@ -1135,5 +2158,6 @@
 
     init();
   </script>
+
 </body>
 </html>
