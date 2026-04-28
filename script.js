@@ -20,6 +20,7 @@ const restartButton = document.getElementById("restartButton");
 const teamSelectA = document.getElementById("teamSelectA");
 const teamSelectB = document.getElementById("teamSelectB");
 const messageBar = document.getElementById("messageBar");
+const fieldStage = document.getElementById("fieldStage");
 
 const inningValue = document.getElementById("inningValue");
 const halfValue = document.getElementById("halfValue");
@@ -38,6 +39,13 @@ const FIELD_LAYOUT_RATIOS = {
   hudHeight: 0.1,
   bottomBarHeight: 0.09
 };
+
+const VIRTUAL_VIEW = {
+  width: 1280,
+  height: 720
+};
+
+const PLAY_RESULT_HOLD_MS = 950;
 
 const FIELD_ANCHORS = {
   home: { x: 0.5, y: 0.88 },
@@ -216,7 +224,7 @@ const FIELDING_SPEED_RANGES = {
 };
 
 const DEBUG_STATE = {
-  enabled: DEBUG || DEBUG_FIELDING,
+  enabled: false,
   lastConsoleLog: 0,
   consoleInterval: 0.75
 };
@@ -321,6 +329,7 @@ function buildFieldLayout(width, height) {
 let RENDER_LAYOUT = buildFieldLayout(canvas.width, canvas.height);
 const COORD_WARNINGS = new Set();
 const BALL_WARNINGS = new Set();
+let pendingPlayResetTimer = null;
 
 function safePoint(point, key, fallback) {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
@@ -431,7 +440,29 @@ function spawnAllPlayers() {
   GAME.controlledFielder = 0;
 }
 
+function cancelPendingPlayReset() {
+  if (pendingPlayResetTimer) {
+    clearTimeout(pendingPlayResetTimer);
+    pendingPlayResetTimer = null;
+  }
+}
+
+function completePlay(message, onBeforeReset = null) {
+  cancelPendingPlayReset();
+  setPlayState(PLAY_STATES.PLAY_RESULT, message, 0.2, true);
+  setMessage(message);
+  pendingPlayResetTimer = setTimeout(() => {
+    pendingPlayResetTimer = null;
+    setPlayState(PLAY_STATES.RESETTING_PLAY, "Resetting play...", 0.08, true);
+    if (typeof onBeforeReset === "function") {
+      onBeforeReset();
+    }
+    resetForNextPitch();
+  }, PLAY_RESULT_HOLD_MS);
+}
+
 function resetForNextPitch() {
+  cancelPendingPlayReset();
   const message = GAME.playCallout?.text ? `${GAME.playCallout.text}. ${GAME.balls}-${GAME.strikes}` : "Player 2: Aim and pitch. Player 1: Get ready.";
   resetPitchBall();
   GAME.battedBall = null;
@@ -1098,21 +1129,23 @@ function updateCamera(dt) {
   let targetX = 0;
   let targetY = 0;
   let damping = CAMERA_TUNING.battingDamping;
+  const playFocusY = lerp(FIELD.mound.y, FIELD.second.y, 0.45);
+  const baseFocusY = playFocusY - FIELD.home.y;
 
   if (GAME.cameraMode === "fielding" && GAME.battedBall) {
     const trackedFielder = defensiveFielders[GAME.controlledFielder];
     const blendX = trackedFielder ? lerp(GAME.battedBall.x, trackedFielder.x, 0.36) : GAME.battedBall.x;
     const blendY = trackedFielder ? lerp(GAME.battedBall.groundY ?? GAME.battedBall.y, trackedFielder.y, 0.36) : (GAME.battedBall.groundY ?? GAME.battedBall.y);
     targetX = blendX - FIELD.home.x;
-    targetY = blendY - FIELD.home.y - 58;
+    targetY = blendY - FIELD.home.y + baseFocusY + 8;
     damping = GAME.pendingPlay?.homeRun ? CAMERA_TUNING.homerDamping : CAMERA_TUNING.fieldingDamping;
   } else if (GAME.cameraMode === "pitching") {
-    targetX = lerp(GAME.pitchAim * 42, GAME.pitchAim * 96, 0.5);
-    targetY = -74 + GAME.pitchAimY * 28;
+    targetX = lerp(GAME.pitchAim * 30, GAME.pitchAim * 64, 0.5);
+    targetY = baseFocusY + GAME.pitchAimY * 14;
     damping = CAMERA_TUNING.pitchingDamping;
   } else {
     targetX = 0;
-    targetY = -22;
+    targetY = baseFocusY - 6;
     damping = CAMERA_TUNING.battingDamping;
   }
 
@@ -1577,6 +1610,7 @@ function startGame() {
   resetCount();
   resetPitchBall();
   spawnAllPlayers();
+  cancelPendingPlayReset();
   resetForNextPitch();
   startScreen.classList.add("hidden");
   gameOverScreen.classList.add("hidden");
@@ -1685,14 +1719,15 @@ function switchSides() {
 
 function addOut(reason) {
   GAME.outs += 1;
-  setPlayState(PLAY_STATES.PLAY_RESULT, reason || "Out at first!", 0.14, true);
-  resetCount();
-  resetForNextPitch();
-  updateHud();
-  setMessage(reason || "Out at first!");
-  if (GAME.outs >= 3) {
-    switchSides();
-  }
+  completePlay(reason || "Out at first!", () => {
+    resetCount();
+    updateHud();
+    if (GAME.outs >= 3) {
+      switchSides();
+    } else {
+      updateHud();
+    }
+  });
 }
 
 function addStrike(reason) {
@@ -1702,10 +1737,9 @@ function addStrike(reason) {
     addOut("Strike three. Batter out.");
     return;
   }
-  setPlayState(PLAY_STATES.PLAY_RESULT, `${reason} Count ${GAME.balls}-${GAME.strikes}`, 0.1, true);
-  resetForNextPitch();
-  updateHud();
-  setMessage(`${reason} Count ${GAME.balls}-${GAME.strikes}`);
+  completePlay(`${reason} Count ${GAME.balls}-${GAME.strikes}`, () => {
+    updateHud();
+  });
 }
 
 function addBall(reason) {
@@ -1714,16 +1748,14 @@ function addBall(reason) {
   if (GAME.balls >= 4) {
     applyWalk();
     resetCount();
-    setPlayState(PLAY_STATES.PLAY_RESULT, `Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`, 0.12, true);
-    resetForNextPitch();
-    updateHud();
-    setMessage(`Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`);
+    completePlay(`Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`, () => {
+      updateHud();
+    });
     return;
   }
-  setPlayState(PLAY_STATES.PLAY_RESULT, `${reason} Count ${GAME.balls}-${GAME.strikes}`, 0.1, true);
-  resetForNextPitch();
-  updateHud();
-  setMessage(`${reason} Count ${GAME.balls}-${GAME.strikes}`);
+  completePlay(`${reason} Count ${GAME.balls}-${GAME.strikes}`, () => {
+    updateHud();
+  });
 }
 
 function foulBall() {
@@ -1732,10 +1764,9 @@ function foulBall() {
   }
   createBurst(FIELD.home.x - 12, FIELD.home.y - 8, "#fff6a8", 7);
   showPlayCallout("FOUL BALL", "warn");
-  setPlayState(PLAY_STATES.PLAY_RESULT, `Foul ball. Count ${GAME.balls}-${GAME.strikes}`, 0.1, true);
-  resetForNextPitch();
-  updateHud();
-  setMessage(`Foul ball. Count ${GAME.balls}-${GAME.strikes}`);
+  completePlay(`Foul ball. Count ${GAME.balls}-${GAME.strikes}`, () => {
+    updateHud();
+  });
 }
 
 function registerHit(type) {
@@ -2277,7 +2308,6 @@ function isBallClearingWallInAir(ballObj) {
 
 function finalizeBattedBallResult(result, reason = "") {
   if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
-  setPlayState(PLAY_STATES.PLAY_RESULT, "Play result...", 0.14, true);
   GAME.pendingPlay.resolved = true;
   GAME.pendingPlay.awaitingThrow = false;
   GAME.pendingPlay.result = result;
@@ -2316,8 +2346,7 @@ function finalizeBattedBallResult(result, reason = "") {
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.afterPlayMin + Math.random() * PITCH_DELAY_TUNING.afterPlayRange;
-  setPlayState(PLAY_STATES.RESETTING_PLAY, "Resetting play...", 0.08, true);
-  resetForNextPitch();
+  completePlay(reason || "Play complete.");
 }
 
 function executeFieldedBallResult(fieldingRole, ballObj) {
@@ -3693,7 +3722,7 @@ function drawUI() {
   drawPlayCallout();
   drawSwingFeedback();
   drawAimMeters();
-  if (GAME.mode === "play") {
+  if (GAME.mode === "play" && DEBUG_STATE.enabled) {
     drawDebugOverlay();
   }
 }
@@ -3702,7 +3731,26 @@ function clearCanvas() {
   ctx.clearRect(0, 0, GAME.width, GAME.height);
 }
 
+function updateCanvasSize() {
+  const stage = document.querySelector(".field-stage");
+  if (!stage) return;
+  const bounds = stage.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) return;
+  const scale = Math.min(bounds.width / VIRTUAL_VIEW.width, bounds.height / VIRTUAL_VIEW.height);
+  const renderW = Math.max(320, Math.round(VIRTUAL_VIEW.width * scale));
+  const renderH = Math.max(180, Math.round(VIRTUAL_VIEW.height * scale));
+  if (canvas.width !== renderW || canvas.height !== renderH) {
+    canvas.width = renderW;
+    canvas.height = renderH;
+    GAME.width = renderW;
+    GAME.height = renderH;
+    syncRenderLayout();
+    spawnAllPlayers();
+  }
+}
+
 function render() {
+  updateCanvasSize();
   syncRenderLayout();
   const shake = GAME.cameraShake > 0 ? Math.sin(performance.now() * 0.1) * 6 : 0;
   ctx.save();
@@ -3749,8 +3797,7 @@ function handleKeyDown(event) {
   }
   input.keys.add(key);
 
-  if (key === "`") {
-    if (!DEBUG_FIELDING && !DEBUG) return;
+  if (key === "`" || key === "~") {
     DEBUG_STATE.enabled = !DEBUG_STATE.enabled;
     setMessage(DEBUG_STATE.enabled ? "Debug overlay ON" : "Debug overlay OFF");
     return;
@@ -3804,6 +3851,11 @@ startButton.addEventListener("click", startGame);
 restartButton.addEventListener("click", startGame);
 window.addEventListener("keydown", handleKeyDown);
 window.addEventListener("keyup", handleKeyUp);
+window.addEventListener("resize", () => {
+  updateCanvasSize();
+  syncRenderLayout();
+  spawnAllPlayers();
+});
 window.addEventListener("click", () => {
   if (document.activeElement !== document.body) {
     document.body.focus();

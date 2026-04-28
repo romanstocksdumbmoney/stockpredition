@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="game-shell">
+    <main id="root" class="game-shell">
       <header class="hud">
         <h1>NEON SLUGGER DELUXE</h1>
         <div class="scoreboard">
@@ -59,9 +59,12 @@
         <button id="restartButton" type="button">Play Again</button>
       </section>
 
-      <canvas id="gameCanvas" width="1080" height="620"></canvas>
+      <section class="field-area">
+        <canvas id="gameCanvas" width="1280" height="720"></canvas>
+      </section>
       <div class="bottom-ui-panel">
         <p id="messageBar" class="message">Select teams and press Start.</p>
+        <p class="status-help">P2 pitch: A/D + 1-4 + Space | P1 bat: A/D + Space | Field: WASD + Q/F/E/R</p>
       </div>
     </main>
 
