@@ -292,7 +292,6 @@
       45%, 62% {
         background: #ff3d3d;
         box-shadow: 0 0 14px rgba(255, 70, 70, 0.95);
-      }
     }
 
     .floating-layer {
@@ -705,81 +704,166 @@
     .case-modal {
       position: fixed;
       inset: 0;
-      z-index: 95;
-      background: rgba(0, 0, 0, 0.78);
-      display: grid;
-      place-items: center;
-      padding: 16px;
+      z-index: 9999;
+      background: rgba(10, 10, 10, 0.95);
+      backdrop-filter: blur(3px);
+      display: flex;
+      flex-direction: column;
+      opacity: 1;
+      transition: opacity 0.3s ease;
     }
 
     .case-modal.hidden {
-      display: none;
+      opacity: 0;
+      pointer-events: none;
     }
 
     .case-modal-card {
-      width: min(1320px, 94vw);
-      border: 1px solid #383838;
-      border-radius: 6px;
-      background: linear-gradient(180deg, rgba(22, 22, 22, 0.98), rgba(8, 8, 8, 0.98));
-      padding: 12px 12px 16px;
-      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+      width: 100%;
+      height: 100%;
+      border: 1px solid #2f2f2f;
+      background: linear-gradient(180deg, rgba(16, 16, 16, 0.99), rgba(6, 6, 6, 0.99));
+      padding: 16px 24px 22px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .case-top {
+      display: grid;
+      justify-items: center;
+      gap: 4px;
+      text-align: center;
     }
 
     .case-modal-title {
       color: #f1f1f1;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 10px;
+      letter-spacing: 1.5px;
+      font-size: clamp(1rem, 2.3vw, 1.3rem);
+      font-weight: 700;
+    }
+
+    .case-icon {
+      width: 94px;
+      height: 72px;
+      border-radius: 8px;
+      border: 2px solid #4f4f4f;
+      background: linear-gradient(145deg, #3b2e1f, #1c1510);
+      position: relative;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.45);
+    }
+
+    .case-icon::before,
+    .case-icon::after {
+      content: "";
+      position: absolute;
+      top: 18%;
+      bottom: 18%;
+      width: 10px;
+      background: #b88f36;
+      border-radius: 3px;
+    }
+
+    .case-icon::before { left: 26%; }
+    .case-icon::after { right: 26%; }
+
+    .case-opening-text {
+      color: var(--terminal-green);
       font-size: 1.05rem;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+    }
+
+    .reel-shell {
+      position: relative;
+      flex: 1;
+      min-height: 180px;
+      display: grid;
+      align-content: center;
+      gap: 8px;
     }
 
     .reel-window {
       position: relative;
       border: 1px solid #343434;
       background: #0e0e0e;
-      border-radius: 5px;
+      border-radius: 8px;
       overflow: hidden;
       height: 120px;
-      padding-block: 10px;
+      width: 100%;
+      padding-block: 12px;
+      isolation: isolate;
+      box-shadow: inset 0 0 34px rgba(0, 0, 0, 0.7);
     }
 
     .reel-track {
       display: flex;
-      align-items: stretch;
-      gap: 8px;
-      padding-inline: 20px;
+      align-items: center;
+      gap: 10px;
+      padding-inline: 46vw;
       transform: translateX(0px);
-      transition: transform 4.8s cubic-bezier(0.33, 1, 0.68, 1);
+      transition: transform 7s cubic-bezier(0.22, 1, 0.36, 1);
       will-change: transform;
     }
 
     .reel-item {
-      flex: 0 0 64px;
-      border: 1px solid #353535;
-      border-radius: 4px;
-      background: linear-gradient(180deg, #242424, #121212);
-      padding: 6px 4px;
+      flex: 0 0 128px;
+      border: 3px solid #353535;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #2a2a2a, #111);
+      padding: 6px 6px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
       text-align: center;
-      color: #ddd;
-      font-size: 0.68rem;
+      color: #f2f2f2;
+      font-size: 0.76rem;
       line-height: 1.05;
       position: relative;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
     .reel-item .tiny {
-      font-size: 0.62rem;
+      font-size: 0.68rem;
       color: #bcbcbc;
       margin-top: 4px;
+    }
+
+    .reel-item .weapon-glyph {
+      width: 40px;
+      height: 10px;
+      border-radius: 8px;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.2));
+      margin-top: 5px;
+      position: relative;
+      opacity: 0.8;
+    }
+
+    .reel-item .weapon-glyph::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      right: -3px;
+      top: 1px;
+      background: rgba(255, 255, 255, 0.7);
     }
 
     .reel-item.winner {
       border-color: #ffd76a;
       box-shadow: 0 0 16px rgba(255, 205, 68, 0.65);
       animation: winnerPulse 700ms ease-in-out infinite alternate;
+    }
+
+    .reel-item.win-zoom {
+      transform: scale(1.3);
+      z-index: 8;
+      box-shadow: 0 0 26px rgba(255, 211, 103, 0.95);
     }
 
     @keyframes winnerPulse {
@@ -789,8 +873,8 @@
 
     .reel-marker {
       position: absolute;
-      top: 0;
-      bottom: 0;
+      top: 8px;
+      bottom: 8px;
       left: 50%;
       width: 2px;
       transform: translateX(-50%);
@@ -798,6 +882,49 @@
       box-shadow: 0 0 8px rgba(231, 190, 80, 0.55);
       pointer-events: none;
       z-index: 4;
+    }
+
+    .reel-pointer {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 11px solid transparent;
+      border-right: 11px solid transparent;
+      z-index: 5;
+      filter: drop-shadow(0 0 8px rgba(248, 196, 77, 0.85));
+    }
+
+    .reel-pointer.top {
+      top: -2px;
+      border-top: none;
+      border-bottom: 16px solid #f6ca58;
+    }
+
+    .reel-pointer.bottom {
+      bottom: -2px;
+      border-bottom: none;
+      border-top: 16px solid #f6ca58;
+    }
+
+    .reel-fade {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 15%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .reel-fade.left {
+      left: 0;
+      background: linear-gradient(90deg, rgba(8, 8, 8, 0.94), transparent);
+    }
+
+    .reel-fade.right {
+      right: 0;
+      background: linear-gradient(270deg, rgba(8, 8, 8, 0.94), transparent);
     }
 
     .drop-banner {
@@ -816,21 +943,325 @@
       opacity: 1;
     }
 
-    .case-close-btn {
-      margin-top: 10px;
-      border: 1px solid #4f7f52;
-      background: linear-gradient(180deg, #203322, #131f14);
-      color: #d7ffd9;
+    .drop-details {
+      border: 1px solid #2c2c2c;
+      border-radius: 6px;
+      background: rgba(12, 12, 12, 0.9);
+      padding: 10px;
+      display: grid;
+      gap: 3px;
+      justify-items: center;
+      text-align: center;
+      min-height: 96px;
+    }
+
+    .drop-name {
+      font-size: 1.2rem;
+      color: #f0f0f0;
+      font-weight: 700;
+    }
+
+    .drop-rarity {
+      font-size: 0.95rem;
+      color: #c9c9c9;
+      letter-spacing: 0.6px;
+    }
+
+    .drop-extra {
+      font-size: 0.9rem;
+      color: #a7f2ac;
+    }
+
+    .wear-row {
+      width: min(520px, 92%);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .wear-bar {
+      height: 10px;
+      border-radius: 20px;
+      background: #1b1b1b;
+      border: 1px solid #3a3a3a;
+      overflow: hidden;
+    }
+
+    .wear-fill {
+      height: 100%;
+      width: 30%;
+      background: linear-gradient(90deg, #4caf50, #efdf69);
+      transition: width 0.35s ease;
+    }
+
+    .wear-label {
+      color: #d2d2d2;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .drop-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .case-action-btn {
+      border: 1px solid #3b3b3b;
       border-radius: 4px;
       font-family: inherit;
       font-weight: 700;
       letter-spacing: 0.5px;
-      padding: 8px 12px;
-      min-width: 140px;
-      display: block;
-      margin-inline: auto;
+      padding: 9px 14px;
+      min-width: 170px;
       cursor: inherit;
-      opacity: 0.9;
+      color: #ececec;
+      transition: transform 0.16s ease, filter 0.16s ease;
+    }
+
+    .case-action-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    .case-action-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .case-action-add { background: linear-gradient(180deg, #26472a, #173019); border-color: #4b9550; color: #d7ffd8; }
+    .case-action-open { background: linear-gradient(180deg, #244766, #162c3d); border-color: #3f739f; color: #d7ecff; }
+    .case-action-sell { background: linear-gradient(180deg, #353535, #242424); border-color: #585858; color: #e2e2e2; }
+
+    .case-particles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 12;
+    }
+
+    .case-particle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: caseParticle 900ms ease-out forwards;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    @keyframes caseParticle {
+      from { opacity: 1; transform: translate(0, 0) scale(1); }
+      to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.25); }
+    }
+
+    .preview-modal,
+    .coin-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9998;
+      background: rgba(8, 8, 8, 0.9);
+      backdrop-filter: blur(2px);
+      display: grid;
+      place-items: center;
+      opacity: 1;
+      transition: opacity 0.25s ease;
+    }
+
+    .preview-modal.hidden,
+    .coin-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .preview-card {
+      width: min(900px, 94vw);
+      max-height: 88vh;
+      overflow-y: auto;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #151515, #0d0d0d);
+      padding: 14px;
+    }
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .preview-list details {
+      border: 1px solid #2d2d2d;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: #121212;
+    }
+
+    .preview-list summary {
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .preview-item {
+      color: #d8d8d8;
+      font-size: 0.9rem;
+      padding: 3px 0;
+    }
+
+    .preview-close {
+      border: 1px solid #4f7f52;
+      background: linear-gradient(180deg, #203322, #131f14);
+      color: #d7ffd9;
+      border-radius: 4px;
+      padding: 7px 12px;
+      font-family: inherit;
+      font-weight: 700;
+      cursor: inherit;
+    }
+
+    .coinflip-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .flip-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 8px;
+    }
+
+    .flip-item {
+      border: 2px solid #383838;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #202020, #111);
+      padding: 8px;
+      text-align: left;
+      color: #e9e9e9;
+      font-family: inherit;
+      cursor: inherit;
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .flip-item.active {
+      border-color: #f5c85d;
+      box-shadow: 0 0 12px rgba(245, 200, 93, 0.45);
+    }
+
+    .flip-item:hover { transform: translateY(-1px); }
+
+    .flip-badge {
+      margin-top: 4px;
+      display: inline-block;
+      border: 1px solid #f5c85d;
+      color: #ffeaac;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .flip-opponent {
+      border: 1px solid #2f2f2f;
+      border-radius: 6px;
+      padding: 9px;
+      background: #121212;
+    }
+
+    .flip-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .flip-btn {
+      border: 1px solid #3b3b3b;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #202020, #121212);
+      color: #ececec;
+      font-family: inherit;
+      font-weight: 700;
+      padding: 8px 12px;
+      cursor: inherit;
+    }
+
+    .flip-btn.ct { border-color: #4886bf; background: linear-gradient(180deg, #264467, #1a2f44); }
+    .flip-btn.t { border-color: #bd8445; background: linear-gradient(180deg, #5f3f23, #3d2917); }
+
+    .flip-history {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .flip-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .flip-dot.win { background: #57d169; box-shadow: 0 0 8px rgba(87, 209, 105, 0.6); }
+    .flip-dot.loss { background: #d25252; box-shadow: 0 0 8px rgba(210, 82, 82, 0.6); }
+
+    .coin-overlay {
+      z-index: 9999;
+    }
+
+    .coin-card {
+      width: min(640px, 92vw);
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #161616, #090909);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .coin-coin {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      margin: 10px auto;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #fff;
+      transform-style: preserve-3d;
+      background: radial-gradient(circle at 25% 25%, #79a5d6, #2c4f7f);
+      box-shadow: 0 0 20px rgba(74, 122, 180, 0.55);
+    }
+
+    .coin-coin.t-side {
+      background: radial-gradient(circle at 25% 25%, #ffd38b, #9a5d23);
+      box-shadow: 0 0 20px rgba(205, 140, 67, 0.55);
+    }
+
+    .coin-result {
+      margin-top: 10px;
+      font-size: clamp(1.2rem, 3.6vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: 1.2px;
+    }
+
+    .coin-result.win { color: #76ea83; }
+    .coin-result.loss { color: #ff7676; }
+
+    .preview-open {
+      border: none;
+      background: transparent;
+      color: #89d3ff;
+      text-decoration: underline;
+      cursor: inherit;
+      font-family: inherit;
+      font-size: 0.88rem;
+      padding: 0;
     }
 
     .knife-flash {
@@ -895,6 +1326,35 @@
     @keyframes knifeParticle {
       from { opacity: 1; transform: translate(0, 0) scale(1); }
       to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .reel-track.spinning .reel-item {
+      filter: blur(1.3px);
+    }
+
+    .coinflip-record {
+      color: #9fe4a5;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+    }
+
+    .coinflip-step {
+      color: #dfdfdf;
+      font-size: 0.95rem;
+      display: grid;
+      gap: 10px;
+    }
+
+    .coin-status {
+      color: #8fd594;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
     .shop-head {
@@ -1242,13 +1702,60 @@
 
   <div id="case-modal" class="case-modal hidden" aria-hidden="true">
     <div class="case-modal-card">
-      <div id="case-modal-title" class="case-modal-title">Case Opening</div>
-      <div class="reel-window">
-        <div class="reel-marker"></div>
-        <div id="reel-track" class="reel-track"></div>
+      <div class="case-top">
+        <div class="case-icon"></div>
+        <div id="case-modal-title" class="case-modal-title">CS:GO Weapon Case</div>
+        <div class="case-opening-text">OPENING...</div>
+      </div>
+      <div class="reel-shell">
+        <div class="reel-pointer top"></div>
+        <div class="reel-pointer bottom"></div>
+        <div class="reel-fade left"></div>
+        <div class="reel-fade right"></div>
+        <div class="reel-window">
+          <div class="reel-marker"></div>
+          <div id="reel-track" class="reel-track"></div>
+        </div>
+        <div id="case-particles" class="case-particles"></div>
       </div>
       <div id="drop-banner" class="drop-banner">ITEM DROPPED</div>
-      <button id="case-close-btn" class="case-close-btn" style="display:none;">Continue</button>
+      <div id="reveal-details" class="drop-details hidden">
+        <div id="reveal-item-name" class="drop-name">AK-47 | Ember Core</div>
+        <div id="reveal-item-meta" class="drop-rarity">★ Covert</div>
+        <div id="reveal-item-cps" class="drop-extra"></div>
+        <div class="wear-row">
+          <div class="wear-bar"><div id="reveal-wear-fill" class="wear-fill"></div></div>
+          <span id="reveal-wear-label" class="wear-label">Factory New</span>
+        </div>
+      </div>
+      <div id="case-action-row" class="drop-actions hidden">
+        <button id="add-inv-btn" class="case-action-btn case-action-add" data-add-inventory="1">ADD TO INVENTORY</button>
+        <button id="open-another-btn" class="case-action-btn case-action-open" data-open-another="1">OPEN ANOTHER</button>
+        <button id="sell-drop-btn" class="case-action-btn case-action-sell" data-sell-drop="1">SELL FOR $0</button>
+      </div>
+      <button id="case-close-btn" class="case-close-btn hidden">Close</button>
+    </div>
+  </div>
+
+  <div id="case-preview-modal" class="preview-modal hidden" aria-hidden="true">
+    <div class="preview-card">
+      <div class="preview-header">
+        <h3>Case Contents</h3>
+        <button id="preview-close-btn" class="preview-close" data-preview-close="1">Close</button>
+      </div>
+      <div id="case-preview-body" class="preview-list"></div>
+    </div>
+  </div>
+
+  <div id="coinflip-modal" class="coin-overlay hidden" aria-hidden="true">
+    <div class="preview-card coinflip-wrap">
+      <div class="preview-header">
+        <h3>Coin Flip</h3>
+        <div id="coinflip-record" class="coinflip-record">Flips: 0W / 0L</div>
+      </div>
+      <div id="coinflip-step" class="coinflip-step"></div>
+      <div id="coinflip-history" class="flip-history"></div>
+      <button id="coinflip-close-btn" class="preview-close" data-coinflip-close="1">Close</button>
     </div>
   </div>
 
@@ -1315,6 +1822,23 @@
 
     const funnyVictims = ["Economy", "Poverty", "Budget Build", "No Armor", "Eco Rush", "Save Round"];
     const killEvents = ["killed", "headshot", "one-tapped", "wallbanged", "deleted"];
+    const wearTiers = [
+      { label: "Factory New", max: 0.07, color: "#4caf50" },
+      { label: "Minimal Wear", max: 0.15, color: "#8bc34a" },
+      { label: "Field-Tested", max: 0.38, color: "#c0ca33" },
+      { label: "Well-Worn", max: 0.45, color: "#ff9800" },
+      { label: "Battle-Scarred", max: 1.0, color: "#f44336" }
+    ];
+    const cpuNames = [
+      "xX_AWP_God_Xx",
+      "noscope_king",
+      "clutch_master_99",
+      "eco_destroyer",
+      "mirage_smurf",
+      "deagle_only",
+      "spray_transfer",
+      "dust2_legend"
+    ];
 
     const state = {
       money: 0,
@@ -1335,7 +1859,21 @@
       knifeInventory: [],
       equippedKnifeId: null,
       caseAnimating: false,
-      bombFlashUntil: 0
+      bombFlashUntil: 0,
+      casePendingDrop: null,
+      casePendingWear: null,
+      caseWinnerNode: null,
+      coinFlip: {
+        selectedRef: null,
+        opponent: null,
+        playerSide: null,
+        pendingWager: null,
+        wins: 0,
+        losses: 0,
+        lossStreak: 0,
+        history: [],
+        searching: false
+      }
     };
 
     const el = {
@@ -1363,7 +1901,26 @@
       caseModalTitle: document.getElementById("case-modal-title"),
       reelTrack: document.getElementById("reel-track"),
       dropBanner: document.getElementById("drop-banner"),
-      caseCloseBtn: document.getElementById("case-close-btn")
+      caseCloseBtn: document.getElementById("case-close-btn"),
+      caseParticles: document.getElementById("case-particles"),
+      revealDetails: document.getElementById("reveal-details"),
+      revealItemName: document.getElementById("reveal-item-name"),
+      revealItemMeta: document.getElementById("reveal-item-meta"),
+      revealItemCps: document.getElementById("reveal-item-cps"),
+      revealWearFill: document.getElementById("reveal-wear-fill"),
+      revealWearLabel: document.getElementById("reveal-wear-label"),
+      caseActionRow: document.getElementById("case-action-row"),
+      addInvBtn: document.getElementById("add-inv-btn"),
+      openAnotherBtn: document.getElementById("open-another-btn"),
+      sellDropBtn: document.getElementById("sell-drop-btn"),
+      casePreviewModal: document.getElementById("case-preview-modal"),
+      casePreviewBody: document.getElementById("case-preview-body"),
+      previewCloseBtn: document.getElementById("preview-close-btn"),
+      coinflipModal: document.getElementById("coinflip-modal"),
+      coinflipStep: document.getElementById("coinflip-step"),
+      coinflipHistory: document.getElementById("coinflip-history"),
+      coinflipRecord: document.getElementById("coinflip-record"),
+      coinflipCloseBtn: document.getElementById("coinflip-close-btn")
     };
 
     let audioCtx = null;
@@ -1797,6 +2354,43 @@
       el.side.textContent = state.side;
     }
 
+    function getRarityWeightForPreview(rarity) {
+      if (rarity === "milspec") return 79.92;
+      if (rarity === "restricted") return 15.98;
+      if (rarity === "classified") return 3.2;
+      if (rarity === "covert") return 0.64;
+      return 0.26;
+    }
+
+    function getWear() {
+      const wear = Math.random();
+      const condition = wearConditions.find((c) => wear <= c.max) || wearConditions[wearConditions.length - 1];
+      return { wear, condition };
+    }
+
+    function normalizeInventoryRef(ref) {
+      if (!ref) return null;
+      if (ref.type === "knife") {
+        const knife = state.knifeInventory.find((k) => k.id === ref.id);
+        return knife ? { ...knife, type: "knife", invId: knife.id } : null;
+      }
+      const skin = state.inventorySkins.find((s) => s.id === ref.id);
+      return skin ? { ...skin, type: "skin", invId: skin.id } : null;
+    }
+
+    function removeInventoryRef(ref) {
+      if (!ref) return;
+      if (ref.type === "knife") {
+        state.knifeInventory = state.knifeInventory.filter((k) => k.id !== ref.id);
+      } else {
+        state.inventorySkins = state.inventorySkins.filter((s) => s.id !== ref.id);
+      }
+    }
+
+    function addWonTag(item, label = "WON IN FLIP") {
+      return { ...item, wonTag: label };
+    }
+
     function renderShopTabs() {
       return `
         <div class="shop-tabs">
@@ -1804,6 +2398,7 @@
           <button class="shop-tab ${state.activeTab === "cases" ? "active" : ""}" data-tab="cases">Cases</button>
           <button class="shop-tab ${state.activeTab === "knives" ? "active" : ""}" data-tab="knives">Knives</button>
           <button class="shop-tab ${state.activeTab === "inventory" ? "active" : ""}" data-tab="inventory">Inventory</button>
+          <button class="shop-tab ${state.activeTab === "coinflip" ? "active" : ""}" data-tab="coinflip">Coin Flip</button>
         </div>
       `;
     }
@@ -1874,6 +2469,7 @@
           <div class="case-row"><span class="label">Case Price</span><strong data-case-price>$${formatMoney(caseCost)}</strong></div>
           <div class="case-row"><span class="label">Cases Owned</span><strong data-case-owned>${state.caseInventory}</strong></div>
           <div class="case-row"><span class="label">Cases Opened</span><strong data-case-opened>${state.casesOpened}</strong></div>
+          <button class="buy-case-btn" data-preview-case="1">View Contents</button>
           <button class="buy-case-btn" data-buy-case="1" ${canBuyCase ? "" : "disabled"}>Buy Case</button>
           <button class="open-case-btn" data-open-case="1" ${canOpen ? "" : "disabled"}>Open Case</button>
         </div>
@@ -1947,7 +2543,7 @@
                 ${entry.kind === "knife" ? `<div class="knife-glyph"></div>` : `<div style="width:32px;height:18px;border-radius:3px;background:${meta.color};opacity:0.75;"></div>`}
                 <div class="inv-main">
                   <div class="inv-name">${name}</div>
-                  <div class="inv-sub">${sub}</div>
+                  <div class="inv-sub">${sub}${entry.wonTag ? ` • ${entry.wonTag}` : ""}</div>
                 </div>
                 <div class="inv-val">$${formatMoney(getItemValue(entry))}</div>
               </article>
@@ -1957,11 +2553,41 @@
       `;
     }
 
+    function buildCoinFlipPool() {
+      const items = [];
+      for (const skin of state.inventorySkins) {
+        items.push({ type: "skin", id: skin.id, item: skin });
+      }
+      for (const knife of state.knifeInventory) {
+        items.push({ type: "knife", id: knife.id, item: knife });
+      }
+      return items;
+    }
+
+    function renderCoinFlipTab() {
+      const pool = buildCoinFlipPool();
+      if (pool.length === 0) {
+        return `
+          <div class="no-items">You need items to flip! Open some cases first.</div>
+          <button class="buy-case-btn" data-go-cases="1">Go To Cases</button>
+        `;
+      }
+      return `
+        <div class="case-box">
+          <div class="case-row"><span class="label">Flip Record</span><strong>${state.coinFlip.wins}W / ${state.coinFlip.losses}L</strong></div>
+          <div class="case-row"><span class="label">Select Wager Item</span><strong>${state.coinFlip.pendingWager ? getDropDisplayName(state.coinFlip.pendingWager.item) : "None"}</strong></div>
+          <button class="open-case-btn" data-open-coinflip="1">Enter Gambling Den</button>
+        </div>
+        <div class="mini-note">Wager one item, pick CT/T, and let fate decide.</div>
+      `;
+    }
+
     function renderShopView() {
       let content = "";
       if (state.activeTab === "shop") content = renderMainShopTab();
       else if (state.activeTab === "cases") content = renderCasesTab();
       else if (state.activeTab === "knives") content = renderKnivesTab();
+      else if (state.activeTab === "coinflip") content = renderCoinFlipTab();
       else content = renderInventoryTab();
 
       el.shop.innerHTML = `${renderShopTabs()}<div class="tab-content">${content}</div>`;
@@ -2017,9 +2643,14 @@
         const price = directKnifePrices[btn.dataset.buyKnife];
         btn.disabled = !price || money < price || state.caseAnimating;
       }
+
+      const openCoin = el.shop.querySelector("[data-open-coinflip]");
+      if (openCoin) {
+        openCoin.disabled = buildCoinFlipPool().length === 0;
+      }
     }
 
-    function grantDrop(drop, sourceLabel) {
+    function applyDrop(drop, sourceLabel) {
       if (drop.kind === "knife") {
         const knife = {
           ...drop,
@@ -2043,6 +2674,60 @@
       renderShopView();
     }
 
+    function showCaseParticles(color = "#ffd56c", count = 32) {
+      if (!el.caseParticles) return;
+      for (let i = 0; i < count; i += 1) {
+        const p = document.createElement("div");
+        p.className = "case-particle";
+        p.style.color = color;
+        p.style.background = color;
+        p.style.left = `${48 + (Math.random() - 0.5) * 15}%`;
+        p.style.top = `${46 + (Math.random() - 0.5) * 12}%`;
+        p.style.setProperty("--dx", `${(Math.random() - 0.5) * 680}px`);
+        p.style.setProperty("--dy", `${(Math.random() - 0.5) * 420}px`);
+        el.caseParticles.appendChild(p);
+        setTimeout(() => p.remove(), 920);
+      }
+    }
+
+    function revealCaseResult(drop, winnerEl) {
+      const wearInfo = getWear();
+      state.casePendingDrop = drop;
+      state.casePendingWear = wearInfo;
+      state.caseWinnerNode = winnerEl;
+      el.revealDetails.classList.remove("hidden");
+      el.caseActionRow.classList.remove("hidden");
+      el.caseCloseBtn.classList.add("hidden");
+
+      const rarity = rarityMeta[drop.rarity];
+      el.revealItemName.textContent = getDropDisplayName(drop);
+      el.revealItemMeta.textContent = `★ ${rarity.label}`;
+      el.revealItemMeta.style.color = rarity.color;
+      el.revealItemCps.textContent = drop.kind === "knife" ? `+${drop.cps.toFixed(1)} CPS` : "";
+      el.revealWearLabel.textContent = wearInfo.condition.name;
+      el.revealWearFill.style.width = `${Math.min(100, wearInfo.wear * 100)}%`;
+      el.revealWearFill.style.background = wearInfo.condition.color;
+
+      if (winnerEl) winnerEl.classList.add("win-zoom");
+      const value = getItemValue(drop);
+      el.sellDropBtn.textContent = `SELL FOR $${formatMoney(value)}`;
+      el.openAnotherBtn.disabled = state.caseInventory <= 0;
+
+      if (drop.rarity === "restricted") showCaseParticles("#9f6aff", 28);
+      if (drop.rarity === "classified") {
+        showCaseParticles("#df58ff", 36);
+        flashOverlay(el.heFlash);
+      }
+      if (drop.rarity === "covert") {
+        showCaseParticles("#ff6161", 44);
+        flashOverlay(el.clickFlash);
+      }
+      if (drop.rarity === "knife") {
+        showCaseParticles("#ffd56c", 60);
+        showKnifeDropCelebration();
+      }
+    }
+
     function buildReel(drop) {
       const items = [];
       const winnerIndex = 28;
@@ -2057,12 +2742,18 @@
       state.caseAnimating = true;
       initAudio();
       playCaseSpinSound();
+      state.casePendingDrop = null;
+      state.casePendingWear = null;
+      state.caseWinnerNode = null;
 
       const { items, winnerIndex } = buildReel(drop);
-      el.caseModalTitle.textContent = titleText;
+      el.caseModalTitle.textContent = titleText.includes("Knife") ? "Premium Weapon Case" : "CS:GO Weapon Case";
       el.dropBanner.classList.remove("show");
-      el.dropBanner.textContent = "ITEM DROPPED";
-      el.caseCloseBtn.style.display = "none";
+      el.dropBanner.textContent = "OPENING...";
+      el.revealDetails.classList.add("hidden");
+      el.caseActionRow.classList.add("hidden");
+      el.caseCloseBtn.classList.add("hidden");
+      el.caseParticles.innerHTML = "";
       el.caseModal.classList.remove("hidden");
       el.caseModal.setAttribute("aria-hidden", "false");
 
@@ -2071,6 +2762,7 @@
         const name = getDropDisplayName(item);
         return `
           <div class="reel-item ${meta.css}" data-reel-index="${index}">
+            <div class="weapon-glyph"></div>
             <div>${name}</div>
             <div class="tiny">${meta.label}</div>
           </div>
@@ -2079,10 +2771,11 @@
 
       el.reelTrack.style.transition = "none";
       el.reelTrack.style.transform = "translateX(0px)";
+      el.reelTrack.style.filter = "blur(2px)";
       void el.reelTrack.offsetWidth;
 
       requestAnimationFrame(() => {
-        el.reelTrack.style.transition = "transform 4.8s cubic-bezier(0.33, 1, 0.68, 1)";
+        el.reelTrack.style.transition = "transform 7s cubic-bezier(0.22, 1, 0.36, 1), filter 1.4s ease";
         const reelWindow = el.reelTrack.parentElement;
         const winnerEl = el.reelTrack.children[winnerIndex];
         const markerX = reelWindow.clientWidth / 2;
@@ -2090,6 +2783,7 @@
         const jitter = (Math.random() - 0.5) * 14;
         const target = markerX - winnerCenter + jitter;
         el.reelTrack.style.transform = `translateX(${target}px)`;
+        setTimeout(() => { el.reelTrack.style.filter = "blur(0px)"; }, 5400);
       });
 
       setTimeout(() => {
@@ -2099,9 +2793,8 @@
           ? `KNIFE DROPPED: ${drop.name} | ${drop.finish}`
           : `ITEM DROPPED: ${drop.name}`;
         el.dropBanner.classList.add("show");
-        el.caseCloseBtn.style.display = "block";
-        grantDrop(drop, titleText.toUpperCase());
-      }, 4950);
+        revealCaseResult(drop, winnerEl);
+      }, 7000);
     }
 
     function closeCaseModal() {
@@ -2117,7 +2810,7 @@
       state.casesOpened += 1;
       const drop = rollDrop();
       startCaseReveal(drop, "Case Opening");
-      renderShopView();
+      updateShopButtons();
     }
 
     function buyCase(sourceButton = null) {
@@ -2308,6 +3001,289 @@
 
       if (button.dataset.buyKnife) {
         buyKnifeDirect(button.dataset.buyKnife, button);
+        return;
+      }
+
+      if (button.dataset.previewCase) {
+        openCasePreview();
+        return;
+      }
+
+      if (button.dataset.openCoinflip) {
+        openCoinFlipModal();
+        return;
+      }
+
+      if (button.dataset.goCases) {
+        state.activeTab = "cases";
+        renderShopView();
+      }
+    }
+
+    function commitPendingCaseDrop() {
+      if (!state.casePendingDrop) return;
+      applyDrop(state.casePendingDrop, "CASE OPENING");
+      state.casePendingDrop = null;
+      state.casePendingWear = null;
+      state.caseWinnerNode = null;
+    }
+
+    function sellPendingCaseDrop() {
+      if (!state.casePendingDrop) return;
+      const value = getItemValue(state.casePendingDrop);
+      addMoney(value);
+      showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(value)}<span class="event"> instant cashout</span>`);
+      state.casePendingDrop = null;
+      state.casePendingWear = null;
+      state.caseWinnerNode = null;
+      updatePrestigeHud();
+      closeCaseModal();
+      renderShopView();
+    }
+
+    function openCasePreview() {
+      const tiers = [
+        ["milspec", skinPools.milspec],
+        ["restricted", skinPools.restricted],
+        ["classified", skinPools.classified],
+        ["covert", skinPools.covert],
+        ["knife", knifeTypes.map((k) => `${k.name} | random finish`)]
+      ];
+      el.casePreviewBody.innerHTML = tiers.map(([rarity, items], idx) => {
+        const meta = rarityMeta[rarity];
+        const odds = getRarityWeightForPreview(rarity).toFixed(2);
+        return `
+          <details ${idx === 0 ? "open" : ""}>
+            <summary style="color:${meta.color}">${meta.label} — ${odds}%</summary>
+            ${items.map((it) => `<div class="preview-item">${it}</div>`).join("")}
+          </details>
+        `;
+      }).join("");
+      el.casePreviewModal.classList.remove("hidden");
+      el.casePreviewModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeCasePreview() {
+      el.casePreviewModal.classList.add("hidden");
+      el.casePreviewModal.setAttribute("aria-hidden", "true");
+    }
+
+    function getComparableOpponentItem(playerRef) {
+      const value = getItemValue(playerRef.item);
+      const pityBoost = state.coinFlip.lossStreak >= 3 ? 1.15 : 1;
+      const targetMin = value * 0.95 * pityBoost;
+      const targetMax = value * 1.35 * pityBoost;
+      const rarityOrder = ["milspec", "restricted", "classified", "covert", "knife"];
+      const all = [];
+      for (const rarity of rarityOrder) {
+        if (rarity === "knife") {
+          const k = createKnifeDrop();
+          all.push({ type: "knife", item: k });
+        } else {
+          all.push({ type: "skin", item: createSkinDrop(rarity) });
+        }
+      }
+      const candidate = all.find((x) => {
+        const v = getItemValue(x.item);
+        return v >= targetMin && v <= targetMax;
+      }) || all[all.length - 1];
+      return candidate;
+    }
+
+    function renderCoinflipHistory() {
+      el.coinflipHistory.innerHTML = state.coinFlip.history.map((h) => `<span class="flip-dot ${h ? "win" : "loss"}"></span>`).join("");
+      el.coinflipRecord.textContent = `Flips: ${state.coinFlip.wins}W / ${state.coinFlip.losses}L`;
+    }
+
+    function renderCoinflipStep() {
+      const pool = buildCoinFlipPool();
+      if (pool.length === 0) {
+        el.coinflipStep.innerHTML = `
+          <div class="no-items">You need items to flip! Open some cases first.</div>
+          <button class="buy-case-btn" data-go-cases-modal="1">Go To Cases</button>
+        `;
+        return;
+      }
+
+      const wager = state.coinFlip.pendingWager;
+      const opponent = state.coinFlip.opponent;
+      const side = state.coinFlip.playerSide;
+      el.coinflipStep.innerHTML = `
+        <div class="coinflip-wrap">
+          <div class="mini-note">Pick an item to wager.</div>
+          <div class="flip-grid">
+            ${pool.map((entry) => {
+              const val = getItemValue(entry.item);
+              const active = wager && wager.id === entry.id && wager.type === entry.type;
+              return `
+                <button class="flip-item ${active ? "active" : ""}" data-flip-select="${entry.type}:${entry.id}">
+                  <div>${getDropDisplayName(entry.item)}</div>
+                  <div class="inv-sub">$${formatMoney(val)}</div>
+                  ${active ? `<span class="flip-badge">Wagered</span>` : ""}
+                </button>
+              `;
+            }).join("")}
+          </div>
+          <button class="flip-btn" data-flip-find ${wager ? "" : "disabled"}>${state.coinFlip.searching ? "Finding opponent..." : "Find Opponent"}</button>
+          ${opponent ? `
+            <div class="flip-opponent">
+              <div><strong>${opponent.name}</strong> wagered ${getDropDisplayName(opponent.item)}</div>
+              <div class="inv-sub">Value: $${formatMoney(getItemValue(opponent.item))}</div>
+            </div>
+            <div class="flip-controls">
+              <button class="flip-btn ct" data-flip-side="CT">CT SIDE</button>
+              <button class="flip-btn t" data-flip-side="T">T SIDE</button>
+              <button class="flip-btn" data-flip-start ${side ? "" : "disabled"}>Flip Coin</button>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function openCoinFlipModal() {
+      el.coinflipModal.classList.remove("hidden");
+      el.coinflipModal.setAttribute("aria-hidden", "false");
+      state.coinFlip.pendingWager = null;
+      state.coinFlip.opponent = null;
+      state.coinFlip.playerSide = null;
+      state.coinFlip.searching = false;
+      renderCoinflipHistory();
+      renderCoinflipStep();
+    }
+
+    function closeCoinFlipModal() {
+      el.coinflipModal.classList.add("hidden");
+      el.coinflipModal.setAttribute("aria-hidden", "true");
+      renderShopView();
+    }
+
+    function canWager(entry) {
+      if (entry.type !== "knife") return true;
+      if (state.knifeInventory.length <= 1) return false;
+      return true;
+    }
+
+    function onCoinflipSelect(encoded) {
+      const [type, id] = encoded.split(":");
+      const pool = buildCoinFlipPool();
+      const entry = pool.find((e) => e.type === type && e.id === id);
+      if (!entry) return;
+      if (!canWager(entry)) {
+        showKillFeed(`<span class="weapon">WARNING</span> You can't wager your only knife!`);
+        return;
+      }
+      state.coinFlip.pendingWager = { type, id, item: entry.item };
+      state.coinFlip.opponent = null;
+      state.coinFlip.playerSide = null;
+      renderCoinflipStep();
+    }
+
+    function findCoinflipOpponent() {
+      if (!state.coinFlip.pendingWager || state.coinFlip.searching) return;
+      state.coinFlip.searching = true;
+      renderCoinflipStep();
+      setTimeout(() => {
+        const oppItem = getComparableOpponentItem(state.coinFlip.pendingWager);
+        state.coinFlip.opponent = {
+          name: randomFrom(cpuNames),
+          item: oppItem.item,
+          type: oppItem.type
+        };
+        state.coinFlip.searching = false;
+        renderCoinflipStep();
+      }, 1500);
+    }
+
+    function startCoinflip() {
+      const wager = state.coinFlip.pendingWager;
+      const opponent = state.coinFlip.opponent;
+      const side = state.coinFlip.playerSide;
+      if (!wager || !opponent || !side) return;
+
+      const coinCard = document.createElement("div");
+      coinCard.className = "coin-card";
+      coinCard.innerHTML = `
+        <div class="mini-note">Flipping...</div>
+        <div id="live-coin" class="coin-coin">${side}</div>
+        <div id="coin-result-text" class="coin-result"></div>
+      `;
+      el.coinflipStep.innerHTML = "";
+      el.coinflipStep.appendChild(coinCard);
+      const liveCoin = document.getElementById("live-coin");
+      const resultText = document.getElementById("coin-result-text");
+
+      let finalWinChance = 0.5;
+      const playerVal = getItemValue(wager.item);
+      const oppVal = getItemValue(opponent.item);
+      if (wager.type !== "knife" && oppVal > playerVal) finalWinChance = 0.55;
+      const isWin = Math.random() < finalWinChance;
+      const resultSide = isWin ? side : (side === "CT" ? "T" : "CT");
+
+      liveCoin.style.transition = "transform 5.2s cubic-bezier(0.2, 1, 0.22, 1)";
+      liveCoin.style.transform = "rotateY(3960deg)";
+      setTimeout(() => {
+        liveCoin.classList.toggle("t-side", resultSide === "T");
+        liveCoin.textContent = resultSide;
+        if (isWin) {
+          flashOverlay(el.heFlash);
+          resultText.className = "coin-result win";
+          resultText.textContent = "YOU WIN!";
+          state.coinFlip.wins += 1;
+          state.coinFlip.lossStreak = 0;
+          const wonOpp = addWonTag({
+            ...opponent.item,
+            id: `${opponent.type}-won-${Date.now()}-${Math.floor(Math.random() * 9999)}`
+          });
+          if (opponent.type === "knife") state.knifeInventory.push(wonOpp);
+          else state.inventorySkins.push(wonOpp);
+          updateEquippedKnife();
+        } else {
+          flashOverlay(el.clickFlash);
+          resultText.className = "coin-result loss";
+          resultText.textContent = "YOU LOSE";
+          state.coinFlip.losses += 1;
+          state.coinFlip.lossStreak += 1;
+          removeInventoryRef(wager);
+          updateEquippedKnife();
+        }
+        state.coinFlip.history.unshift(isWin);
+        state.coinFlip.history = state.coinFlip.history.slice(0, 10);
+        updateEquippedKnifeHud();
+        renderCoinflipHistory();
+        setTimeout(() => {
+          state.coinFlip.pendingWager = null;
+          state.coinFlip.opponent = null;
+          state.coinFlip.playerSide = null;
+          renderCoinflipStep();
+          renderShopView();
+        }, 1900);
+      }, 5200);
+    }
+
+    function handleCoinflipClick(event) {
+      const button = event.target.closest("button");
+      if (!button) return;
+      if (button.dataset.flipSelect) {
+        onCoinflipSelect(button.dataset.flipSelect);
+        return;
+      }
+      if (button.dataset.flipFind) {
+        findCoinflipOpponent();
+        return;
+      }
+      if (button.dataset.flipSide) {
+        state.coinFlip.playerSide = button.dataset.flipSide;
+        renderCoinflipStep();
+        return;
+      }
+      if (button.dataset.flipStart) {
+        startCoinflip();
+        return;
+      }
+      if (button.dataset.goCasesModal) {
+        closeCoinFlipModal();
+        state.activeTab = "cases";
+        renderShopView();
       }
     }
 
@@ -2329,6 +3305,22 @@
       el.prestigeBtn.addEventListener("click", tryPrestige);
       el.shop.addEventListener("click", handleShopClick);
       el.caseCloseBtn.addEventListener("click", closeCaseModal);
+      el.addInvBtn.addEventListener("click", () => {
+        commitPendingCaseDrop();
+        closeCaseModal();
+      });
+      el.openAnotherBtn.addEventListener("click", () => {
+        commitPendingCaseDrop();
+        if (state.caseInventory > 0) {
+          openCase();
+        } else {
+          closeCaseModal();
+        }
+      });
+      el.sellDropBtn.addEventListener("click", sellPendingCaseDrop);
+      el.previewCloseBtn.addEventListener("click", closeCasePreview);
+      el.coinflipCloseBtn.addEventListener("click", closeCoinFlipModal);
+      el.coinflipStep.addEventListener("click", handleCoinflipClick);
     }
 
     function init() {
