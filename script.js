@@ -35,15 +35,15 @@ const finalScoreText = document.getElementById("finalScoreText");
 // Centralized render geometry. Every field/actor draw uses this system.
 const FIELD_LAYOUT_RATIOS = {
   // Bigger, deeper isometric playfield so pitcher/fielders are not cramped.
-  homeY: 0.87,
-  secondY: 0.26,
-  baseSpread: 0.29,
-  hudHeight: 70,
-  bottomBarHeight: 60
+  homeY: 0.84,
+  secondY: 0.4,
+  baseSpread: 0.24,
+  hudHeight: 0.1,
+  bottomBarHeight: 0.09
 };
 
 const FIELD_DEPTH_TUNING = {
-  moundDepthRatio: 0.56
+  moundDepthRatio: 0.5
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -87,13 +87,13 @@ const PITCH_TUNING = {
 };
 
 const CAMERA_TUNING = {
-  battingDamping: 0.16,
-  pitchingDamping: 0.16,
-  fieldingDamping: 0.15,
-  homerDamping: 0.16,
-  maxX: 240,
-  maxYTop: -260,
-  maxYBottom: 70
+  battingDamping: 0.15,
+  pitchingDamping: 0.15,
+  fieldingDamping: 0.14,
+  homerDamping: 0.15,
+  maxX: 220,
+  maxYTop: -172,
+  maxYBottom: 52
 };
 
 const PITCH_TYPE_CONFIG = {
@@ -228,13 +228,19 @@ function normalizeVector(x, y) {
 const normalize2D = normalizeVector;
 
 function buildFieldLayout(width, height) {
+  const hudHeight = FIELD_LAYOUT_RATIOS.hudHeight <= 1
+    ? height * FIELD_LAYOUT_RATIOS.hudHeight
+    : FIELD_LAYOUT_RATIOS.hudHeight;
+  const bottomBarHeight = FIELD_LAYOUT_RATIOS.bottomBarHeight <= 1
+    ? height * FIELD_LAYOUT_RATIOS.bottomBarHeight
+    : FIELD_LAYOUT_RATIOS.bottomBarHeight;
   const layout = {
     centerX: width / 2,
     homeY: height * FIELD_LAYOUT_RATIOS.homeY,
     secondY: height * FIELD_LAYOUT_RATIOS.secondY,
     baseSpread: width * FIELD_LAYOUT_RATIOS.baseSpread,
-    hudHeight: FIELD_LAYOUT_RATIOS.hudHeight,
-    bottomBarHeight: FIELD_LAYOUT_RATIOS.bottomBarHeight
+    hudHeight,
+    bottomBarHeight
   };
   const midY = (layout.homeY + layout.secondY) / 2;
   const bases = {
@@ -250,16 +256,22 @@ function buildFieldLayout(width, height) {
   const toFirst = normalizeVector(bases.first.x - bases.home.x, bases.first.y - bases.home.y);
   const toThird = normalizeVector(bases.third.x - bases.home.x, bases.third.y - bases.home.y);
   const foulLength = Math.max(width, height) * 0.92;
+  const fieldLeft = 18;
+  const fieldRight = width - 18;
+  const fieldTop = Math.round(layout.hudHeight + 8);
+  const fieldBottom = Math.round(height - layout.bottomBarHeight - 8);
   return {
     layout,
     bases,
     foulRight: { x: bases.home.x + toFirst.x * foulLength, y: bases.home.y + toFirst.y * foulLength },
     foulLeft: { x: bases.home.x + toThird.x * foulLength, y: bases.home.y + toThird.y * foulLength },
     fieldRect: {
-      left: 18,
-      right: width - 18,
-      top: layout.hudHeight + 6,
-      bottom: height - layout.bottomBarHeight + 14
+      left: fieldLeft,
+      right: fieldRight,
+      top: fieldTop,
+      bottom: fieldBottom,
+      width: fieldRight - fieldLeft,
+      height: fieldBottom - fieldTop
     }
   };
 }
@@ -377,6 +389,21 @@ const ACTIVE_ROLE_ACTIONS = {
   none: []
 };
 
+const PLAY_STATES = {
+  MENU: "MENU",
+  READY_FOR_PITCH: "READY_FOR_PITCH",
+  PITCH_WINDUP: "PITCH_WINDUP",
+  PITCH_IN_FLIGHT: "PITCH_IN_FLIGHT",
+  SWING_WINDOW: "SWING_WINDOW",
+  BALL_IN_PLAY: "BALL_IN_PLAY",
+  PLAY_RESULT: "PLAY_RESULT",
+  RESETTING_PLAY: "RESETTING_PLAY",
+  PAUSED: "PAUSED"
+};
+
+const DEFENSE_COLORS = { jersey: "#3d69ff", cap: "#1e3eaa", trim: "#9bc5ff" };
+const OFFENSE_COLORS = { jersey: "#f26a3f", cap: "#8f2e18", trim: "#ffc3a8" };
+
 const TEAMS = [
   {
     id: "comets",
@@ -452,6 +479,12 @@ const GAME = {
   swingFeedback: "",
   swingFeedbackLife: 0,
   localMultiplayer: true,
+  inputState: PLAY_STATES.MENU,
+  playState: PLAY_STATES.MENU,
+  stateLockTimer: 0,
+  stateChangeCooldown: 0.075,
+  pitchThrownThisPlay: false,
+  swingUsedThisPitch: false,
   selectedPitchType: "fastball",
   pitchCharge: {
     active: false,
@@ -558,6 +591,8 @@ function normalizeInputKey(event) {
 
 function isActionHeld(controller, action) {
   if (!actionAllowedForRole(GAME.controlledRole, action)) return false;
+  if (!actionAllowedForInputState(action)) return false;
+  if (GAME.stateLockTimer > 0) return false;
   const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
   const keys = preset[action] ?? [];
   return keys.some((key) => input.keys.has(key));
@@ -565,6 +600,8 @@ function isActionHeld(controller, action) {
 
 function wasActionPressed(controller, action) {
   if (!actionAllowedForRole(GAME.controlledRole, action)) return false;
+  if (!actionAllowedForInputState(action)) return false;
+  if (GAME.stateLockTimer > 0) return false;
   const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
   const keys = preset[action] ?? [];
   return keys.some((key) => input.justPressed.has(key));
@@ -572,6 +609,8 @@ function wasActionPressed(controller, action) {
 
 function wasActionReleased(controller, action) {
   if (!actionAllowedForRole(GAME.controlledRole, action)) return false;
+  if (!actionAllowedForInputState(action)) return false;
+  if (GAME.stateLockTimer > 0) return false;
   const preset = CONTROL_PRESETS[controller] ?? CONTROL_PRESETS.player1;
   const keys = preset[action] ?? [];
   return keys.some((key) => input.justReleased.has(key));
@@ -580,6 +619,25 @@ function wasActionReleased(controller, action) {
 function clearInputFrame() {
   input.justPressed.clear();
   input.justReleased.clear();
+}
+
+function clearGameplayInputState(clearHeld = false) {
+  input.justPressed.clear();
+  input.justReleased.clear();
+  if (clearHeld) input.keys.clear();
+}
+
+function setPlayState(nextState, message = "", lockSeconds = 0, clearHeld = false) {
+  if (GAME.playState === nextState) {
+    if (message) setMessage(message);
+    return;
+  }
+  GAME.playState = nextState;
+  GAME.inputState = nextState;
+  const nextLock = Number.isFinite(lockSeconds) ? lockSeconds : GAME.stateChangeCooldown;
+  GAME.stateLockTimer = Math.max(0, nextLock);
+  clearGameplayInputState(clearHeld);
+  if (message) setMessage(message);
 }
 
 function getControllerForSide(side) {
@@ -607,14 +665,16 @@ function actionAllowedForRole(role, action) {
 
 function determineActiveInputRole() {
   if (GAME.mode !== "play") return "none";
-  if (GAME.battedBall) return "fielder";
-  if (pitchBall.active) return "batter";
+  if (GAME.playState === PLAY_STATES.BALL_IN_PLAY) return "fielder";
+  if (GAME.playState === PLAY_STATES.PITCH_IN_FLIGHT || GAME.playState === PLAY_STATES.SWING_WINDOW) {
+    return "batter";
+  }
   return "pitcher";
 }
 
 function logInputEvent(action, details = "") {
   if (!DEBUG_INPUT) return;
-  const state = `${GAME.mode}/${GAME.phase}`;
+  const state = `${GAME.mode}/${GAME.playState}`;
   if (details) {
     console.log(`[INPUT] ${action} in state: ${state} (${details})`);
   } else {
@@ -624,6 +684,34 @@ function logInputEvent(action, details = "") {
 
 function updateControlledRole() {
   GAME.controlledRole = determineActiveInputRole();
+}
+
+function isStateIn(...states) {
+  return states.includes(GAME.playState);
+}
+
+function canPitchInput() {
+  return isStateIn(PLAY_STATES.READY_FOR_PITCH, PLAY_STATES.PITCH_WINDUP) && GAME.stateLockTimer <= 0;
+}
+
+function canSwingInput() {
+  return isStateIn(PLAY_STATES.PITCH_IN_FLIGHT, PLAY_STATES.SWING_WINDOW) && GAME.stateLockTimer <= 0;
+}
+
+function canFieldingInput() {
+  return isStateIn(PLAY_STATES.BALL_IN_PLAY) && GAME.stateLockTimer <= 0;
+}
+
+function actionAllowedForInputState(action) {
+  if (
+    GAME.playState === PLAY_STATES.MENU
+    || GAME.playState === PLAY_STATES.PAUSED
+    || GAME.playState === PLAY_STATES.PLAY_RESULT
+    || GAME.playState === PLAY_STATES.RESETTING_PLAY
+  ) {
+    return false;
+  }
+  return (ACTION_ALLOWED_STATES[action] ?? []).includes(GAME.playState);
 }
 
 const GameManager = {
@@ -773,6 +861,7 @@ function getPitchAimInputs(controller) {
 function selectPitchTypeByKey(key) {
   const selected = PITCH_TYPE_BY_KEY[key];
   if (!selected) return;
+  if (!canPitchInput() || !isStateIn(PLAY_STATES.READY_FOR_PITCH, PLAY_STATES.PITCH_WINDUP)) return;
   GAME.selectedPitchType = selected;
   GAME.debugInfo.pitchType = PITCH_TYPE_CONFIG[selected].label;
   logInputEvent("Pitch type selected", PITCH_TYPE_CONFIG[selected].label);
@@ -808,16 +897,21 @@ function computePitchChargeQuality(meter) {
 }
 
 function startPitchCharge() {
+  if (!canPitchInput()) return;
+  if (!isStateIn(PLAY_STATES.READY_FOR_PITCH)) return;
+  if (GAME.pitchThrownThisPlay) return;
   if (!GAME.pitchReady || pitchBall.active || GAME.battedBall) return;
   const pitcherController = getFieldingController();
   GAME.pitchCharge.active = true;
   GAME.pitchCharge.elapsed = 0;
   GAME.pitchCharge.owner = pitcherController;
+  setPlayState(PLAY_STATES.PITCH_WINDUP, "Pitcher winding up...", 0.04, true);
   GameManager.setPhase("pitch_setup", "pitching");
-  setMessage(`${GAME.teams[GAME.fieldingSide].name} charging ${PITCH_TYPE_CONFIG[GAME.selectedPitchType].label}...`);
 }
 
 function releasePitchCharge() {
+  if (!isStateIn(PLAY_STATES.PITCH_WINDUP)) return;
+  if (!canPitchInput()) return;
   if (!GAME.pitchCharge.active) return;
   const quality = computePitchChargeQuality(GAME.pitchCharge.meter);
   GAME.pitchCharge.quality = quality;
@@ -877,6 +971,7 @@ function updateCamera(dt) {
 }
 
 function queueThrowToBase(baseKey) {
+  if (!canFieldingInput()) return;
   if (!GAME.pendingPlay || GAME.pendingPlay.resolved || !GAME.pendingPlay.awaitingThrow) return;
   GAME.pendingPlay.targetBase = baseKey;
   GAME.pendingPlay.throwTimer = 0;
@@ -1016,15 +1111,15 @@ function setupDefense() {
   const rightInfieldX = (first.x + second.x) / 2 + 14;
   const leftInfieldX = (third.x + second.x) / 2 - 14;
   const spots = [
-    { role: "pitcher", x: FIELD.mound.x - 10, y: FIELD.mound.y - 46 },
-    { role: "catcher", x: home.x - 12, y: home.y + 8 },
-    { role: "first", x: first.x + 16, y: first.y - 12 },
-    { role: "second", x: rightInfieldX, y: (first.y + second.y) / 2 - 6 },
-    { role: "shortstop", x: leftInfieldX, y: (third.y + second.y) / 2 - 2 },
-    { role: "third", x: third.x - 24, y: third.y - 10 },
-    { role: "left", x: third.x - 162, y: third.y - 318 },
-    { role: "center", x: second.x - 18, y: second.y - 394 },
-    { role: "right", x: first.x + 162, y: first.y - 318 }
+    { role: "pitcher", x: FIELD.mound.x - 10, y: FIELD.mound.y - 44 },
+    { role: "catcher", x: home.x - 12, y: home.y + 10 },
+    { role: "first", x: first.x + 14, y: first.y - 10 },
+    { role: "second", x: rightInfieldX + 10, y: (first.y + second.y) / 2 - 8 },
+    { role: "shortstop", x: leftInfieldX - 10, y: (third.y + second.y) / 2 - 6 },
+    { role: "third", x: third.x - 18, y: third.y - 10 },
+    { role: "left", x: third.x - 126, y: third.y - 244 },
+    { role: "center", x: second.x - 10, y: second.y - 286 },
+    { role: "right", x: first.x + 126, y: first.y - 244 }
   ];
 
   defensiveFielders.length = 0;
@@ -1278,6 +1373,11 @@ function startGame() {
   };
   GAME.localMultiplayer = true;
   GAME.phase = "pitch_setup";
+  GAME.playState = PLAY_STATES.READY_FOR_PITCH;
+  GAME.inputState = PLAY_STATES.READY_FOR_PITCH;
+  GAME.stateLockTimer = 0;
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.initial;
@@ -1316,7 +1416,7 @@ function startGame() {
   startScreen.classList.add("hidden");
   gameOverScreen.classList.add("hidden");
   updateHud();
-  setMessage("Top 1: Player 2 pitch hold/release, Player 1 swings. Select pitch with 1-4.");
+  setMessage("Player 2: Aim and pitch. Player 1: Get ready.");
   GameManager.syncControllerRoles();
 }
 
@@ -1411,13 +1511,16 @@ function switchSides() {
   GAME.controllerSides.player2 = oldControllers.player2 === "away" ? "home" : "away";
   setupDefense();
   updateHud();
-  setMessage(`${GAME.half.toUpperCase()} ${GAME.inning}: Roles switched. Pitch with hold/release, swing on timing.`);
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
+  setPlayState(PLAY_STATES.READY_FOR_PITCH, "Player 2: Aim and pitch. Player 1: Get ready.", 0.08, true);
   GameManager.setPhase("pitch_setup", "pitching");
   GameManager.syncControllerRoles();
 }
 
 function addOut(reason) {
   GAME.outs += 1;
+  setPlayState(PLAY_STATES.PLAY_RESULT, reason || "Out at first!", 0.14, true);
   resetCount();
   resetPitchBall();
   GAME.battedBall = null;
@@ -1426,9 +1529,14 @@ function addOut(reason) {
   GAME.swingBuffer = 0;
   GAME.playCallout = null;
   GAME.pitchReady = true;
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
   GameManager.setPhase("pitch_setup", "pitching");
   updateHud();
-  setMessage(reason);
+  if (GAME.outs < 3) {
+    setPlayState(PLAY_STATES.READY_FOR_PITCH, reason || "Out at first!", 0.08, true);
+  }
+  setMessage(reason || "Out at first!");
   if (GAME.outs >= 3) {
     switchSides();
   }
@@ -1441,9 +1549,13 @@ function addStrike(reason) {
     addOut("Strike three. Batter out.");
     return;
   }
+  setPlayState(PLAY_STATES.PLAY_RESULT, `${reason} Count ${GAME.balls}-${GAME.strikes}`, 0.1, true);
   resetPitchBall();
   GAME.pitchReady = true;
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
   updateHud();
+  setPlayState(PLAY_STATES.READY_FOR_PITCH, `${reason} Count ${GAME.balls}-${GAME.strikes}`, 0.08, true);
   setMessage(`${reason} Count ${GAME.balls}-${GAME.strikes}`);
 }
 
@@ -1453,15 +1565,23 @@ function addBall(reason) {
   if (GAME.balls >= 4) {
     applyWalk();
     resetCount();
+    setPlayState(PLAY_STATES.PLAY_RESULT, `Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`, 0.12, true);
     resetPitchBall();
     GAME.pitchReady = true;
+    GAME.pitchThrownThisPlay = false;
+    GAME.swingUsedThisPitch = false;
     updateHud();
+    setPlayState(PLAY_STATES.READY_FOR_PITCH, `Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`, 0.1, true);
     setMessage(`Ball four. Walk for ${GAME.teams[GAME.battingSide].name}.`);
     return;
   }
+  setPlayState(PLAY_STATES.PLAY_RESULT, `${reason} Count ${GAME.balls}-${GAME.strikes}`, 0.1, true);
   resetPitchBall();
   GAME.pitchReady = true;
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
   updateHud();
+  setPlayState(PLAY_STATES.READY_FOR_PITCH, `${reason} Count ${GAME.balls}-${GAME.strikes}`, 0.08, true);
   setMessage(`${reason} Count ${GAME.balls}-${GAME.strikes}`);
 }
 
@@ -1471,9 +1591,13 @@ function foulBall() {
   }
   createBurst(FIELD.home.x - 12, FIELD.home.y - 8, "#fff6a8", 7);
   showPlayCallout("FOUL BALL", "warn");
+  setPlayState(PLAY_STATES.PLAY_RESULT, `Foul ball. Count ${GAME.balls}-${GAME.strikes}`, 0.1, true);
   resetPitchBall();
   GAME.pitchReady = true;
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
   updateHud();
+  setPlayState(PLAY_STATES.READY_FOR_PITCH, `Foul ball. Count ${GAME.balls}-${GAME.strikes}`, 0.08, true);
   setMessage(`Foul ball. Count ${GAME.balls}-${GAME.strikes}`);
 }
 
@@ -1590,6 +1714,8 @@ function pitchInStrikeZone(x, y) {
 }
 
 function spawnPitch() {
+  if (!canPitchInput() || !isStateIn(PLAY_STATES.PITCH_WINDUP, PLAY_STATES.READY_FOR_PITCH)) return;
+  if (GAME.pitchThrownThisPlay) return;
   const fieldingTeam = GAME.teams[GAME.fieldingSide];
   const pitchRating = teamRating(fieldingTeam, "pitching");
   const zone = getStrikeZoneBounds();
@@ -1655,6 +1781,9 @@ function spawnPitch() {
   GAME.debugInfo.pitchDuration = `${Math.round(pitchDurationMs)}ms`;
   GAME.debugInfo.pitchType = selectedPitch.label;
   pitcher.windup = 0.22;
+  GAME.pitchThrownThisPlay = true;
+  GAME.swingUsedThisPitch = false;
+  setPlayState(PLAY_STATES.PITCH_IN_FLIGHT, "Swing now!", 0.04, true);
   GameManager.setPhase("pitch_flight", "batting");
 }
 
@@ -1881,16 +2010,20 @@ function resolveSwing(ballX, ballY) {
 }
 
 function handleSwingInput() {
+  if (!canSwingInput()) return;
+  if (GAME.swingUsedThisPitch) return;
   if (GAME.mode !== "play" || GAME.battedBall || !pitchBall.active) return;
   // Queue a tiny swing buffer if user presses a hair early.
   if (pitchBall.judged || pitchBall.swingAttempted) {
     GAME.swingBuffer = SWING_BUFFER_WINDOW;
     return;
   }
+  GAME.swingUsedThisPitch = true;
   batter.activeSwing = true;
   batter.swingTime = batter.swingDuration;
   pitchBall.swingAttempted = true;
   GAME.timingMeter.active = true;
+  setPlayState(PLAY_STATES.SWING_WINDOW, "Swing now!", 0.04, false);
   resolveSwing(pitchBall.x, pitchBall.y);
 }
 
@@ -1927,6 +2060,7 @@ function updatePitchAim(dt) {
 
 function updateFieldingInput(dt) {
   if (GAME.mode !== "play" || GAME.controlledRole !== "fielder") return;
+  if (!canFieldingInput()) return;
   if (!GAME.battedBall) return;
 
   const controller = getFieldingController();
@@ -2005,6 +2139,7 @@ function isBallClearingWallInAir(ballObj) {
 
 function finalizeBattedBallResult(result, reason = "") {
   if (!GAME.pendingPlay || GAME.pendingPlay.resolved) return;
+  setPlayState(PLAY_STATES.PLAY_RESULT, "Play result...", 0.14, true);
   GAME.pendingPlay.resolved = true;
   GAME.pendingPlay.awaitingThrow = false;
   GAME.pendingPlay.result = result;
@@ -2043,6 +2178,10 @@ function finalizeBattedBallResult(result, reason = "") {
   GAME.pitchReady = true;
   GAME.pitchTimer = 0;
   GAME.nextPitchDelay = PITCH_DELAY_TUNING.afterPlayMin + Math.random() * PITCH_DELAY_TUNING.afterPlayRange;
+  setPlayState(PLAY_STATES.RESETTING_PLAY, "Resetting play...", 0.08, true);
+  GAME.pitchThrownThisPlay = false;
+  GAME.swingUsedThisPitch = false;
+  setPlayState(PLAY_STATES.READY_FOR_PITCH, "Player 2: Aim and pitch. Player 1: Get ready.", 0.06, true);
   GameManager.setPhase("pitch_setup", "pitching");
 }
 
@@ -2409,6 +2548,10 @@ function update(dt) {
     return;
   }
 
+  if (GAME.stateLockTimer > 0) {
+    GAME.stateLockTimer = Math.max(0, GAME.stateLockTimer - dt);
+  }
+
   GameManager.syncControllerRoles();
   updatePitchAim(dt);
   PitchingController.update(dt);
@@ -2466,6 +2609,9 @@ function update(dt) {
   }
 
   if (pitchBall.active) {
+    if (GAME.playState !== PLAY_STATES.PITCH_IN_FLIGHT && GAME.playState !== PLAY_STATES.SWING_WINDOW) {
+      setPlayState(PLAY_STATES.PITCH_IN_FLIGHT, "Swing now!", 0);
+    }
     if (!Number.isFinite(pitchBall.x) || !Number.isFinite(pitchBall.y)) {
       pitchBall.x = pitcher.x + 14;
       pitchBall.y = pitcher.y + 16;
@@ -2537,6 +2683,9 @@ function update(dt) {
 
     if (!pitchBall.crossedZone && rawT >= zoneCrossT) {
       pitchBall.crossedZone = true;
+      if (GAME.playState !== PLAY_STATES.SWING_WINDOW) {
+        setPlayState(PLAY_STATES.SWING_WINDOW, "Swing now!", 0);
+      }
       if (!pitchBall.judged) queueTakenPitchCall(pitchBall.plateX, pitchBall.plateY);
     }
 
@@ -3308,10 +3457,11 @@ function drawSwingFeedback() {
 }
 
 function drawAimMeters() {
-  const leftPad = 18;
-  const bottomPad = 20;
-  const panelH = 102;
-  const panelW = 250;
+  const bounds = RENDER_LAYOUT.fieldRect;
+  const leftPad = Math.round(bounds.left + 10);
+  const bottomPad = Math.round((GAME.height - bounds.bottom) + 8);
+  const panelH = Math.round(clampValue(bounds.height * 0.17, 92, 118));
+  const panelW = Math.round(clampValue(bounds.width * 0.25, 228, 280));
   const panelY = GAME.height - panelH - bottomPad;
 
   const selectedPitch = PITCH_TYPE_CONFIG[GAME.selectedPitchType] ?? PITCH_TYPE_CONFIG.fastball;
@@ -3322,16 +3472,16 @@ function drawAimMeters() {
   ctx.lineWidth = 2;
   ctx.strokeRect(leftPad, panelY, panelW, panelH);
   ctx.fillStyle = "#5ad8ff";
-  ctx.font = "bold 24px 'Trebuchet MS', sans-serif";
+  ctx.font = "bold 22px 'Trebuchet MS', sans-serif";
   ctx.fillText("PITCH CONTROL", leftPad + 10, panelY + 26);
 
   ctx.fillStyle = "#f0f8ff";
-  ctx.font = "22px 'Trebuchet MS', sans-serif";
-  ctx.fillText("Aim (A/D):", leftPad + 16, panelY + 58);
-  const meterX = leftPad + 96;
-  const meterY = panelY + 46;
-  const meterW = 144;
-  const meterH = 16;
+  ctx.font = "20px 'Trebuchet MS', sans-serif";
+  ctx.fillText("Aim (A/D):", leftPad + 14, panelY + panelH * 0.56);
+  const meterX = leftPad + panelW * 0.38;
+  const meterY = panelY + panelH * 0.44;
+  const meterW = panelW * 0.56;
+  const meterH = 14;
   ctx.fillStyle = "rgba(14, 40, 72, 0.95)";
   ctx.fillRect(meterX, meterY, meterW, meterH);
   ctx.fillStyle = "#66d9ff";
@@ -3341,8 +3491,8 @@ function drawAimMeters() {
   ctx.strokeRect(meterX, meterY, meterW, meterH);
 
   ctx.fillStyle = "#f0f8ff";
-  ctx.font = "30px 'Trebuchet MS', sans-serif";
-  ctx.fillText(`Pitch: ${selectedPitch.key}`, leftPad + 16, panelY + 90);
+  ctx.font = "24px 'Trebuchet MS', sans-serif";
+  ctx.fillText(`Pitch: ${selectedPitch.key}`, leftPad + 14, panelY + panelH - 12);
 
   if (GAME.pitchCharge.active) {
     const chargeX = leftPad + 14;
@@ -3359,22 +3509,22 @@ function drawAimMeters() {
     ctx.strokeRect(chargeX, chargeY, chargeW, 10);
   }
 
-  const rightW = 230;
-  const rightH = 102;
-  const rightX = GAME.width - rightW - leftPad;
-  const rightY = GAME.height - rightH - bottomPad;
+  const rightW = Math.round(clampValue(bounds.width * 0.23, 220, 274));
+  const rightH = panelH;
+  const rightX = Math.round(bounds.right - rightW - 10);
+  const rightY = panelY;
   ctx.fillStyle = "rgba(8, 18, 38, 0.9)";
   ctx.fillRect(rightX, rightY, rightW, rightH);
   ctx.strokeStyle = "rgba(85, 214, 255, 0.8)";
   ctx.strokeRect(rightX, rightY, rightW, rightH);
   ctx.fillStyle = "#5ad8ff";
-  ctx.font = "bold 24px 'Trebuchet MS', sans-serif";
+  ctx.font = "bold 22px 'Trebuchet MS', sans-serif";
   ctx.fillText("CONTACT", rightX + 62, rightY + 26);
 
   const meterLeft = rightX + 14;
-  const meterTop = rightY + 44;
+  const meterTop = rightY + rightH * 0.44;
   const meterWidth = rightW - 28;
-  const meterHeight = 22;
+  const meterHeight = 18;
   ctx.fillStyle = "#df6e2f";
   ctx.fillRect(meterLeft, meterTop, meterWidth * 0.32, meterHeight);
   ctx.fillStyle = "#49e398";
@@ -3390,10 +3540,10 @@ function drawAimMeters() {
   ctx.fillStyle = "#09111f";
   ctx.fillRect(meterLeft + timingPos * meterWidth - 2, meterTop - 2, 4, meterHeight + 4);
   ctx.fillStyle = "#f0f8ff";
-  ctx.font = "18px 'Trebuchet MS', sans-serif";
-  ctx.fillText("WEAK", meterLeft + 6, rightY + 90);
-  ctx.fillText("GOOD", meterLeft + meterWidth * 0.4, rightY + 90);
-  ctx.fillText("PERFECT", meterLeft + meterWidth * 0.76, rightY + 90);
+  ctx.font = "16px 'Trebuchet MS', sans-serif";
+  ctx.fillText("WEAK", meterLeft + 4, rightY + rightH - 12);
+  ctx.fillText("GOOD", meterLeft + meterWidth * 0.4, rightY + rightH - 12);
+  ctx.fillText("PERFECT", meterLeft + meterWidth * 0.74, rightY + rightH - 12);
 }
 
 function drawUI() {
