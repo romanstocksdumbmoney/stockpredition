@@ -51,10 +51,20 @@ const FIELD_ANCHORS = {
   secondBaseman: { x: 0.64, y: 0.52 },
   shortstop: { x: 0.36, y: 0.52 },
   thirdBaseman: { x: 0.24, y: 0.61 },
-  leftField: { x: 0.18, y: 0.33 },
-  centerField: { x: 0.5, y: 0.25 },
-  rightField: { x: 0.82, y: 0.33 }
+  leftField: { x: 0.18, y: 0.17 },
+  centerField: { x: 0.5, y: 0.125 },
+  rightField: { x: 0.82, y: 0.17 }
 };
+
+const PLAYABLE_FIELD_NORMALIZED_BOUNDS = {
+  left: 0.12,
+  right: 0.88,
+  top: 0.08,
+  bottom: 0.94
+};
+
+const OUTFIELD_WALL_NORMALIZED_Y = 0.08;
+const OUTFIELD_PLAYER_CLEARANCE = 20;
 
 const FIELD_DEPTH_TUNING = {
   moundDepthRatio: 0.5
@@ -74,14 +84,14 @@ const VISUAL_COLORS = {
 
 const DEFENSE_COLORS = {
   jersey: VISUAL_COLORS.defenseBlue,
-  cap: "#144fb3",
+  cap: "#124fb5",
   trim: "#9ac7ff"
 };
 
 const OFFENSE_COLORS = {
   jersey: VISUAL_COLORS.offenseOrange,
-  cap: "#9a4b13",
-  trim: "#ffd2ac"
+  cap: "#8f2e18",
+  trim: "#ffc3a8"
 };
 
 // Controls "time between pitches" so at-bats are not rapid fire.
@@ -341,6 +351,34 @@ function fieldPointFromAnchor(anchor) {
   };
 }
 
+function getPlayableBounds() {
+  const bounds = RENDER_LAYOUT.fieldRect;
+  return {
+    left: bounds.left + 8,
+    right: bounds.right - 8,
+    top: bounds.top + 8,
+    bottom: bounds.bottom - 8
+  };
+}
+
+function clampPointToPlayableBounds(x, y) {
+  const bounds = getPlayableBounds();
+  return {
+    x: clampValue(x, bounds.left, bounds.right),
+    y: clampValue(y, bounds.top, bounds.bottom)
+  };
+}
+
+function clampPlayerToField(player) {
+  const wall = getOutfieldWall();
+  const clamped = clampPointToPlayableBounds(player.x, player.y);
+  player.x = clamped.x;
+  player.y = Math.max(clamped.y, wall.y + 20);
+  if (player.y < wall.y + 20) {
+    console.warn("PLAYER OUTSIDE FIELD:", player.role ?? player.id ?? player);
+  }
+}
+
 function syncRenderLayout() {
   RENDER_LAYOUT = buildFieldLayout(GAME.width, GAME.height);
   FIELD.home = { ...RENDER_LAYOUT.bases.home };
@@ -387,6 +425,8 @@ function spawnAllPlayers() {
   const batterPoint = fieldPointFromAnchor(FIELD_ANCHORS.batter);
   batter.x = batterPoint.x;
   batter.y = batterPoint.y;
+  clampPlayerToPlayableField(batter, "batter");
+  defensiveFielders.forEach((fielder) => clampPlayerToPlayableField(fielder, fielder.role));
   GAME.debugInfo.players = String(defensiveFielders.length + 2);
   GAME.controlledFielder = 0;
 }
@@ -1217,7 +1257,7 @@ function setupDefense() {
   const skin = ["#f8d2ad", "#c58b62", "#8b5b3f"];
   const hair = ["#1e1e1e", "#5d3414", "#704224"];
   const pos = {
-    pitcher: fieldPointFromAnchor(FIELD_ANCHORS.mound),
+    pitcher: safePoint(FIELD.mound, "mound", fieldPointFromAnchor(FIELD_ANCHORS.mound)),
     catcher: fieldPointFromAnchor(FIELD_ANCHORS.catcher),
     first: fieldPointFromAnchor(FIELD_ANCHORS.firstBaseman),
     second: fieldPointFromAnchor(FIELD_ANCHORS.secondBaseman),
@@ -1238,19 +1278,25 @@ function setupDefense() {
     { role: "center", x: pos.center.x, y: pos.center.y },
     { role: "right", x: pos.right.x, y: pos.right.y }
   ];
+  const wall = getOutfieldWall();
+  const minY = wall.y + 12;
 
   defensiveFielders.length = 0;
   spots.forEach((spot, index) => {
     const speedRange = FIELDING_SPEED_RANGES[spot.role] ?? [140, 180];
     const baseSpeed = lerp(speedRange[0], speedRange[1], teamRating(defenseTeam, "fielding"));
+    const clamped = clampFieldPoint(spot.x, spot.y, minY);
+    if (DEBUG_FIELDING && clamped.y < wall.y) {
+      console.warn("PLAYER OUTSIDE FIELD:", { role: spot.role, x: clamped.x, y: clamped.y, wallY: wall.y });
+    }
     defensiveFielders.push({
       ...spot,
-      homeX: spot.x,
-      homeY: spot.y,
-      x: spot.x,
-      y: spot.y,
-      targetX: spot.x,
-      targetY: spot.y,
+      homeX: clamped.x,
+      homeY: clamped.y,
+      x: clamped.x,
+      y: clamped.y,
+      targetX: clamped.x,
+      targetY: clamped.y,
       state: "idle",
       speed: baseSpeed,
       vx: 0,
