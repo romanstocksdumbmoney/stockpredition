@@ -40,7 +40,7 @@ body {
   max-width: 100vw;
   max-height: 100vh;
   display: grid;
-  grid-template-rows: 10% minmax(0, 1fr) 10%;
+  grid-template-rows: 80px minmax(0, 1fr) 55px;
   border: 2px solid rgba(83, 210, 255, 0.88);
   border-radius: 0;
   background: linear-gradient(180deg, rgba(7, 14, 31, 0.97), rgba(4, 9, 20, 0.98));
@@ -51,7 +51,7 @@ body {
   overflow: hidden;
 }
 
-.field-area {
+.field-stage {
   position: relative;
   min-height: 0;
   min-width: 0;
@@ -61,7 +61,7 @@ body {
   overflow: hidden;
 }
 
-.field-area canvas {
+.field-stage canvas {
   width: 100%;
   height: 100%;
 }
@@ -336,6 +336,7 @@ button:focus-visible {
 
 .bottom-ui-panel {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 0;
