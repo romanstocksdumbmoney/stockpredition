@@ -20,6 +20,9 @@ const restartButton = document.getElementById("restartButton");
 const teamSelectA = document.getElementById("teamSelectA");
 const teamSelectB = document.getElementById("teamSelectB");
 const messageBar = document.getElementById("messageBar");
+const modeBanner = document.getElementById("modeBanner");
+const modeBannerTitle = document.getElementById("modeBannerTitle");
+const modeBannerSubtitle = document.getElementById("modeBannerSubtitle");
 const fieldStage = document.getElementById("fieldStage");
 
 const inningValue = document.getElementById("inningValue");
@@ -45,7 +48,9 @@ const VIRTUAL_VIEW = {
   height: 720
 };
 
-const PLAY_RESULT_HOLD_MS = 950;
+const PLAY_RESULT_HOLD_MS = 1200;
+const BALL_IN_PLAY_FAILSAFE_SECONDS = 8;
+const BALL_DEAD_TIMEOUT_SECONDS = 1.5;
 
 const FIELD_ANCHORS = {
   home: { x: 0.5, y: 0.88 },
@@ -465,6 +470,8 @@ function resetForNextPitch() {
   cancelPendingPlayReset();
   const message = GAME.playCallout?.text ? `${GAME.playCallout.text}. ${GAME.balls}-${GAME.strikes}` : "Player 2: Aim and pitch. Player 1: Get ready.";
   resetPitchBall();
+  GAME.ballInPlayElapsed = 0;
+  GAME.ballStillElapsed = 0;
   GAME.battedBall = null;
   GAME.pendingPlay = null;
   GAME.throwBall = null;
@@ -817,6 +824,11 @@ function setPlayState(nextState, message = "", lockSeconds = 0, clearHeld = fals
   }
   GAME.playState = nextState;
   GAME.inputState = nextState;
+  GAME.debugInfo.state = nextState;
+  if (nextState === PLAY_STATES.BALL_IN_PLAY) {
+    GAME.ballInPlayElapsed = 0;
+    GAME.ballStillElapsed = 0;
+  }
   const nextLock = Number.isFinite(lockSeconds) ? lockSeconds : GAME.stateChangeCooldown;
   GAME.stateLockTimer = Math.max(0, nextLock);
   clearGameplayInputState(clearHeld);
@@ -1021,6 +1033,9 @@ function configureTeams() {
 
 function setMessage(text) {
   messageBar.textContent = text;
+  if (GAME.playState === PLAY_STATES.PLAY_RESULT && modeBannerSubtitle) {
+    modeBannerSubtitle.textContent = text;
+  }
 }
 
 function setSwingFeedback(text, quality = 0) {
@@ -2769,6 +2784,26 @@ function update(dt) {
     }
   }
 
+  if (GAME.playState === PLAY_STATES.BALL_IN_PLAY) {
+    GAME.ballInPlayElapsed += dt;
+    if (GAME.ballInPlayElapsed >= BALL_IN_PLAY_FAILSAFE_SECONDS) {
+      completePlay("Play over. Ready for next pitch.");
+    } else if (GAME.battedBall) {
+      const speed = Math.hypot(GAME.battedBall.vx ?? 0, GAME.battedBall.vy ?? 0);
+      if (speed < 22) {
+        GAME.ballStillElapsed += dt;
+        if (GAME.ballStillElapsed >= BALL_DEAD_TIMEOUT_SECONDS) {
+          completePlay("Ball dead. Ready for next pitch.");
+        }
+      } else {
+        GAME.ballStillElapsed = 0;
+      }
+    }
+  } else {
+    GAME.ballInPlayElapsed = 0;
+    GAME.ballStillElapsed = 0;
+  }
+
   if (GAME.pitchReady && !GAME.battedBall && !pitchBall.active && !GAME.pitchCharge.active) {
     GAME.pitchTimer += dt;
     if (!GAME.localMultiplayer && GAME.pitchTimer >= GAME.nextPitchDelay) {
@@ -3628,8 +3663,74 @@ function drawSwingFeedback() {
   ctx.restore();
 }
 
+function getModeBannerForState() {
+  const resultText = messageBar?.textContent?.trim() || "Result recorded";
+  const map = {
+    [PLAY_STATES.READY_FOR_PITCH]: {
+      title: "PITCH NOW",
+      subtitle: "Player 2: Aim A/D • Select 1-4 • Press SPACE to throw",
+      color: "#22dfff"
+    },
+    [PLAY_STATES.PITCHING]: {
+      title: "PITCHING",
+      subtitle: "Release to throw",
+      color: "#39c6ff"
+    },
+    [PLAY_STATES.PITCH_IN_FLIGHT]: {
+      title: "SWING NOW",
+      subtitle: "Player 1: Press SPACE",
+      color: "#ffcc5b"
+    },
+    [PLAY_STATES.SWING_WINDOW]: {
+      title: "SWING NOW",
+      subtitle: "Player 1: Press SPACE",
+      color: "#ffcc5b"
+    },
+    [PLAY_STATES.BALL_IN_PLAY]: {
+      title: "FIELD THE BALL",
+      subtitle: "WASD move • Q first • F second • E third • R home",
+      color: "#79f6a8"
+    },
+    [PLAY_STATES.PLAY_RESULT]: {
+      title: "PLAY RESULT",
+      subtitle: resultText,
+      color: "#ffd79d"
+    },
+    [PLAY_STATES.RESETTING_PLAY]: {
+      title: "RESETTING...",
+      subtitle: "Next pitch coming",
+      color: "#c5d2de"
+    },
+    [PLAY_STATES.PAUSED]: {
+      title: "PAUSED",
+      subtitle: "Press Enter to continue",
+      color: "#9ec5df"
+    },
+    [PLAY_STATES.LOADING]: {
+      title: "LOADING",
+      subtitle: "Preparing field",
+      color: "#9ec5df"
+    }
+  };
+  return map[GAME.playState] ?? {
+    title: "NEON SLUGGER DELUXE",
+    subtitle: "Ready",
+    color: "#22dfff"
+  };
+}
+
+function drawModeBanner() {
+  if (!modeBanner || !modeBannerTitle || !modeBannerSubtitle || GAME.mode !== "play") return;
+  const banner = getModeBannerForState();
+  modeBannerTitle.textContent = banner.title;
+  modeBannerSubtitle.textContent = banner.subtitle;
+  modeBanner.style.setProperty("--banner-accent", banner.color);
+}
+
 function drawAimMeters() {
   const bounds = RENDER_LAYOUT.fieldRect;
+  const pitchPanelActive = GAME.playState === PLAY_STATES.READY_FOR_PITCH;
+  const contactPanelActive = GAME.playState === PLAY_STATES.PITCH_IN_FLIGHT || GAME.playState === PLAY_STATES.SWING_WINDOW;
   const leftPad = Math.round(bounds.left + 10);
   const bottomPad = Math.round((GAME.height - bounds.bottom) + 8);
   const panelH = Math.round(clampValue(bounds.height * 0.17, 92, 118));
@@ -3638,6 +3739,7 @@ function drawAimMeters() {
 
   const selectedPitch = PITCH_TYPE_CONFIG[GAME.selectedPitchType] ?? PITCH_TYPE_CONFIG.fastball;
 
+  ctx.globalAlpha = pitchPanelActive ? 1 : 0.45;
   ctx.fillStyle = "rgba(8, 18, 38, 0.9)";
   ctx.fillRect(leftPad, panelY, panelW, panelH);
   ctx.strokeStyle = "rgba(85, 214, 255, 0.8)";
@@ -3645,7 +3747,7 @@ function drawAimMeters() {
   ctx.strokeRect(leftPad, panelY, panelW, panelH);
   ctx.fillStyle = "#5ad8ff";
   ctx.font = "bold 22px 'Trebuchet MS', sans-serif";
-  ctx.fillText("PITCH CONTROL", leftPad + 10, panelY + 26);
+  ctx.fillText(pitchPanelActive ? "PITCH CONTROL - ACTIVE" : "PITCH CONTROL - LOCKED", leftPad + 10, panelY + 26);
 
   ctx.fillStyle = "#f0f8ff";
   ctx.font = "20px 'Trebuchet MS', sans-serif";
@@ -3685,13 +3787,14 @@ function drawAimMeters() {
   const rightH = panelH;
   const rightX = Math.round(bounds.right - rightW - 10);
   const rightY = panelY;
+  ctx.globalAlpha = contactPanelActive ? 1 : 0.45;
   ctx.fillStyle = "rgba(8, 18, 38, 0.9)";
   ctx.fillRect(rightX, rightY, rightW, rightH);
   ctx.strokeStyle = "rgba(85, 214, 255, 0.8)";
   ctx.strokeRect(rightX, rightY, rightW, rightH);
   ctx.fillStyle = "#5ad8ff";
   ctx.font = "bold 22px 'Trebuchet MS', sans-serif";
-  ctx.fillText("CONTACT", rightX + 62, rightY + 26);
+  ctx.fillText(contactPanelActive ? "CONTACT - SWING NOW" : "CONTACT - WAITING", rightX + 18, rightY + 26);
 
   const meterLeft = rightX + 14;
   const meterTop = rightY + rightH * 0.44;
@@ -3716,12 +3819,14 @@ function drawAimMeters() {
   ctx.fillText("WEAK", meterLeft + 4, rightY + rightH - 12);
   ctx.fillText("GOOD", meterLeft + meterWidth * 0.4, rightY + rightH - 12);
   ctx.fillText("PERFECT", meterLeft + meterWidth * 0.74, rightY + rightH - 12);
+  ctx.globalAlpha = 1;
 }
 
 function drawUI() {
   drawPlayCallout();
   drawSwingFeedback();
   drawAimMeters();
+  drawModeBanner();
   if (GAME.mode === "play" && DEBUG_STATE.enabled) {
     drawDebugOverlay();
   }
