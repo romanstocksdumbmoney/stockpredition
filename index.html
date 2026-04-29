@@ -1023,6 +1023,8 @@
       caseAnimating: false,
       bombFlashUntil: 0,
       casePendingDrop: null,
+      casePendingInventoryItem: null,
+      casePendingInventoryId: null,
       currentDroppedItem: null,
       casePendingWear: null,
       caseWinnerNode: null,
@@ -1449,6 +1451,19 @@
       return true;
     }
 
+    function finalizePendingInventoryAdd(sourceLabel = "CASE OPENING") {
+      if (!state.casePendingInventoryItem) {
+        console.error("No pending inventory item to finalize.");
+        return false;
+      }
+      const pending = state.casePendingInventoryItem;
+      const added = addItemToInventory(pending, sourceLabel);
+      if (added) {
+        state.casePendingInventoryItem = null;
+      }
+      return added;
+    }
+
     function addToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
       return addItemToInventory(item, sourceLabel, options);
     }
@@ -1458,18 +1473,32 @@
       console.log("Dropped item:", window.pendingCaseItem || state.casePendingDrop || currentDroppedItem);
       console.log("Current inventory before add:", JSON.stringify(inventory));
 
-      const droppedItem = window.pendingCaseItem || state.casePendingDrop || currentDroppedItem;
-      if (!droppedItem) {
-        console.error("No pending dropped item found.");
+      if (state.casePendingInventoryId) {
+        console.log("✅ Drop already queued in inventory:", state.casePendingInventoryId);
+        window.pendingCaseItem = null;
+        state.casePendingDrop = null;
+        state.currentDroppedItem = null;
+        currentDroppedItem = null;
+        state.casePendingInventoryItem = null;
+        state.casePendingWear = null;
+        state.caseWinnerNode = null;
+        state.casePendingInventoryId = null;
+        return true;
+      }
+
+      if (!state.casePendingInventoryItem) {
+        console.error("No pending inventory item found.");
         return false;
       }
 
-      const added = addItemToInventory(droppedItem, "CASE OPENING");
+      const added = finalizePendingInventoryAdd("CASE OPENING");
       if (added) {
         window.pendingCaseItem = null;
         state.casePendingDrop = null;
         state.currentDroppedItem = null;
         currentDroppedItem = null;
+        state.casePendingInventoryItem = null;
+        state.casePendingInventoryId = null;
         state.casePendingWear = null;
         state.caseWinnerNode = null;
       }
@@ -2188,6 +2217,18 @@
       currentDroppedItem = drop;
       window.pendingCaseItem = drop;
       state.casePendingWear = wearInfo;
+      state.casePendingInventoryItem = createInventoryItemFromDrop(drop, wearInfo);
+      state.casePendingInventoryId = null;
+      if (state.casePendingInventoryItem) {
+        const queued = addItemToInventory(state.casePendingInventoryItem, "CASE OPENING", { skipRender: true });
+        if (queued) {
+          state.casePendingInventoryId = state.casePendingInventoryItem.id;
+          state.casePendingInventoryItem = null;
+          console.log("✅ Drop queued immediately:", state.casePendingInventoryId);
+        } else {
+          console.warn("⚠️ Immediate queue failed; waiting for manual add.");
+        }
+      }
       state.caseWinnerNode = winnerEl;
       el.revealDetails.classList.remove("hidden");
       el.revealDetails.classList.toggle("knife-drop-card", drop.kind === "knife");
@@ -2278,7 +2319,9 @@
       playCaseSpinSound();
       clearCaseTimers();
       state.casePendingDrop = null;
+      state.casePendingInventoryItem = null;
       state.casePendingWear = null;
+      state.casePendingInventoryId = null;
       state.caseWinnerNode = null;
 
       const { items, winnerIndex } = buildReel(drop);
@@ -2332,15 +2375,30 @@
       }, 12000);
     }
 
-    function closeCaseModal() {
+    function closeCaseModal(options = {}) {
+      const { discardQueuedDrop = true } = options;
       clearCaseTimers();
       el.caseModal.classList.add("hidden");
       el.caseModal.setAttribute("aria-hidden", "true");
       state.caseAnimating = false;
+      if (discardQueuedDrop && state.casePendingInventoryId) {
+        const pendingIndex = inventory.findIndex((item) => item.id === state.casePendingInventoryId);
+        if (pendingIndex >= 0) {
+          inventory.splice(pendingIndex, 1);
+          refreshInventoryBuckets();
+          updateEquippedKnife();
+          updateEquippedKnifeHud();
+          updateOperatorStats();
+          saveInventory();
+          updateInventoryBadge(-1);
+        }
+      }
       state.casePendingDrop = null;
       state.currentDroppedItem = null;
       currentDroppedItem = null;
       window.pendingCaseItem = null;
+      state.casePendingInventoryItem = null;
+      state.casePendingInventoryId = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
       state.activeTab = "cases";
@@ -2590,17 +2648,40 @@
     function sellPendingCaseDrop() {
       const droppedItem = window.pendingCaseItem || state.casePendingDrop || currentDroppedItem;
       if (!droppedItem) return;
-      const value = getItemValue(droppedItem);
-      addMoney(value);
-      showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(value)}<span class="event"> instant cashout</span>`);
       state.casePendingDrop = null;
       state.currentDroppedItem = null;
       currentDroppedItem = null;
       window.pendingCaseItem = null;
+      state.casePendingInventoryItem = null;
+      if (state.casePendingInventoryId) {
+        const soldItemIndex = inventory.findIndex((item) => item.id === state.casePendingInventoryId);
+        if (soldItemIndex >= 0) {
+          const [soldItem] = inventory.splice(soldItemIndex, 1);
+          refreshInventoryBuckets();
+          updateEquippedKnife();
+          updateEquippedKnifeHud();
+          updateOperatorStats();
+          saveInventory();
+          updateInventoryBadge(-1);
+          const value = getItemValue(soldItem);
+          addMoney(value);
+          showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(value)}<span class="event"> instant cashout</span>`);
+          state.casePendingInventoryId = null;
+          state.casePendingWear = null;
+          state.caseWinnerNode = null;
+          updatePrestigeHud();
+          closeCaseModal({ discardQueuedDrop: false });
+          return;
+        }
+      }
+      const fallbackValue = getItemValue(droppedItem);
+      addMoney(fallbackValue);
+      showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(fallbackValue)}<span class="event"> instant cashout</span>`);
+      state.casePendingInventoryId = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
       updatePrestigeHud();
-      closeCaseModal();
+      closeCaseModal({ discardQueuedDrop: false });
     }
 
     function openCasePreview() {
@@ -2865,11 +2946,11 @@
 
       el.prestigeBtn.addEventListener("click", tryPrestige);
       el.shop.addEventListener("click", handleShopClick);
-      el.caseCloseBtn.addEventListener("click", closeCaseModal);
+      el.caseCloseBtn.addEventListener("click", () => closeCaseModal({ discardQueuedDrop: true }));
       el.addInvBtn.addEventListener("click", () => {
         const committed = commitPendingCaseDrop();
         if (committed) {
-          closeCaseModal();
+          closeCaseModal({ discardQueuedDrop: false });
         }
       });
       el.openAnotherBtn.addEventListener("click", () => {
@@ -2877,7 +2958,7 @@
         if (committed && state.caseInventory > 0) {
           openCase();
         } else {
-          closeCaseModal();
+          closeCaseModal({ discardQueuedDrop: false });
         }
       });
       el.sellDropBtn.addEventListener("click", sellPendingCaseDrop);
@@ -2886,7 +2967,7 @@
       el.coinflipStep.addEventListener("click", handleCoinflipClick);
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && !el.caseModal.classList.contains("hidden")) {
-          closeCaseModal();
+          closeCaseModal({ discardQueuedDrop: true });
         }
       });
     }
