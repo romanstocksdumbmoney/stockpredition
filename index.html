@@ -31,7 +31,7 @@
       }
 
       .field-wrap {
-        position: absolute;
+        position: fixed;
         inset: 0;
         width: 100vw;
         height: 100vh;
@@ -41,159 +41,113 @@
 
       canvas {
         display: block;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
         image-rendering: pixelated;
       }
 
-      .top-header {
-        position: absolute;
+      #scoreboard {
+        position: fixed;
         top: 12px;
         left: 50%;
         transform: translateX(-50%);
-        z-index: 8;
+        z-index: 100;
+        background: white;
+        border: 3px solid #1a1a2e;
+        border-radius: 12px;
+        padding: 8px 20px;
+        text-align: center;
+        font-family: "Press Start 2P", monospace;
+        font-size: 11px;
+        min-width: 420px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         pointer-events: none;
       }
 
-      .title {
-        display: none;
-      }
-
-      .scoreboard {
-        background: #fff;
-        border: 4px solid #1a1a2e;
-        border-radius: 12px;
-        padding: 10px 18px 9px;
-        display: grid;
-        gap: 8px;
-        width: min(760px, 94vw);
-        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.24);
-      }
-
-      .score-row,
-      .count-row {
+      #scoreboard .score-row {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 12px;
+        gap: 16px;
+        margin-bottom: 4px;
       }
 
-      .team {
+      #scoreboard .count-row {
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: center;
+        gap: 16px;
       }
 
-      .chip {
-        border: none;
-        background: transparent;
-        padding: 0;
-        font-size: 12px;
+      #scoreboard .team-red {
+        color: #E8272A;
+        font-size: 13px;
       }
 
-      .chip.red {
-        color: #f34040;
+      #scoreboard .team-blue {
+        color: #1E6FD9;
+        font-size: 13px;
       }
 
-      .chip.blue {
-        color: #3d66ff;
+      #scoreboard .score {
+        font-size: 18px;
+        font-weight: 900;
       }
 
-      .score-num {
-        font-size: 24px;
-      }
-
-      .score-num.red-num {
-        color: #d42f2f;
-      }
-
-      .score-num.blue-num {
-        color: #2c58ef;
-      }
-
-      .score-mid {
+      #scoreboard .inning {
+        color: #555;
         font-size: 10px;
-        color: #1a1a2e;
       }
 
-      .score-divider {
-        font-size: 14px;
-        color: #1a1a2e;
+      #scoreboard .dash {
+        color: #666;
       }
 
-      .mini {
-        font-size: 10px;
-        color: #1a1a2e;
-      }
-
-      .base-diamond {
-        position: relative;
-        width: 40px;
-        height: 28px;
-        margin-left: 6px;
-      }
-
-      .diamond-dot {
-        position: absolute;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #8b96a3;
-        border: 1.5px solid #29344e;
-      }
-
-      .diamond-dot.occupied {
-        background: #ffd84d;
-        box-shadow: 0 0 8px rgba(255, 216, 77, 0.88);
-      }
-
-      .dot-second { left: 16px; top: 0; }
-      .dot-third { left: 6px; top: 10px; }
-      .dot-first { left: 26px; top: 10px; }
-      .dot-home { left: 16px; top: 20px; background: #5b6472; border-color: #5b6472; }
-
-      .bottom-hud {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 70px;
-        display: flex;
+      #sb-bases {
+        display: inline-flex;
+        gap: 3px;
         align-items: center;
-        justify-content: space-between;
-        padding: 0 18px 10px;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 8;
+      }
+
+      #pitchBadge {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        z-index: 100;
+        background: #E8272A;
+        color: white;
+        font-family: "Press Start 2P", monospace;
+        font-size: 10px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 2px solid #000;
         pointer-events: none;
       }
 
-      .pitch-badge {
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 3px solid #111;
-        color: #fff;
-        font-size: 10px;
-        background: #df4848;
-      }
-
-      .pitch-badge.fastball { background: #e64d4d; }
-      .pitch-badge.curveball { background: #4d75ee; }
-      .pitch-badge.changeup { background: #45bf63; }
-      .pitch-badge.slider { background: #e28e3f; }
-
       .mobile-swing {
-        width: 100px;
-        height: 100px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 100;
+        width: 90px;
+        height: 90px;
         border-radius: 50%;
-        border: 5px solid #111;
-        background: #e8272a;
-        color: #fff;
+        background: radial-gradient(circle at 35% 35%, #ff6666, #E8272A);
+        border: 4px solid #000;
+        color: white;
         font-family: "Press Start 2P", monospace;
-        font-size: 13px;
-        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.35);
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        user-select: none;
         touch-action: manipulation;
         transition: transform 120ms ease, opacity 140ms ease;
-        pointer-events: auto;
       }
 
       .mobile-swing:active {
@@ -248,27 +202,24 @@
       }
 
       @media (max-width: 900px) {
-        .scoreboard {
-          width: min(96vw, 760px);
-          padding: 8px 10px;
-          gap: 6px;
+        #scoreboard {
+          min-width: 0;
+          width: min(94vw, 620px);
+          padding: 7px 9px;
+          font-size: 9px;
         }
-
-        .score-row,
-        .count-row {
+        #scoreboard .score-row,
+        #scoreboard .count-row {
           gap: 8px;
         }
-
-        .score-num {
-          font-size: 18px;
-        }
-
-        .chip {
+        #scoreboard .team-red,
+        #scoreboard .team-blue {
           font-size: 10px;
         }
-
-        .mini,
-        .score-mid {
+        #scoreboard .score {
+          font-size: 14px;
+        }
+        #scoreboard .inning {
           font-size: 8px;
         }
       }
@@ -276,42 +227,30 @@
   </head>
   <body>
     <div id="root">
-      <header class="top-header">
-        <div class="scoreboard">
+      <div id="scoreboard">
           <div class="score-row">
-            <div class="team">
-              <span class="chip red">COMETS</span>
-              <span id="scoreComets" class="score-num red-num">0</span>
-            </div>
-            <span class="score-divider">—</span>
-            <div class="score-mid"><span id="inning">INNING 1</span> • <span id="half">TOP</span></div>
-            <span class="score-divider">—</span>
-            <div class="team">
-              <span id="scoreFoxes" class="score-num blue-num">0</span>
-              <span class="chip blue">FOXES</span>
-            </div>
+            <span id="sb-team1" class="team-red">COMETS</span>
+            <span id="sb-score1" class="score">0</span>
+            <span class="dash">—</span>
+            <span id="sb-inning" class="inning">INN 1 TOP</span>
+            <span class="dash">—</span>
+            <span id="sb-score2" class="score">0</span>
+            <span id="sb-team2" class="team-blue">FOXES</span>
           </div>
-          <div class="count-row mini">
-            <span>B: <strong id="balls">0</strong></span>
-            <span>S: <strong id="strikes">0</strong></span>
-            <span>O: <strong id="outs">0</strong></span>
-            <div class="base-diamond" aria-label="Baserunner diamond">
-              <span id="baseDotSecond" class="diamond-dot dot-second"></span>
-              <span id="baseDotThird" class="diamond-dot dot-third"></span>
-              <span id="baseDotFirst" class="diamond-dot dot-first"></span>
-              <span class="diamond-dot dot-home"></span>
-            </div>
+          <div class="count-row">
+            <span>B: <span id="sb-balls">0</span></span>
+            <span>S: <span id="sb-strikes">0</span></span>
+            <span>O: <span id="sb-outs">0</span></span>
+            <span id="sb-bases"></span>
           </div>
         </div>
-      </header>
+      </div>
 
       <section class="field-wrap" id="fieldWrap">
         <canvas id="gameCanvas" width="1280" height="720" aria-label="Neon Slugger Deluxe"></canvas>
 
-        <div class="bottom-hud">
-          <div id="pitchBadge" class="pitch-badge fastball">PITCH: <span id="pitchType">FASTBALL</span></div>
-          <button id="swingButton" class="mobile-swing" type="button">SWING</button>
-        </div>
+        <div id="pitchBadge">PITCH: FASTBALL</div>
+        <button id="swingButton" class="mobile-swing" type="button">SWING</button>
 
         <div id="gameOver" class="game-over">
           <h2 id="winnerText">GAME OVER</h2>
@@ -375,18 +314,14 @@
         const winnerText = document.getElementById("winnerText");
         const restartButton = document.getElementById("restartButton");
 
-        const scoreComets = document.getElementById("scoreComets");
-        const scoreFoxes = document.getElementById("scoreFoxes");
-        const inningEl = document.getElementById("inning");
-        const halfEl = document.getElementById("half");
-        const ballsEl = document.getElementById("balls");
-        const strikesEl = document.getElementById("strikes");
-        const outsEl = document.getElementById("outs");
-        const pitchTypeEl = document.getElementById("pitchType");
+        const scoreComets = document.getElementById("sb-score1");
+        const scoreFoxes = document.getElementById("sb-score2");
+        const inningEl = document.getElementById("sb-inning");
+        const ballsEl = document.getElementById("sb-balls");
+        const strikesEl = document.getElementById("sb-strikes");
+        const outsEl = document.getElementById("sb-outs");
         const pitchBadge = document.getElementById("pitchBadge");
-        const baseDotFirst = document.getElementById("baseDotFirst");
-        const baseDotSecond = document.getElementById("baseDotSecond");
-        const baseDotThird = document.getElementById("baseDotThird");
+        const baseDotsSvg = document.getElementById("sb-bases");
 
         const input = {
           keysHeld: new Set(),
@@ -412,7 +347,6 @@
         const PERFECT_WINDOW = 12;
         const GOOD_WINDOW = 35;
         const FAIR_WINDOW = 65;
-        const pitchBadgeClasses = ["fastball", "curveball", "changeup", "slider"];
         const INNING_TRANSITION_DURATION = 2.6;
         const HIT_TIER_TEXT = {
           homerun: { text: "HOME RUN!", color: "#ffd700", size: 72 },
@@ -450,7 +384,6 @@
           throwBall: null,
           runnerProgress: 0,
           runnerTargetBase: 1,
-          runnerAnims: [],
           baseRunners: [null, null, null],
           nextRunnerId: 1,
           popupTexts: [],
@@ -489,6 +422,7 @@
         let audioCtx = null;
         let ambientSource = null;
         let ambientGain = null;
+        let activeRunners = [];
 
         function initPlayers() {
           if (game.crowd.length === 0) initCrowd();
@@ -601,19 +535,31 @@
         function updateScoreboard() {
           scoreComets.textContent = String(game.score.comets);
           scoreFoxes.textContent = String(game.score.foxes);
-          inningEl.textContent = `INNING ${game.inning}`;
-          halfEl.textContent = game.half;
+          inningEl.textContent = `INN ${game.inning} ${game.half === "TOP" ? "TOP" : "BOT"}`;
           ballsEl.textContent = String(game.balls);
           strikesEl.textContent = String(game.strikes);
           outsEl.textContent = String(game.outs);
-          pitchTypeEl.textContent = game.pitchType;
+
           if (pitchBadge) {
-            pitchBadge.classList.remove(...pitchBadgeClasses);
-            pitchBadge.classList.add(game.pitchType.toLowerCase());
+            const colors = {
+              FASTBALL: "#E8272A",
+              CURVEBALL: "#1E6FD9",
+              CHANGEUP: "#00c853",
+              SLIDER: "#ff9100"
+            };
+            pitchBadge.style.background = colors[game.pitchType] || "#E8272A";
+            pitchBadge.textContent = `PITCH: ${game.pitchType}`;
           }
-          baseDotFirst?.classList.toggle("occupied", Boolean(game.baseRunners[0]));
-          baseDotSecond?.classList.toggle("occupied", Boolean(game.baseRunners[1]));
-          baseDotThird?.classList.toggle("occupied", Boolean(game.baseRunners[2]));
+
+          if (baseDotsSvg) {
+            baseDotsSvg.innerHTML = `
+              <svg width="28" height="28" viewBox="0 0 28 28" aria-label="bases">
+                <rect x="10" y="2" width="8" height="8" fill="${game.baseRunners[1] ? "#FFD700" : "#ccc"}" stroke="#333" stroke-width="1.5" transform="rotate(45 14 6)"/>
+                <rect x="2" y="10" width="8" height="8" fill="${game.baseRunners[2] ? "#FFD700" : "#ccc"}" stroke="#333" stroke-width="1.5" transform="rotate(45 6 14)"/>
+                <rect x="18" y="10" width="8" height="8" fill="${game.baseRunners[0] ? "#FFD700" : "#ccc"}" stroke="#333" stroke-width="1.5" transform="rotate(45 22 14)"/>
+              </svg>
+            `;
+          }
         }
 
         function randomPitchType() {
@@ -1184,7 +1130,7 @@
           game.ballInPlayTime = 0;
           game.ballDeadTime = 0;
           game.runnerProgress = 0;
-          game.runnerAnims.length = 0;
+          activeRunners = [];
           game.transitionText = "";
           game.fieldingPlan = null;
           game.throwMeta = null;
@@ -1203,12 +1149,71 @@
           input.swingPressedThisFrame = false;
         }
 
-        function cloneRunner(runner, baseIndex) {
-          return runner ? { ...runner, state: RUNNER_STATE.HOLDING, baseIndex, lead: 0 } : null;
+        function getBasePos(name) {
+          if (name === "home") return { x: BASES.home.x, y: BASES.home.y };
+          if (name === "first") return { x: BASES.first.x, y: BASES.first.y };
+          if (name === "second") return { x: BASES.second.x, y: BASES.second.y };
+          if (name === "third") return { x: BASES.third.x, y: BASES.third.y };
+          return { x: BASES.home.x, y: BASES.home.y };
         }
 
-        function createBatterRunner(baseIndex) {
-          return makeRunner(baseIndex);
+        function baseNameToIndex(name) {
+          if (name === "first") return 0;
+          if (name === "second") return 1;
+          if (name === "third") return 2;
+          return -1;
+        }
+
+        function makeAnimatedRunner(teamOverride = null) {
+          const r = makeRunner(0);
+          if (teamOverride) r.team = teamOverride;
+          return r;
+        }
+
+        function launchRunnerAnimation(runnerObj, fromBase, toBase, speedOverride = null) {
+          const order = ["home", "first", "second", "third", "home"];
+          const fromIdx = order.indexOf(fromBase);
+          const toIdx = order.indexOf(toBase);
+          if (fromIdx < 0 || toIdx < 0) return;
+          const waypoints = [];
+          let i = fromIdx;
+          let guard = 0;
+          while (guard < 6) {
+            waypoints.push(getBasePos(order[i]));
+            if (order[i] === toBase) break;
+            i = (i + 1) % 4;
+            guard += 1;
+          }
+          const startPos = waypoints[0];
+          if (!startPos || waypoints.length < 2) return;
+          const runner = runnerObj ? { ...runnerObj } : makeAnimatedRunner();
+          activeRunners.push({
+            id: runner.id || `active-${Date.now()}-${Math.random()}`,
+            team: runner.team || "red",
+            x: startPos.x,
+            y: startPos.y,
+            waypoints,
+            wpIndex: 0,
+            speed: speedOverride ?? 4.2,
+            dest: toBase,
+            frame: 0,
+            frameTimer: 0,
+            done: false
+          });
+        }
+
+        function onRunnerReachedBase(ar) {
+          if (ar.dest === "home") return;
+          const idx = baseNameToIndex(ar.dest);
+          if (idx >= 0) {
+            game.baseRunners[idx] = {
+              id: ar.id,
+              team: ar.team,
+              state: RUNNER_STATE.HOLDING,
+              baseIndex: idx,
+              lead: 0
+            };
+          }
         }
 
         function toHitType(hitTypeOrBases, reason = "hit") {
@@ -1222,69 +1227,39 @@
 
         function advanceRunners(hitTypeOrBases, reason = "hit") {
           const hitType = toHitType(hitTypeOrBases, reason);
-          const newRunners = [...game.baseRunners];
+          const old = [...game.baseRunners];
+          const battingTeam = game.half === "TOP" ? "red" : "blue";
           let runs = 0;
+          game.baseRunners = [null, null, null];
 
           if (hitType === "single") {
-            if (newRunners[2]) runs += 1;
-            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
-            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 2, { ...newRunners[1], state: RUNNER_STATE.RUNNING }));
-            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 1, { ...newRunners[0], state: RUNNER_STATE.RUNNING }));
-            game.runnerAnims.push(makeRunnerAnim(-1, 0, createBatterRunner(0)));
-            newRunners[2] = cloneRunner(newRunners[1], 2);
-            newRunners[1] = cloneRunner(newRunners[0], 1);
-            newRunners[0] = createBatterRunner(0);
+            if (old[2]) { launchRunnerAnimation(old[2], "third", "home"); runs += 1; }
+            if (old[1]) launchRunnerAnimation(old[1], "second", "third");
+            if (old[0]) launchRunnerAnimation(old[0], "first", "second");
+            launchRunnerAnimation(makeAnimatedRunner(battingTeam), "home", "first");
           } else if (hitType === "double") {
-            if (newRunners[2]) runs += 1;
-            if (newRunners[1]) runs += 1;
-            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
-            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 3, { ...newRunners[1], state: RUNNER_STATE.SCORING }));
-            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 2, { ...newRunners[0], state: RUNNER_STATE.RUNNING }));
-            game.runnerAnims.push(makeRunnerAnim(-1, 1, createBatterRunner(1)));
-            newRunners[2] = cloneRunner(newRunners[0], 2);
-            newRunners[1] = createBatterRunner(1);
-            newRunners[0] = null;
+            if (old[2]) { launchRunnerAnimation(old[2], "third", "home"); runs += 1; }
+            if (old[1]) { launchRunnerAnimation(old[1], "second", "home"); runs += 1; }
+            if (old[0]) launchRunnerAnimation(old[0], "first", "third");
+            launchRunnerAnimation(makeAnimatedRunner(battingTeam), "home", "second");
           } else if (hitType === "triple") {
-            if (newRunners[0]) runs += 1;
-            if (newRunners[1]) runs += 1;
-            if (newRunners[2]) runs += 1;
-            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 3, { ...newRunners[0], state: RUNNER_STATE.SCORING }));
-            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 3, { ...newRunners[1], state: RUNNER_STATE.SCORING }));
-            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
-            game.runnerAnims.push(makeRunnerAnim(-1, 2, createBatterRunner(2)));
-            newRunners[0] = null;
-            newRunners[1] = null;
-            newRunners[2] = createBatterRunner(2);
+            if (old[2]) { launchRunnerAnimation(old[2], "third", "home"); runs += 1; }
+            if (old[1]) { launchRunnerAnimation(old[1], "second", "home"); runs += 1; }
+            if (old[0]) { launchRunnerAnimation(old[0], "first", "home"); runs += 1; }
+            launchRunnerAnimation(makeAnimatedRunner(battingTeam), "home", "third");
           } else if (hitType === "homerun") {
-            if (newRunners[0]) runs += 1;
-            if (newRunners[1]) runs += 1;
-            if (newRunners[2]) runs += 1;
+            if (old[2]) { launchRunnerAnimation(old[2], "third", "home", 2.5); runs += 1; }
+            if (old[1]) { launchRunnerAnimation(old[1], "second", "home", 2.5); runs += 1; }
+            if (old[0]) { launchRunnerAnimation(old[0], "first", "home", 2.5); runs += 1; }
+            launchRunnerAnimation(makeAnimatedRunner(battingTeam), "home", "home", 2.5);
             runs += 1;
-            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 3, { ...newRunners[0], state: RUNNER_STATE.SCORING }));
-            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 3, { ...newRunners[1], state: RUNNER_STATE.SCORING }));
-            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
-            game.runnerAnims.push(makeRunnerAnim(-1, 3, createBatterRunner(3)));
-            newRunners[0] = null;
-            newRunners[1] = null;
-            newRunners[2] = null;
           } else if (hitType === "walk") {
-            if (newRunners[0] && newRunners[1] && newRunners[2]) runs += 1;
-            if (newRunners[2] && newRunners[1] && newRunners[0]) {
-              game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
-            }
-            if (newRunners[1] && newRunners[0]) {
-              game.runnerAnims.push(makeRunnerAnim(1, 2, { ...newRunners[1], state: RUNNER_STATE.RUNNING }));
-              newRunners[2] = cloneRunner(newRunners[1], 2);
-            }
-            if (newRunners[0]) {
-              game.runnerAnims.push(makeRunnerAnim(0, 1, { ...newRunners[0], state: RUNNER_STATE.RUNNING }));
-              newRunners[1] = cloneRunner(newRunners[0], 1);
-            }
-            game.runnerAnims.push(makeRunnerAnim(-1, 0, createBatterRunner(0)));
-            newRunners[0] = createBatterRunner(0);
+            if (old[0] && old[1] && old[2]) { launchRunnerAnimation(old[2], "third", "home"); runs += 1; }
+            if (old[0] && old[1]) launchRunnerAnimation(old[1], "second", "third");
+            if (old[0]) launchRunnerAnimation(old[0], "first", "second");
+            launchRunnerAnimation(makeAnimatedRunner(battingTeam), "home", "first");
           }
 
-          game.baseRunners = newRunners;
           if (runs > 0) {
             game.score.comets += runs;
             spawnPopup(`+${runs} RUN`, "#ffe86f", { x: BASES.home.x, y: BASES.home.y - 42, size: 40 });
@@ -1296,28 +1271,6 @@
             spawnFireworks(640, 240, 36);
           }
           updateScoreboard();
-        }
-
-        function makeRunnerAnim(fromBaseIndex, toBaseIndex, runner) {
-          const points = [BASES.home, BASES.first, BASES.second, BASES.third, BASES.home];
-          const fromPoint = fromBaseIndex < 0 ? points[0] : points[fromBaseIndex + 1];
-          const toPoint = toBaseIndex >= 3 ? points[4] : points[toBaseIndex + 1];
-          const midX = (fromPoint.x + toPoint.x) * 0.5;
-          const midY = (fromPoint.y + toPoint.y) * 0.5;
-          const curve = toBaseIndex === 3 ? -20 : 24;
-          return {
-            runner: runner ? { ...runner } : makeRunner(toBaseIndex),
-            fromX: fromPoint.x,
-            fromY: fromPoint.y,
-            cx: midX + (toPoint.x - fromPoint.x) * 0.18,
-            cy: midY + curve,
-            toX: toPoint.x,
-            toY: toPoint.y,
-            t: 0,
-            duration: fromBaseIndex < 0 ? 1.2 : 1.05,
-            slide: Math.random() < 0.35 && toBaseIndex > 0 && toBaseIndex < 3,
-            toBaseIndex
-          };
         }
 
         function spawnPopup(text, color, options = {}) {
@@ -1744,24 +1697,37 @@
           }
         }
 
-        function updateRunnerAnims(dt) {
-          for (let i = game.runnerAnims.length - 1; i >= 0; i -= 1) {
-            const r = game.runnerAnims[i];
-            r.t += dt / r.duration;
-            if (r.runner) {
-              if (r.t >= 1) {
-                if (r.toBaseIndex >= 3) {
-                  r.runner.state = RUNNER_STATE.SCORING;
-                } else {
-                  r.runner.state = RUNNER_STATE.HOLDING;
-                  r.runner.baseIndex = r.toBaseIndex;
-                  r.runner.lead = 0;
-                }
-              } else {
-                r.runner.state = RUNNER_STATE.RUNNING;
-              }
+        function updateActiveRunners() {
+          for (let i = activeRunners.length - 1; i >= 0; i -= 1) {
+            const ar = activeRunners[i];
+            if (ar.done) {
+              activeRunners.splice(i, 1);
+              continue;
             }
-            if (r.t >= 1) game.runnerAnims.splice(i, 1);
+            const nextWP = ar.waypoints[ar.wpIndex + 1];
+            if (!nextWP) {
+              onRunnerReachedBase(ar);
+              activeRunners.splice(i, 1);
+              continue;
+            }
+            const dx = nextWP.x - ar.x;
+            const dy = nextWP.y - ar.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= ar.speed) {
+              ar.x = nextWP.x;
+              ar.y = nextWP.y;
+              ar.wpIndex += 1;
+              if (ar.wpIndex >= ar.waypoints.length - 1) {
+                onRunnerReachedBase(ar);
+                activeRunners.splice(i, 1);
+                continue;
+              }
+            } else {
+              ar.x += (dx / dist) * ar.speed;
+              ar.y += (dy / dist) * ar.speed;
+            }
+            ar.frameTimer += 1;
+            if (ar.frameTimer % 5 === 0) ar.frame = (ar.frame + 1) % 4;
           }
         }
 
@@ -1839,8 +1805,11 @@
             if (a.state === FIELDER_STATE.REACTING && a.stateTimer <= 0) {
               a.state = FIELDER_STATE.RUNNING;
             } else if (a.state === FIELDER_STATE.FOLLOW_THROUGH && a.stateTimer <= 0) {
-              a.state = FIELDER_STATE.IDLE;
-              f.isAnimating = false;
+              a.state = FIELDER_STATE.RETURNING;
+              a.stateTimer = 0;
+              a.runFrame = 0;
+              f.hasBall = false;
+              f.isAnimating = true;
             } else if (a.state === FIELDER_STATE.RETURNING) {
               const dx = f.baseX - f.x;
               const dy = f.baseY - f.y;
@@ -1985,9 +1954,14 @@
         }
 
         function resizeCanvas() {
-          const rect = fieldWrap.getBoundingClientRect();
-          canvas.style.width = `${Math.floor(rect.width)}px`;
-          canvas.style.height = `${Math.floor(rect.height)}px`;
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+          canvas.style.width = "100vw";
+          canvas.style.height = "100vh";
+          canvas.style.display = "block";
+          canvas.style.position = "fixed";
+          canvas.style.top = "0";
+          canvas.style.left = "0";
         }
 
         function draw() {
@@ -2003,9 +1977,8 @@
           drawPlayers();
           drawBaseRunners();
           drawBall();
-          drawRunnerAnimations();
+          drawActiveRunners();
           drawParticlesLayer();
-          drawTimingBar();
           ctx.restore();
 
           drawPopups();
@@ -2049,11 +2022,11 @@
         }
 
         function drawField() {
-          const wallTop = FIELD.wallY;
+          const wallTop = Math.round(VIRTUAL_HEIGHT * 0.30);
           const wallHeight = 25;
           const warningTrackTop = wallTop + wallHeight;
           const warningTrackHeight = 30;
-          const grassTop = warningTrackTop + warningTrackHeight;
+          const grassTop = Math.round(VIRTUAL_HEIGHT * 0.30);
 
           drawStadiumStands(wallTop);
 
@@ -2208,7 +2181,7 @@
         }
 
         function drawStadiumStands(wallTop) {
-          const standsTop = SKY_BAND_Y - 8;
+          const standsTop = Math.round(VIRTUAL_HEIGHT * 0.22);
           const standsBottom = wallTop - 2;
           const rows = 5;
           const rowH = (standsBottom - standsTop) / rows;
@@ -2239,19 +2212,7 @@
             }
           }
 
-          // press box / scoreboard
-          ctx.fillStyle = "#1d2f46";
-          roundRect(ctx, VIRTUAL_WIDTH / 2 - 92, standsTop - 22, 184, 20, 4);
-          ctx.fill();
-          ctx.strokeStyle = "#111";
-          ctx.stroke();
-          ctx.fillStyle = "#3ec5ff";
-          ctx.fillRect(VIRTUAL_WIDTH / 2 - 78, standsTop - 16, 56, 8);
-          ctx.fillRect(VIRTUAL_WIDTH / 2 + 22, standsTop - 16, 56, 8);
-          ctx.fillStyle = "#ff9b3d";
-          ctx.font = '8px "Press Start 2P"';
-          ctx.textAlign = "center";
-          ctx.fillText(`${game.score.comets}-${game.score.foxes}`, VIRTUAL_WIDTH / 2, standsTop - 7);
+          // press box
           ctx.textAlign = "left";
         }
 
@@ -2515,25 +2476,6 @@
           ctx.restore();
         }
 
-        function drawRunnerAnimations() {
-          for (const r of game.runnerAnims) {
-            const t = Math.min(1, r.t);
-            const inv = 1 - t;
-            const x = inv * inv * r.fromX + 2 * inv * t * r.cx + t * t * r.toX;
-            const y = inv * inv * r.fromY + 2 * inv * t * r.cy + t * t * r.toY;
-            if (r.slide && t > 0.86) {
-              ctx.save();
-              ctx.translate(x, y + 4);
-              ctx.rotate(-0.32);
-              ctx.scale(1.18, 0.78);
-              drawPlayer({ team: r.runner?.team || "red", x: 0, y: 0, role: "runner", swing: 0, anim: { vx: 140, vy: 0, runFrame: 2 } }, false, false);
-              ctx.restore();
-            } else {
-              drawPlayer({ team: r.runner?.team || "red", x, y, role: "runner", swing: 0, anim: { vx: 110, vy: 0, runFrame: 1 } }, false, false);
-            }
-          }
-        }
-
         function getRunnerHoldPosition(baseIndex, lead = 0) {
           if (baseIndex === 0) return { x: BASES.first.x - 16 + lead, y: BASES.first.y + 14 };
           if (baseIndex === 1) return { x: BASES.second.x + lead * 0.45, y: BASES.second.y + 16 };
@@ -2547,6 +2489,19 @@
             const leadDir = i === 2 ? 1 : i === 1 ? 0.3 : 1;
             const pos = getRunnerHoldPosition(i, runner.lead * leadDir);
             drawPlayer({ team: runner.team || "red", x: pos.x, y: pos.y, role: "runner", swing: 0, anim: { vx: Math.abs(runner.lead) > 2 ? 35 : 0, vy: 0 } }, false, false);
+          }
+        }
+
+        function drawActiveRunners() {
+          for (const ar of activeRunners) {
+            drawPlayer({
+              team: ar.team || "red",
+              x: ar.x,
+              y: ar.y,
+              role: "runner",
+              swing: 0,
+              anim: { vx: 95 + ar.frame * 8, vy: 0, runFrame: ar.frame }
+            }, false, false);
           }
         }
 
@@ -2564,34 +2519,6 @@
           ctx.globalAlpha = 1;
         }
 
-        function drawTimingBar() {
-          if (!(game.phase === PHASE.PITCH_FLIGHT || game.phase === PHASE.BATTING_WINDOW) || !game.pitchBall) return;
-          const barW = 120;
-          const barH = 9;
-          const barX = BASES.home.x - barW / 2;
-          const barY = BASES.home.y + 18;
-
-          roundRect(ctx, barX - 3, barY - 3, barW + 6, barH + 6, 4);
-          ctx.fillStyle = "rgba(0,0,0,0.34)";
-          ctx.fill();
-
-          ctx.fillStyle = "#d84a4a";
-          ctx.fillRect(barX, barY, barW, barH);
-          ctx.fillStyle = "#f0c24b";
-          ctx.fillRect(barX + barW * 0.18, barY, barW * 0.64, barH);
-          ctx.fillStyle = "#4fdb64";
-          ctx.fillRect(barX + barW * 0.44, barY, barW * 0.12, barH);
-
-          const dotT = Math.max(0, Math.min(1, game.pitchBall.t));
-          const dotX = barX + dotT * barW;
-          ctx.fillStyle = "#ffffff";
-          ctx.strokeStyle = "#111";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(dotX, barY + barH / 2, 4.2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        }
         function drawPopups() {
           for (const p of game.popupTexts) {
             const progress = Math.min(1, p.age / p.duration);
@@ -2777,7 +2704,7 @@
             players.batter.swing = Math.max(0, players.batter.swing - dt);
           }
 
-          updateRunnerAnims(dt);
+          updateActiveRunners();
           updatePlayerAnimations(dt);
           applyFieldingSupportMotion(dt);
           updateCrowd(dt);
@@ -2945,8 +2872,8 @@
           game.lockInput = false;
           game.transitionText = "";
           game.baseRunners = [null, null, null];
+          activeRunners = [];
           game.nextRunnerId = 1;
-          game.runnerAnims = [];
           game.popupTexts = [];
           game.particles = [];
           game.fireworks = [];
