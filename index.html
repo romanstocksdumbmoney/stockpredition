@@ -220,13 +220,13 @@
     .stats-title { color: #9ec4dd; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 1px; }
     .stat-row {
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto auto 1fr auto;
       align-items: center;
       gap: 8px;
       color: #d5e5f1;
       font-size: 0.9rem;
     }
-    .stat-icon { opacity: 0.85; }
+    .stat-icon { opacity: 0.9; display: inline-flex; align-items: center; justify-content: center; width: 18px; }
     .stat-dots { border-bottom: 1px dotted #3e6275; align-self: center; height: 1px; }
     .stat-value { color: var(--green-bright); font-family: "Orbitron", sans-serif; font-size: 0.82rem; }
 
@@ -833,9 +833,9 @@
       <section class="stats-panel">
         <div class="stats-title">Operator Stats</div>
         <div class="stat-row"><span class="stat-icon">⚡</span><span>Clicks / sec</span><span class="stat-dots"></span><span id="stat-cps" class="stat-value">0.0</span></div>
-        <div class="stat-row"><span class="stat-icon">🖱️</span><span>Total Clicks</span><span class="stat-dots"></span><span id="stat-total-clicks" class="stat-value">0</span></div>
-        <div class="stat-row"><span class="stat-icon">📦</span><span>Cases Opened</span><span class="stat-dots"></span><span id="stat-cases-opened" class="stat-value">0</span></div>
-        <div class="stat-row"><span class="stat-icon">🔪</span><span>Knives Owned</span><span class="stat-dots"></span><span id="stat-knives-owned" class="stat-value">0</span></div>
+        <div class="stat-row"><span class="stat-icon">◎</span><span>Total Clicks</span><span class="stat-dots"></span><span id="stat-total-clicks" class="stat-value">0</span></div>
+        <div class="stat-row"><span class="stat-icon">▣</span><span>Cases Opened</span><span class="stat-dots"></span><span id="stat-cases-opened" class="stat-value">0</span></div>
+        <div class="stat-row"><span class="stat-icon">★</span><span>Knives Owned</span><span class="stat-dots"></span><span id="stat-knives-owned" class="stat-value">0</span></div>
       </section>
       <section id="equipped-knife-display" class="equipped-knife-display">
         <span class="label">Equipped Knife</span>
@@ -1098,8 +1098,20 @@
     let audioCtx = null;
     let bombCtx = null;
     let bombHover = false;
-    let inventory = [];
     const inventoryStorageKey = "csgo_inventory";
+    const moneyStorageKey = "csgo_money";
+    const casesOpenedStorageKey = "csgo_cases_opened";
+    const casesOwnedStorageKey = "csgo_cases_owned";
+    const totalClicksStorageKey = "csgo_total_clicks";
+    let inventory = (() => {
+      try {
+        const raw = localStorage.getItem(inventoryStorageKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
 
     function roundedRectPath(ctx, x, y, w, h, r) {
       const radius = Math.min(r, w / 2, h / 2);
@@ -1217,6 +1229,22 @@
       return `${min}:${String(sec).padStart(2, "0")}`;
     }
 
+    function normalizeRarity(rarity) {
+      const fallback = "milspec";
+      if (!rarity) return fallback;
+      const normalized = String(rarity).toLowerCase();
+      if (rarityMeta[normalized]) return normalized;
+      const rarityAliasToCanonical = {
+        gray: "consumer",
+        blue: "milspec",
+        purple: "restricted",
+        pink: "classified",
+        red: "covert",
+        gold: "knife"
+      };
+      return rarityAliasToCanonical[normalized] || fallback;
+    }
+
     function getRarityTier(rarity) {
       if (rarity === "knife") return "gold";
       if (rarity === "covert") return "red";
@@ -1232,7 +1260,7 @@
 
     function normalizeInventoryItem(item) {
       if (!item) return null;
-      const rarity = item.rarity || "milspec";
+      const rarity = normalizeRarity(item.rarity || item.rarityTier || "milspec");
       const type = item.type || item.kind || (rarity === "knife" ? "knife" : "skin");
       const id = item.id || `${type}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
       const finish = item.finish || "";
@@ -1276,6 +1304,46 @@
       }
     }
 
+    function saveProgressState() {
+      try {
+        localStorage.setItem(moneyStorageKey, String(state.money));
+        localStorage.setItem(casesOpenedStorageKey, String(state.casesOpened));
+        localStorage.setItem(casesOwnedStorageKey, String(state.caseInventory));
+        localStorage.setItem(totalClicksStorageKey, String(state.totalClicks));
+      } catch (error) {
+        console.error("Failed to save progress state:", error);
+      }
+    }
+
+    function loadProgressState() {
+      try {
+        const moneyRaw = localStorage.getItem(moneyStorageKey);
+        const casesOpenedRaw = localStorage.getItem(casesOpenedStorageKey);
+        const casesOwnedRaw = localStorage.getItem(casesOwnedStorageKey);
+        const totalClicksRaw = localStorage.getItem(totalClicksStorageKey);
+
+        if (moneyRaw !== null) {
+          const parsed = Number.parseFloat(moneyRaw);
+          if (Number.isFinite(parsed)) state.money = Math.max(0, parsed);
+        }
+        if (casesOpenedRaw !== null) {
+          const parsed = Number.parseInt(casesOpenedRaw, 10);
+          if (Number.isFinite(parsed)) state.casesOpened = Math.max(0, parsed);
+        }
+        if (casesOwnedRaw !== null) {
+          const parsed = Number.parseInt(casesOwnedRaw, 10);
+          if (Number.isFinite(parsed)) state.caseInventory = Math.max(0, parsed);
+        }
+        if (totalClicksRaw !== null) {
+          const parsed = Number.parseInt(totalClicksRaw, 10);
+          if (Number.isFinite(parsed)) state.totalClicks = Math.max(0, parsed);
+        }
+        state.displayedMoney = state.money;
+      } catch (error) {
+        console.error("Failed to load progress state:", error);
+      }
+    }
+
     function loadInventory() {
       try {
         const raw = localStorage.getItem(inventoryStorageKey);
@@ -1297,21 +1365,26 @@
       }
     }
 
+    function resolveRarityKey(item = {}) {
+      return normalizeRarity(item.rarity || item.rarityTier || (item.type === "knife" || item.kind === "knife" ? "knife" : "milspec"));
+    }
+
     function createInventoryItemFromDrop(drop, wearInfo = null) {
       const isKnife = (drop.type || drop.kind) === "knife" || drop.rarity === "knife";
       const normalizedWear = wearInfo?.condition?.name || drop.float || getRandomWearCondition();
+      const rarityKey = resolveRarityKey(drop);
       return normalizeInventoryItem({
         id: drop.id || `${isKnife ? "knife" : "skin"}-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
         name: drop.name,
-        rarity: drop.rarity,
-        rarityLabel: rarityMeta[drop.rarity]?.label || drop.rarityLabel || "Unknown",
+        rarity: rarityKey,
+        rarityLabel: rarityMeta[rarityKey]?.label || drop.rarityLabel || "Unknown",
         type: isKnife ? "knife" : "skin",
         kind: isKnife ? "knife" : "skin",
         cps: drop.cps || 0,
         knifeType: isKnife ? drop.name : null,
         finish: drop.finish || null,
         float: normalizedWear,
-        value: drop.value ?? getItemValue({ ...drop, kind: isKnife ? "knife" : "skin" }),
+        value: drop.value ?? getItemValue({ ...drop, rarity: rarityKey, kind: isKnife ? "knife" : "skin" }),
         wonInFlip: Boolean(drop.wonInFlip),
         wonTag: drop.wonTag || ""
       });
@@ -1352,6 +1425,7 @@
       updateEquippedKnife();
       updateEquippedKnifeHud();
       updatePrestigeHud();
+      updateOperatorStats();
       saveInventory();
 
       if (!skipRender) {
@@ -1380,7 +1454,8 @@
         state.caseWinnerNode = null;
       }
 
-      console.log("Inventory after add:", inventory);
+      console.log("Inventory after:", JSON.stringify(inventory));
+      console.log("localStorage:", localStorage.getItem(inventoryStorageKey));
       return added;
     }
 
@@ -1393,6 +1468,7 @@
     function addMoney(amount) {
       state.money += amount;
       if (state.money < 0) state.money = 0;
+      saveProgressState();
     }
 
     function animateMoneyHud() {
@@ -1643,12 +1719,15 @@
     }
 
     function getDropDisplayName(drop) {
-      return drop.kind === "knife" ? `${drop.name} | ${drop.finish}` : drop.name;
+      const isKnife = drop.kind === "knife" || drop.type === "knife";
+      return isKnife ? `${drop.name} | ${drop.finish}` : drop.name;
     }
 
     function getItemValue(item) {
-      const base = rarityMeta[item.rarity].value;
-      if (item.kind === "knife") {
+      const rarity = normalizeRarity(item.rarity);
+      const base = (rarityMeta[rarity] || rarityMeta.milspec).value;
+      const isKnife = item.kind === "knife" || item.type === "knife";
+      if (isKnife) {
         return base + Math.round(item.cps * 120);
       }
       return base;
@@ -1677,15 +1756,12 @@
       el.equippedKnifeCps.textContent = `(+${knife.cps.toFixed(1)} CPS)`;
     }
 
-    function updateSidebarStats() {
-      const cpsNode = document.getElementById("stat-cps");
-      const totalNode = document.getElementById("stat-total-clicks");
-      const casesNode = document.getElementById("stat-cases-opened");
-      const knivesNode = document.getElementById("stat-knives-owned");
-      if (cpsNode) cpsNode.textContent = getCps().toFixed(1);
-      if (totalNode) totalNode.textContent = Math.floor(state.totalClicks).toLocaleString();
-      if (casesNode) casesNode.textContent = `${state.casesOpened}`;
-      if (knivesNode) knivesNode.textContent = `${state.knifeInventory.length}`;
+    function updateOperatorStats() {
+      if (el.statCps) el.statCps.textContent = getCps().toFixed(1);
+      if (el.statTotalClicks) el.statTotalClicks.textContent = Math.floor(state.totalClicks).toLocaleString();
+      if (el.statCasesOpened) el.statCasesOpened.textContent = `${state.casesOpened || 0}`;
+      const knivesCount = inventory.filter((item) => item.type === "knife").length;
+      if (el.statKnivesOwned) el.statKnivesOwned.textContent = `${knivesCount}`;
     }
 
     function showKnifeDropCelebration() {
@@ -1747,6 +1823,7 @@
       inventory = inventory.filter((item) => item.id !== ref.id);
       refreshInventoryBuckets();
       saveInventory();
+      updateOperatorStats();
     }
 
     function addWonTag(item, label = "WON IN FLIP") {
@@ -1873,7 +1950,9 @@
       const entries = [
         ...inventory
       ].sort((a, b) => {
-        const rarityDelta = rarityMeta[b.rarity].order - rarityMeta[a.rarity].order;
+        const aMeta = rarityMeta[normalizeRarity(a.rarity)] || rarityMeta.milspec;
+        const bMeta = rarityMeta[normalizeRarity(b.rarity)] || rarityMeta.milspec;
+        const rarityDelta = bMeta.order - aMeta.order;
         if (rarityDelta !== 0) return rarityDelta;
         return getDropDisplayName(a).localeCompare(getDropDisplayName(b));
       });
@@ -1897,7 +1976,7 @@
         </div>
         <div class="inventory-list">
           ${entries.map((entry) => {
-            const meta = rarityMeta[entry.rarity];
+            const meta = rarityMeta[normalizeRarity(entry.rarity)] || rarityMeta.milspec;
             const name = getDropDisplayName(entry);
             const sub = entry.kind === "knife"
               ? `${meta.label} • +${entry.cps.toFixed(1)} CPS`
@@ -2038,6 +2117,9 @@
     function revealCaseResult(drop, winnerEl) {
       clearCaseTimers();
       const wearInfo = getWear();
+      console.log("=== CASE OPENED ===");
+      console.log("Item dropped:", drop);
+      console.log("Inventory before:", JSON.stringify(inventory));
       state.casePendingDrop = drop;
       state.currentDroppedItem = drop;
       currentDroppedItem = drop;
@@ -2206,6 +2288,8 @@
       state.casesOpened += 1;
       const drop = rollDrop();
       startCaseReveal(drop, "Case Opening");
+      saveProgressState();
+      updateOperatorStats();
       updateShopButtons();
     }
 
@@ -2216,6 +2300,7 @@
       playPurchaseSound();
       addMoney(-cost);
       state.caseInventory += 1;
+      saveProgressState();
       spawnPurchaseFloat(sourceButton, "+1 CASE");
       showKillFeed(`<span class="weapon">CASE</span> purchased <span class="event">$${formatMoney(cost)}</span>`);
       updatePrestigeHud();
@@ -2295,6 +2380,7 @@
       initAudio();
       const gain = getClickValue();
       addMoney(gain);
+      state.totalClicks += 1;
       playClickSound();
       flashOverlay(el.clickFlash);
 
@@ -2312,6 +2398,7 @@
       el.bombBtn.classList.remove("shake");
       void el.bombBtn.offsetWidth;
       el.bombBtn.classList.add("shake");
+      updateOperatorStats();
     }
 
     function tryPrestige() {
@@ -2337,6 +2424,7 @@
       state.knifeInventory = [];
       inventory = [];
       saveInventory();
+      saveProgressState();
       state.equippedKnifeId = null;
       updateInventoryBadge(0, true);
       state.activeTab = "shop";
@@ -2349,6 +2437,7 @@
       renderShopView();
       updateRoundHud();
       updatePrestigeHud();
+      updateOperatorStats();
     }
 
     function gameTick() {
@@ -2366,6 +2455,7 @@
       updatePrestigeHud();
       updateShopButtons();
       updateEquippedKnifeHud();
+      updateOperatorStats();
       drawBombDevice(performance.now());
     }
 
@@ -2731,11 +2821,13 @@
     }
 
     function init() {
+      loadProgressState();
       loadInventory();
       updateEquippedKnife();
       updateRoundHud();
       updatePrestigeHud();
       updateEquippedKnifeHud();
+      updateOperatorStats();
       renderShopView();
       if (el.bombCanvas) {
         bombCtx = el.bombCanvas.getContext("2d");
