@@ -1970,9 +1970,7 @@
     }
 
     function renderInventoryTab() {
-      const entries = [
-        ...inventory
-      ].sort((a, b) => {
+      const entries = [...inventory].sort((a, b) => {
         const aMeta = rarityMeta[normalizeRarity(a.rarity)] || rarityMeta.milspec;
         const bMeta = rarityMeta[normalizeRarity(b.rarity)] || rarityMeta.milspec;
         const rarityDelta = bMeta.order - aMeta.order;
@@ -1981,38 +1979,58 @@
       });
 
       const totalValue = entries.reduce((sum, entry) => sum + getItemValue(entry), 0);
-
-      if (entries.length === 0) {
-        return `
-          <div class="collection-summary">
-            <span>Total Collection Value</span>
-            <strong>$0.00</strong>
-          </div>
-          <div class="no-items">Inventory empty. Start opening cases.</div>
-        `;
-      }
-
-      return `
+      const summary = `
         <div class="collection-summary">
           <span>Total Collection Value</span>
           <strong>$${formatMoney(totalValue)}</strong>
         </div>
+      `;
+
+      if (entries.length === 0) {
+        return `${summary}<div class="no-items">Inventory empty. Start opening cases.</div>`;
+      }
+
+      const rarityColors = {
+        gold: "#e4ae39",
+        red: "#eb4b4b",
+        pink: "#d32ce6",
+        purple: "#8847ff",
+        blue: "#4b69ff",
+        gray: "#aaaaaa"
+      };
+      const rarityOrder = { gold: 0, red: 1, pink: 2, purple: 3, blue: 4, gray: 5 };
+      const mappedEntries = entries.map((entry) => ({
+        ...entry,
+        rarityTier: entry.rarityTier || getRarityTier(normalizeRarity(entry.rarity))
+      })).sort((a, b) => (rarityOrder[a.rarityTier] ?? 5) - (rarityOrder[b.rarityTier] ?? 5));
+
+      return `
+        ${summary}
         <div class="inventory-list">
-          ${entries.map((entry) => {
+          ${mappedEntries.map((entry) => {
+            const tier = entry.rarityTier || "blue";
             const meta = rarityMeta[normalizeRarity(entry.rarity)] || rarityMeta.milspec;
-            const name = getDropDisplayName(entry);
-            const sub = entry.kind === "knife"
-              ? `${meta.label} • +${entry.cps.toFixed(1)} CPS`
-              : meta.label;
+            const isKnife = entry.type === "knife" || entry.kind === "knife";
             return `
-              <article class="inv-card ${meta.css}">
-                ${entry.kind === "knife" ? `<div class="knife-glyph"></div>` : `<div style="width:32px;height:18px;border-radius:3px;background:${meta.color};opacity:0.75;"></div>`}
-                <div class="inv-main">
-                  <div class="inv-name">${name}</div>
-                  <div class="inv-sub">${sub}${entry.wonTag ? ` • ${entry.wonTag}` : ""}</div>
+              <div style="
+                display:flex;justify-content:space-between;align-items:center;
+                background:#162030;
+                border-left:4px solid ${rarityColors[tier] || "#555"};
+                border-radius:4px;padding:10px 12px;margin-bottom:6px;
+              ">
+                <div>
+                  <div style="color:#e8eef4;font-size:13px;font-weight:bold;">${getDropDisplayName(entry)}</div>
+                  <div style="color:${rarityColors[tier] || "#aaa"};font-size:11px;">
+                    ${(entry.rarityLabel || meta.label)} · ${(entry.float || "Field-Tested")}
+                  </div>
+                  ${entry.cps > 0 ? `<div style="color:#4caf50;font-size:11px;">⚡ +${entry.cps.toFixed(1)} CPS</div>` : ""}
+                  ${entry.wonInFlip ? `<div style="color:#f0a500;font-size:10px;">🪙 Won in flip</div>` : ""}
                 </div>
-                <div class="inv-val">$${formatMoney(getItemValue(entry))}</div>
-              </article>
+                <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+                  <div style="color:#f0a500;font-size:12px;">$${(entry.value || 0).toLocaleString()}</div>
+                  ${isKnife ? `<div style="color:#e4ae39;font-size:10px;">★ KNIFE</div>` : ""}
+                </div>
+              </div>
             `;
           }).join("")}
         </div>
@@ -2847,8 +2865,8 @@
     }
 
     function init() {
+      initInventory();
       loadProgressState();
-      loadInventory();
       updateEquippedKnife();
       updateRoundHud();
       updatePrestigeHud();
