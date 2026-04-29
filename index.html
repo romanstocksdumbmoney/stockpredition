@@ -1023,6 +1023,7 @@
       caseAnimating: false,
       bombFlashUntil: 0,
       casePendingDrop: null,
+      currentDroppedItem: null,
       casePendingWear: null,
       caseWinnerNode: null,
       caseRevealTimer: null,
@@ -1097,6 +1098,8 @@
     let audioCtx = null;
     let bombCtx = null;
     let bombHover = false;
+    let inventory = [];
+    const inventoryStorageKey = "csgo_inventory";
 
     function roundedRectPath(ctx, x, y, w, h, r) {
       const radius = Math.min(r, w / 2, h / 2);
@@ -1212,6 +1215,173 @@
       const min = Math.floor(seconds / 60);
       const sec = seconds % 60;
       return `${min}:${String(sec).padStart(2, "0")}`;
+    }
+
+    function getRarityTier(rarity) {
+      if (rarity === "knife") return "gold";
+      if (rarity === "covert") return "red";
+      if (rarity === "classified") return "pink";
+      if (rarity === "restricted") return "purple";
+      if (rarity === "milspec") return "blue";
+      return "gray";
+    }
+
+    function getRandomWearCondition() {
+      return randomFrom(wearTiers).label;
+    }
+
+    function normalizeInventoryItem(item) {
+      if (!item) return null;
+      const rarity = item.rarity || "milspec";
+      const type = item.type || item.kind || (rarity === "knife" ? "knife" : "skin");
+      const id = item.id || `${type}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+      const finish = item.finish || "";
+      const baseName = item.name || (type === "knife" ? "Unknown Knife" : "Unknown Skin");
+      return {
+        id,
+        name: baseName,
+        rarity,
+        rarityLabel: item.rarityLabel || rarityMeta[rarity]?.label || "Unknown",
+        rarityTier: item.rarityTier || getRarityTier(rarity),
+        type,
+        kind: type,
+        cps: Number(item.cps || 0),
+        knifeType: item.knifeType || (type === "knife" ? baseName : null),
+        finish,
+        float: item.float || getRandomWearCondition(),
+        value: Number(item.value ?? getItemValue({ ...item, kind: type, rarity })),
+        wonInFlip: Boolean(item.wonInFlip),
+        wonTag: item.wonTag || ""
+      };
+    }
+
+    function refreshInventoryBuckets() {
+      state.inventorySkins = inventory.filter((item) => item.type === "skin");
+      state.knifeInventory = inventory.filter((item) => item.type === "knife");
+    }
+
+    function updateInventoryBadge(delta = 0, reset = false) {
+      if (reset) {
+        state.inventoryBadgeCount = 0;
+      } else if (delta !== 0) {
+        state.inventoryBadgeCount = Math.max(0, state.inventoryBadgeCount + delta);
+      }
+    }
+
+    function saveInventory() {
+      try {
+        localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory));
+      } catch (error) {
+        console.error("Failed to save inventory:", error);
+      }
+    }
+
+    function loadInventory() {
+      try {
+        const raw = localStorage.getItem(inventoryStorageKey);
+        if (!raw) {
+          inventory = [];
+          refreshInventoryBuckets();
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        inventory = Array.isArray(parsed)
+          ? parsed.map((entry) => normalizeInventoryItem(entry)).filter(Boolean)
+          : [];
+        refreshInventoryBuckets();
+        console.log("Loaded inventory:", inventory.length, "items");
+      } catch (error) {
+        console.error("Inventory load failed, resetting inventory:", error);
+        inventory = [];
+        refreshInventoryBuckets();
+      }
+    }
+
+    function createInventoryItemFromDrop(drop, wearInfo = null) {
+      const isKnife = (drop.type || drop.kind) === "knife" || drop.rarity === "knife";
+      const normalizedWear = wearInfo?.condition?.name || drop.float || getRandomWearCondition();
+      return normalizeInventoryItem({
+        id: drop.id || `${isKnife ? "knife" : "skin"}-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        name: drop.name,
+        rarity: drop.rarity,
+        rarityLabel: rarityMeta[drop.rarity]?.label || drop.rarityLabel || "Unknown",
+        type: isKnife ? "knife" : "skin",
+        kind: isKnife ? "knife" : "skin",
+        cps: drop.cps || 0,
+        knifeType: isKnife ? drop.name : null,
+        finish: drop.finish || null,
+        float: normalizedWear,
+        value: drop.value ?? getItemValue({ ...drop, kind: isKnife ? "knife" : "skin" }),
+        wonInFlip: Boolean(drop.wonInFlip),
+        wonTag: drop.wonTag || ""
+      });
+    }
+
+    function addToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
+      const { skipRender = false, skipBadge = false } = options;
+      if (!item) {
+        console.error("addToInventory called with null item");
+        return false;
+      }
+
+      const normalizedItem = normalizeInventoryItem(item);
+      if (!normalizedItem) {
+        console.error("addToInventory normalization failed", item);
+        return false;
+      }
+
+      inventory.push(normalizedItem);
+      refreshInventoryBuckets();
+
+      if (!skipBadge) {
+        updateInventoryBadge(1);
+      }
+
+      if (normalizedItem.type === "knife") {
+        showKnifeDropCelebration();
+        playKnifeDropSound();
+      }
+
+      const sourceLabelSafe = String(sourceLabel || "DROP").replace(/[<>]/g, "");
+      if (normalizedItem.type === "knife") {
+        showKillFeed(`<span class="weapon">KNIFE DROPPED</span> ${normalizedItem.name}<span class="event"> ${normalizedItem.finish}</span>`);
+      } else {
+        showKillFeed(`<span class="weapon">${sourceLabelSafe}</span> ${normalizedItem.name}<span class="event"> ${rarityMeta[normalizedItem.rarity]?.label || normalizedItem.rarityLabel}</span>`);
+      }
+
+      updateEquippedKnife();
+      updateEquippedKnifeHud();
+      updatePrestigeHud();
+      saveInventory();
+
+      if (!skipRender) {
+        renderShopView();
+      }
+      return true;
+    }
+
+    function handleAddToInventory() {
+      console.log("=== ADD TO INVENTORY CLICKED ===");
+      console.log("Dropped item:", state.casePendingDrop || currentDroppedItem);
+      console.log("Current inventory before add:", inventory);
+
+      const droppedItem = state.casePendingDrop || currentDroppedItem;
+      if (!droppedItem) {
+        console.error("No pending dropped item found.");
+        return false;
+      }
+
+      const added = addToInventory(droppedItem, "CASE OPENING");
+      if (added) {
+        state.casePendingDrop = null;
+        state.currentDroppedItem = null;
+        currentDroppedItem = null;
+        state.casePendingWear = null;
+        state.caseWinnerNode = null;
+      }
+
+      console.log("Inventory after add:", inventory);
+      return added;
     }
 
     function flashOverlay(overlayEl) {
@@ -1387,11 +1557,17 @@
 
     function createSkinDrop(rarity) {
       return {
+        id: `skin-drop-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
         kind: "skin",
+        type: "skin",
         rarity,
+        rarityLabel: rarityMeta[rarity]?.label || "Mil-Spec",
         name: randomFrom(skinPools[rarity]),
         finish: "",
-        cps: 0
+        cps: 0,
+        float: getRandomWearCondition(),
+        value: rarityMeta[rarity]?.value || 50,
+        wonInFlip: false
       };
     }
 
@@ -1431,12 +1607,18 @@
       const finish = rollKnifeFinish();
       const extra = finish === "Doppler Phase 3" || finish === "Fade" ? 2 : 0;
       return {
+        id: `knife-drop-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
         kind: "knife",
+        type: "knife",
         rarity: "knife",
+        rarityLabel: rarityMeta.knife.label,
         knifeId: type.id,
         name: type.name,
         finish,
-        cps: type.cps + extra
+        cps: type.cps + extra,
+        float: getRandomWearCondition(),
+        value: rarityMeta.knife.value + Math.round((type.cps + extra) * 120),
+        wonInFlip: false
       };
     }
 
@@ -1562,15 +1744,13 @@
 
     function removeInventoryRef(ref) {
       if (!ref) return;
-      if (ref.type === "knife") {
-        state.knifeInventory = state.knifeInventory.filter((k) => k.id !== ref.id);
-      } else {
-        state.inventorySkins = state.inventorySkins.filter((s) => s.id !== ref.id);
-      }
+      inventory = inventory.filter((item) => item.id !== ref.id);
+      refreshInventoryBuckets();
+      saveInventory();
     }
 
     function addWonTag(item, label = "WON IN FLIP") {
-      return { ...item, wonTag: label };
+      return { ...item, wonTag: label, wonInFlip: true };
     }
 
     function renderShopTabs() {
@@ -1691,8 +1871,7 @@
 
     function renderInventoryTab() {
       const entries = [
-        ...state.inventorySkins,
-        ...state.knifeInventory
+        ...inventory
       ].sort((a, b) => {
         const rarityDelta = rarityMeta[b.rarity].order - rarityMeta[a.rarity].order;
         if (rarityDelta !== 0) return rarityDelta;
@@ -1836,27 +2015,8 @@
     }
 
     function applyDrop(drop, sourceLabel) {
-      if (drop.kind === "knife") {
-        const knife = {
-          ...drop,
-          id: `${drop.knifeId}-${Date.now()}-${Math.floor(Math.random() * 100000)}`
-        };
-        state.knifeInventory.push(knife);
-        updateEquippedKnife();
-        updateEquippedKnifeHud();
-        showKnifeDropCelebration();
-        playKnifeDropSound();
-        showKillFeed(`<span class="weapon">KNIFE DROPPED</span> ${knife.name}<span class="event"> ${knife.finish}</span>`);
-      } else {
-        state.inventorySkins.push({
-          ...drop,
-          id: `skin-${Date.now()}-${Math.floor(Math.random() * 100000)}`
-        });
-        const sourceLabelSafe = sourceLabel.replace(/[<>]/g, "");
-        showKillFeed(`<span class="weapon">${sourceLabelSafe}</span> ${drop.name}<span class="event"> ${rarityMeta[drop.rarity].label}</span>`);
-      }
-      updatePrestigeHud();
-      renderShopView();
+      const item = createInventoryItemFromDrop(drop, state.casePendingWear);
+      return addToInventory(item, sourceLabel);
     }
 
     function showCaseParticles(color = "#ffd56c", count = 32) {
@@ -1879,6 +2039,8 @@
       clearCaseTimers();
       const wearInfo = getWear();
       state.casePendingDrop = drop;
+      state.currentDroppedItem = drop;
+      currentDroppedItem = drop;
       state.casePendingWear = wearInfo;
       state.caseWinnerNode = winnerEl;
       el.revealDetails.classList.remove("hidden");
@@ -2030,6 +2192,8 @@
       el.caseModal.setAttribute("aria-hidden", "true");
       state.caseAnimating = false;
       state.casePendingDrop = null;
+      state.currentDroppedItem = null;
+      currentDroppedItem = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
       state.activeTab = "cases";
@@ -2171,8 +2335,10 @@
       state.casesOpened = 0;
       state.inventorySkins = [];
       state.knifeInventory = [];
+      inventory = [];
+      saveInventory();
       state.equippedKnifeId = null;
-      state.inventoryBadgeCount = 0;
+      updateInventoryBadge(0, true);
       state.activeTab = "shop";
       clearCaseTimers();
       for (const key of Object.keys(state.upgradesOwned)) {
@@ -2210,7 +2376,7 @@
       if (button.dataset.tab) {
         state.activeTab = button.dataset.tab;
         if (state.activeTab === "inventory") {
-          state.inventoryBadgeCount = 0;
+          updateInventoryBadge(0, true);
         }
         renderShopView();
         return;
@@ -2258,21 +2424,18 @@
     }
 
     function commitPendingCaseDrop() {
-      if (!state.casePendingDrop) return false;
-      applyDrop(state.casePendingDrop, "CASE OPENING");
-      state.inventoryBadgeCount += 1;
-      state.casePendingDrop = null;
-      state.casePendingWear = null;
-      state.caseWinnerNode = null;
-      return true;
+      return handleAddToInventory();
     }
 
     function sellPendingCaseDrop() {
-      if (!state.casePendingDrop) return;
-      const value = getItemValue(state.casePendingDrop);
+      const droppedItem = state.casePendingDrop || currentDroppedItem;
+      if (!droppedItem) return;
+      const value = getItemValue(droppedItem);
       addMoney(value);
       showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(value)}<span class="event"> instant cashout</span>`);
       state.casePendingDrop = null;
+      state.currentDroppedItem = null;
+      currentDroppedItem = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
       updatePrestigeHud();
@@ -2472,8 +2635,7 @@
             ...opponent.item,
             id: `${opponent.type}-won-${Date.now()}-${Math.floor(Math.random() * 9999)}`
           });
-          if (opponent.type === "knife") state.knifeInventory.push(wonOpp);
-          else state.inventorySkins.push(wonOpp);
+          addToInventory(wonOpp, "COIN FLIP", { skipBadge: true, skipRender: true });
           updateEquippedKnife();
         } else {
           flashOverlay(el.clickFlash);
@@ -2544,8 +2706,10 @@
       el.shop.addEventListener("click", handleShopClick);
       el.caseCloseBtn.addEventListener("click", closeCaseModal);
       el.addInvBtn.addEventListener("click", () => {
-        commitPendingCaseDrop();
-        closeCaseModal();
+        const committed = commitPendingCaseDrop();
+        if (committed) {
+          closeCaseModal();
+        }
       });
       el.openAnotherBtn.addEventListener("click", () => {
         const committed = commitPendingCaseDrop();
@@ -2567,6 +2731,8 @@
     }
 
     function init() {
+      loadInventory();
+      updateEquippedKnife();
       updateRoundHud();
       updatePrestigeHud();
       updateEquippedKnifeHud();
