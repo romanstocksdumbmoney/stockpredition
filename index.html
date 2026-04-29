@@ -1098,20 +1098,23 @@
     let audioCtx = null;
     let bombCtx = null;
     let bombHover = false;
-    const inventoryStorageKey = "csgo_inventory";
+    const inventoryStorageKey = "csgo_clicker_inventory";
+    const legacyInventoryStorageKey = "csgo_inventory";
     const moneyStorageKey = "csgo_money";
     const casesOpenedStorageKey = "csgo_cases_opened";
     const casesOwnedStorageKey = "csgo_cases_owned";
     const totalClicksStorageKey = "csgo_total_clicks";
+    let currentDroppedItem = null;
     let inventory = (() => {
       try {
-        const raw = localStorage.getItem(inventoryStorageKey);
+        const raw = localStorage.getItem(inventoryStorageKey) || localStorage.getItem(legacyInventoryStorageKey);
         const parsed = raw ? JSON.parse(raw) : [];
         return Array.isArray(parsed) ? parsed : [];
       } catch {
         return [];
       }
     })();
+    window.pendingCaseItem = null;
 
     function roundedRectPath(ctx, x, y, w, h, r) {
       const radius = Math.min(r, w / 2, h / 2);
@@ -1262,9 +1265,10 @@
       if (!item) return null;
       const rarity = normalizeRarity(item.rarity || item.rarityTier || "milspec");
       const type = item.type || item.kind || (rarity === "knife" ? "knife" : "skin");
-      const id = item.id || `${type}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+      const id = item.id || `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
       const finish = item.finish || "";
       const baseName = item.name || (type === "knife" ? "Unknown Knife" : "Unknown Skin");
+      const defaultValue = rarityMeta[rarity]?.value || 50;
       return {
         id,
         name: baseName,
@@ -1277,7 +1281,7 @@
         knifeType: item.knifeType || (type === "knife" ? baseName : null),
         finish,
         float: item.float || getRandomWearCondition(),
-        value: Number(item.value ?? getItemValue({ ...item, kind: type, rarity })),
+        value: Number(item.value ?? defaultValue),
         wonInFlip: Boolean(item.wonInFlip),
         wonTag: item.wonTag || ""
       };
@@ -1299,6 +1303,8 @@
     function saveInventory() {
       try {
         localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory));
+        localStorage.setItem(legacyInventoryStorageKey, JSON.stringify(inventory));
+        console.log("💾 Inventory saved:", inventory.length, "items");
       } catch (error) {
         console.error("Failed to save inventory:", error);
       }
@@ -1344,12 +1350,13 @@
       }
     }
 
-    function loadInventory() {
+    function initInventory() {
       try {
-        const raw = localStorage.getItem(inventoryStorageKey);
+        const raw = localStorage.getItem(inventoryStorageKey) || localStorage.getItem(legacyInventoryStorageKey);
         if (!raw) {
           inventory = [];
           refreshInventoryBuckets();
+          console.log("✅ Inventory loaded:", inventory.length, "items");
           return;
         }
         const parsed = JSON.parse(raw);
@@ -1357,12 +1364,17 @@
           ? parsed.map((entry) => normalizeInventoryItem(entry)).filter(Boolean)
           : [];
         refreshInventoryBuckets();
-        console.log("Loaded inventory:", inventory.length, "items");
+        saveInventory();
+        console.log("✅ Inventory loaded:", inventory.length, "items");
       } catch (error) {
         console.error("Inventory load failed, resetting inventory:", error);
         inventory = [];
         refreshInventoryBuckets();
       }
+    }
+
+    function loadInventory() {
+      initInventory();
     }
 
     function resolveRarityKey(item = {}) {
@@ -1390,16 +1402,17 @@
       });
     }
 
-    function addToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
+    function addItemToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
       const { skipRender = false, skipBadge = false } = options;
-      if (!item) {
-        console.error("addToInventory called with null item");
+      console.log("➕ addItemToInventory called with:", item);
+      if (!item || typeof item !== "object") {
+        console.error("❌ Invalid item:", item);
         return false;
       }
 
       const normalizedItem = normalizeInventoryItem(item);
       if (!normalizedItem) {
-        console.error("addToInventory normalization failed", item);
+        console.error("❌ addItemToInventory normalization failed:", item);
         return false;
       }
 
@@ -1431,22 +1444,29 @@
       if (!skipRender) {
         renderShopView();
       }
+      console.log("✅ Item added! Inventory now:", inventory.length, "items");
+      console.log("✅ Item details:", normalizedItem);
       return true;
+    }
+
+    function addToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
+      return addItemToInventory(item, sourceLabel, options);
     }
 
     function handleAddToInventory() {
       console.log("=== ADD TO INVENTORY CLICKED ===");
-      console.log("Dropped item:", state.casePendingDrop || currentDroppedItem);
-      console.log("Current inventory before add:", inventory);
+      console.log("Dropped item:", window.pendingCaseItem || state.casePendingDrop || currentDroppedItem);
+      console.log("Current inventory before add:", JSON.stringify(inventory));
 
-      const droppedItem = state.casePendingDrop || currentDroppedItem;
+      const droppedItem = window.pendingCaseItem || state.casePendingDrop || currentDroppedItem;
       if (!droppedItem) {
         console.error("No pending dropped item found.");
         return false;
       }
 
-      const added = addToInventory(droppedItem, "CASE OPENING");
+      const added = addItemToInventory(droppedItem, "CASE OPENING");
       if (added) {
+        window.pendingCaseItem = null;
         state.casePendingDrop = null;
         state.currentDroppedItem = null;
         currentDroppedItem = null;
@@ -1757,10 +1777,13 @@
     }
 
     function updateOperatorStats() {
-      if (el.statCps) el.statCps.textContent = getCps().toFixed(1);
-      if (el.statTotalClicks) el.statTotalClicks.textContent = Math.floor(state.totalClicks).toLocaleString();
-      if (el.statCasesOpened) el.statCasesOpened.textContent = `${state.casesOpened || 0}`;
+      const cpsVal = Number.isFinite(getCps()) ? getCps() : 0;
+      const totalClicksVal = Number.isFinite(state.totalClicks) ? state.totalClicks : 0;
+      const casesOpenedVal = Number.isFinite(state.casesOpened) ? state.casesOpened : 0;
       const knivesCount = inventory.filter((item) => item.type === "knife").length;
+      if (el.statCps) el.statCps.textContent = cpsVal.toFixed(1);
+      if (el.statTotalClicks) el.statTotalClicks.textContent = Math.floor(totalClicksVal).toLocaleString();
+      if (el.statCasesOpened) el.statCasesOpened.textContent = `${casesOpenedVal}`;
       if (el.statKnivesOwned) el.statKnivesOwned.textContent = `${knivesCount}`;
     }
 
@@ -2123,6 +2146,7 @@
       state.casePendingDrop = drop;
       state.currentDroppedItem = drop;
       currentDroppedItem = drop;
+      window.pendingCaseItem = drop;
       state.casePendingWear = wearInfo;
       state.caseWinnerNode = winnerEl;
       el.revealDetails.classList.remove("hidden");
@@ -2276,6 +2300,7 @@
       state.casePendingDrop = null;
       state.currentDroppedItem = null;
       currentDroppedItem = null;
+      window.pendingCaseItem = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
       state.activeTab = "cases";
@@ -2518,7 +2543,7 @@
     }
 
     function sellPendingCaseDrop() {
-      const droppedItem = state.casePendingDrop || currentDroppedItem;
+      const droppedItem = window.pendingCaseItem || state.casePendingDrop || currentDroppedItem;
       if (!droppedItem) return;
       const value = getItemValue(droppedItem);
       addMoney(value);
@@ -2526,6 +2551,7 @@
       state.casePendingDrop = null;
       state.currentDroppedItem = null;
       currentDroppedItem = null;
+      window.pendingCaseItem = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
       updatePrestigeHud();
