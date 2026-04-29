@@ -60,13 +60,13 @@
 
       .scoreboard {
         background: #ffffff;
-        border: 4px solid #3a89b5;
+        border: 4px solid #111;
         border-radius: 16px;
         padding: 8px 16px;
         display: grid;
         gap: 6px;
         min-width: min(780px, 92vw);
-        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+        box-shadow: 0 6px 0 rgba(0, 0, 0, 0.28);
       }
 
       .score-row,
@@ -113,17 +113,17 @@
 
       .score-mid {
         font-size: 10px;
-        color: #13354f;
+        color: #1a1a1a;
       }
 
       .score-divider {
-        color: #3f6f93;
+        color: #111;
         font-size: 14px;
       }
 
       .mini {
         font-size: 10px;
-        color: #13354f;
+        color: #1a1a1a;
       }
 
       .base-diamond {
@@ -188,15 +188,15 @@
         position: absolute;
         right: 18px;
         bottom: 18px;
-        width: 90px;
-        height: 90px;
+        width: 100px;
+        height: 100px;
         border-radius: 50%;
         border: 4px solid #111;
-        background: radial-gradient(circle at 35% 30%, #fff6ac, #f5a623);
-        color: #111;
+        background: #E8272A;
+        color: #fff;
         font-family: "Press Start 2P", monospace;
         font-size: 13px;
-        box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
+        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.35);
         touch-action: manipulation;
         transition: transform 120ms ease, opacity 140ms ease;
       }
@@ -206,8 +206,9 @@
       }
 
       .mobile-swing.active {
-        animation: swingPulse 1.05s ease-in-out infinite;
+        animation: swingPulse 0.95s ease-in-out infinite;
         opacity: 1;
+        box-shadow: 0 0 18px rgba(232, 39, 42, 0.75), 0 8px 0 rgba(0,0,0,0.35);
       }
 
       .mobile-swing.locked {
@@ -403,6 +404,9 @@
         const FOUL_POLE_LEFT_X = 84;
         const FOUL_POLE_RIGHT_X = VIRTUAL_WIDTH - 84;
         const INFIELD_SPLIT_Y = BASES.second.y + 34;
+        const PERFECT_WINDOW = 12;
+        const GOOD_WINDOW = 35;
+        const FAIR_WINDOW = 65;
 
         const game = {
           inning: 1,
@@ -660,15 +664,15 @@
           game.lastAction = "Swing";
           resumeAudio();
 
-          const ideal = 0.78;
-          const t = game.pitchBall.t;
-          const diff = t - ideal;
-          const abs = Math.abs(diff);
-          const closeToPlate = Math.abs(game.pitchBall.y - (BASES.home.y - 10)) < 38;
-          const timingOffsetMs = diff * (game.pitchBall.duration * 1000);
+          const perfectContactTime = 0.78;
+          const swingTime = game.pitchBall.t;
+          const timingOffset = swingTime - perfectContactTime;
+          const timingOffsetMs = timingOffset * (game.pitchBall.duration * 1000);
+          const absMs = Math.abs(timingOffsetMs);
+          const closeToPlate = Math.abs(game.pitchBall.y - (BASES.home.y - 10)) < 40;
 
-          if (!closeToPlate || abs > 0.24) {
-            spawnPopup("STRIKE!", "#ff5252");
+          if (!closeToPlate) {
+            spawnPopup("STRIKE!", "#ff4d4d");
             playStrikeMiss();
             players.batter.anim = players.batter.anim || {};
             players.batter.anim.missWobble = 0.14;
@@ -676,39 +680,32 @@
             return;
           }
 
-          if (timingOffsetMs < -40) {
-            registerFoulBall("Pulled foul left.");
-            return;
-          }
-          if (timingOffsetMs > 40) {
-            registerFoulBall("Pushed foul right.");
-            return;
-          }
-
-          if (abs <= 0.05) {
-            spawnPopup("PERFECT!", "#ffea5d");
+          if (absMs <= PERFECT_WINDOW) {
+            spawnPopup("PERFECT!", "#ffd43b");
             playBatCrack();
             launchHit("PERFECT", timingOffsetMs);
             return;
           }
 
-          if (abs <= 0.13) {
-            spawnPopup("GOOD HIT!", "#6eff95");
+          if (absMs <= GOOD_WINDOW) {
+            spawnPopup("GOOD HIT!", "#4cff81");
             playBatCrack();
             launchHit("GOOD", timingOffsetMs);
             return;
           }
 
-          if (abs <= 0.21) {
-            spawnPopup("WEAK CONTACT", "#d8ffc0");
+          if (absMs <= FAIR_WINDOW) {
+            spawnPopup("FAIR!", "#9dff7a");
             playBatCrack();
             launchHit("WEAK", timingOffsetMs);
             return;
           }
 
-          spawnPopup("STRIKE!", "#ff7a7a");
-          playStrikeMiss();
-          addStrike("Late swing. Strike!");
+          if (timingOffsetMs < 0) {
+            registerFoulBall("Early swing foul left.");
+          } else {
+            registerFoulBall("Late swing foul right.");
+          }
         }
 
         function launchHit(quality, timingOffsetMs = 0) {
@@ -952,9 +949,9 @@
         }
 
         function registerFoulBall(message = "Foul ball.") {
-          game.strikes = Math.min(2, game.strikes + 1);
+          if (game.strikes < 2) game.strikes += 1;
           updateScoreboard();
-          spawnPopup("FOUL", "#ffd084");
+          spawnPopup("FOUL!", "#ff9b3d");
           completePlay(message);
         }
 
@@ -1039,10 +1036,11 @@
           game.phaseTimer = 0;
           setStatus(message);
           game.lastAction = message;
-          spawnPopup(playResultCallout(message), "#ffffff", {
+          const callout = playResultCallout(message);
+          spawnPopup(callout, resultColorForCallout(callout), {
             kind: "result",
             duration: 1.4,
-            size: 72
+            size: 76
           });
 
           game.playResultTimeout = setTimeout(() => {
@@ -1064,6 +1062,16 @@
           if (m.includes("ended")) return "PLAY OVER";
           if (m.includes("hit")) return "HIT!";
           return String(message || "PLAY").toUpperCase();
+        }
+
+        function resultColorForCallout(callout) {
+          if (callout.includes("HOME RUN")) return "#ffd23f";
+          if (callout.includes("STRIKE")) return "#ff4d4d";
+          if (callout.includes("BALL")) return "#4aa3ff";
+          if (callout.includes("HIT")) return "#48dd67";
+          if (callout.includes("FOUL")) return "#ff9b3d";
+          if (callout.includes("OUT")) return "#ff4d4d";
+          return "#ffffff";
         }
 
         function resetForNextPitch() {
@@ -1100,81 +1108,97 @@
           input.swingPressedThisFrame = false;
         }
 
-        function advanceRunners(basesToAdvance, reason = "hit") {
-          if (reason === "walk") {
-            advanceRunnersOnWalk();
-            return;
-          }
-
-          let runs = 0;
-          const next = [null, null, null];
-          const current = [...game.baseRunners];
-
-          for (let i = 2; i >= 0; i -= 1) {
-            const runner = current[i];
-            if (!runner) continue;
-            const movedRunner = { ...runner, state: RUNNER_STATE.RUNNING, baseIndex: Math.min(3, i + basesToAdvance), lead: 0 };
-            const dest = i + basesToAdvance;
-            if (dest >= 3) {
-              runs += 1;
-              game.runnerAnims.push(makeRunnerAnim(i, 3, movedRunner));
-            } else {
-              next[dest] = movedRunner;
-              game.runnerAnims.push(makeRunnerAnim(i, dest, movedRunner));
-            }
-          }
-
-          if (basesToAdvance >= 4) {
-            runs += 1;
-            game.runnerAnims.push(makeRunnerAnim(-1, 3, makeRunner(3)));
-          } else {
-            const batterRunner = makeRunner(Math.max(0, basesToAdvance - 1));
-            next[basesToAdvance - 1] = batterRunner;
-            game.runnerAnims.push(makeRunnerAnim(-1, basesToAdvance - 1, batterRunner));
-          }
-
-          game.baseRunners = next;
-          if (runs > 0) {
-            game.score.comets += runs;
-            spawnPopup(`+${runs} RUN`, "#ffe86f", { x: BASES.home.x, y: BASES.home.y - 40, size: 40 });
-            game.flashAlpha = 0.25;
-          }
-          if (reason === "homer") {
-            playCrowdCheer();
-            spawnFireworks(640, 240, 36);
-          }
-          updateScoreboard();
+        function cloneRunner(runner, baseIndex) {
+          return runner ? { ...runner, state: RUNNER_STATE.HOLDING, baseIndex, lead: 0 } : null;
         }
 
-        function advanceRunnersOnWalk() {
+        function createBatterRunner(baseIndex) {
+          return makeRunner(baseIndex);
+        }
+
+        function toHitType(hitTypeOrBases, reason = "hit") {
+          if (typeof hitTypeOrBases === "string") return hitTypeOrBases;
+          if (reason === "walk") return "walk";
+          if (hitTypeOrBases >= 4) return "homerun";
+          if (hitTypeOrBases === 3) return "triple";
+          if (hitTypeOrBases === 2) return "double";
+          return "single";
+        }
+
+        function advanceRunners(hitTypeOrBases, reason = "hit") {
+          const hitType = toHitType(hitTypeOrBases, reason);
+          const newRunners = [...game.baseRunners];
           let runs = 0;
-          const next = [...game.baseRunners];
 
-          if (next[0] && next[1] && next[2]) {
+          if (hitType === "single") {
+            if (newRunners[2]) runs += 1;
+            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
+            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 2, { ...newRunners[1], state: RUNNER_STATE.RUNNING }));
+            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 1, { ...newRunners[0], state: RUNNER_STATE.RUNNING }));
+            game.runnerAnims.push(makeRunnerAnim(-1, 0, createBatterRunner(0)));
+            newRunners[2] = cloneRunner(newRunners[1], 2);
+            newRunners[1] = cloneRunner(newRunners[0], 1);
+            newRunners[0] = createBatterRunner(0);
+          } else if (hitType === "double") {
+            if (newRunners[2]) runs += 1;
+            if (newRunners[1]) runs += 1;
+            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
+            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 3, { ...newRunners[1], state: RUNNER_STATE.SCORING }));
+            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 2, { ...newRunners[0], state: RUNNER_STATE.RUNNING }));
+            game.runnerAnims.push(makeRunnerAnim(-1, 1, createBatterRunner(1)));
+            newRunners[2] = cloneRunner(newRunners[0], 2);
+            newRunners[1] = createBatterRunner(1);
+            newRunners[0] = null;
+          } else if (hitType === "triple") {
+            if (newRunners[0]) runs += 1;
+            if (newRunners[1]) runs += 1;
+            if (newRunners[2]) runs += 1;
+            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 3, { ...newRunners[0], state: RUNNER_STATE.SCORING }));
+            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 3, { ...newRunners[1], state: RUNNER_STATE.SCORING }));
+            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
+            game.runnerAnims.push(makeRunnerAnim(-1, 2, createBatterRunner(2)));
+            newRunners[0] = null;
+            newRunners[1] = null;
+            newRunners[2] = createBatterRunner(2);
+          } else if (hitType === "homerun") {
+            if (newRunners[0]) runs += 1;
+            if (newRunners[1]) runs += 1;
+            if (newRunners[2]) runs += 1;
             runs += 1;
-            game.runnerAnims.push(makeRunnerAnim(2, 3, { ...next[2], state: RUNNER_STATE.SCORING }));
-            next[2] = null;
-          }
-          if (next[1] && next[0]) {
-            game.runnerAnims.push(makeRunnerAnim(1, 2, { ...next[1], state: RUNNER_STATE.RUNNING }));
-            next[2] = { ...next[1], baseIndex: 2, lead: 0 };
-            next[1] = null;
-          }
-          if (next[0]) {
-            game.runnerAnims.push(makeRunnerAnim(0, 1, { ...next[0], state: RUNNER_STATE.RUNNING }));
-            next[1] = { ...next[0], baseIndex: 1, lead: 0 };
-            next[0] = null;
+            if (newRunners[0]) game.runnerAnims.push(makeRunnerAnim(0, 3, { ...newRunners[0], state: RUNNER_STATE.SCORING }));
+            if (newRunners[1]) game.runnerAnims.push(makeRunnerAnim(1, 3, { ...newRunners[1], state: RUNNER_STATE.SCORING }));
+            if (newRunners[2]) game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
+            game.runnerAnims.push(makeRunnerAnim(-1, 3, createBatterRunner(3)));
+            newRunners[0] = null;
+            newRunners[1] = null;
+            newRunners[2] = null;
+          } else if (hitType === "walk") {
+            if (newRunners[0] && newRunners[1] && newRunners[2]) runs += 1;
+            if (newRunners[2] && newRunners[1] && newRunners[0]) {
+              game.runnerAnims.push(makeRunnerAnim(2, 3, { ...newRunners[2], state: RUNNER_STATE.SCORING }));
+            }
+            if (newRunners[1] && newRunners[0]) {
+              game.runnerAnims.push(makeRunnerAnim(1, 2, { ...newRunners[1], state: RUNNER_STATE.RUNNING }));
+              newRunners[2] = cloneRunner(newRunners[1], 2);
+            }
+            if (newRunners[0]) {
+              game.runnerAnims.push(makeRunnerAnim(0, 1, { ...newRunners[0], state: RUNNER_STATE.RUNNING }));
+              newRunners[1] = cloneRunner(newRunners[0], 1);
+            }
+            game.runnerAnims.push(makeRunnerAnim(-1, 0, createBatterRunner(0)));
+            newRunners[0] = createBatterRunner(0);
           }
 
-          const batterRunner = makeRunner(0);
-          next[0] = batterRunner;
-          game.runnerAnims.push(makeRunnerAnim(-1, 0, batterRunner));
-
-          game.baseRunners = next;
+          game.baseRunners = newRunners;
           if (runs > 0) {
             game.score.comets += runs;
-            spawnPopup(`+${runs} RUN`, "#ffe86f", { x: BASES.home.x, y: BASES.home.y - 40, size: 40 });
-            game.flashAlpha = 0.22;
+            spawnPopup(`+${runs} RUN`, "#ffe86f", { x: BASES.home.x, y: BASES.home.y - 42, size: 40 });
+            game.flashAlpha = 0.25;
+            triggerCrowdHomeRun();
+          }
+          if (hitType === "homerun") {
+            playCrowdCheer();
+            spawnFireworks(640, 240, 36);
           }
           updateScoreboard();
         }
@@ -1824,7 +1848,7 @@
                 f.anim.vx = vx;
                 f.anim.vy = vy;
                 if (ballFielded) {
-                  f.anim.state = FIELDER_STATE.RETURNING;
+                  f.anim.state = FIELDER_STATE.IDLE;
                   f.isAnimating = false;
                 }
               }
@@ -1886,6 +1910,7 @@
           drawBall();
           drawRunnerAnimations();
           drawParticlesLayer();
+          drawTimingBar();
           ctx.restore();
 
           drawPopups();
@@ -1899,59 +1924,33 @@
         }
 
         function drawBackground() {
-          const t = performance.now() * 0.00004;
-          const skyGrad = ctx.createLinearGradient(0, 0, 0, VIRTUAL_HEIGHT);
-          skyGrad.addColorStop(0, "#1a3a5c");
-          skyGrad.addColorStop(0.48, "#4a9edd");
-          skyGrad.addColorStop(0.72, "#87ceeb");
-          skyGrad.addColorStop(1, "#9ad9ff");
-          ctx.fillStyle = skyGrad;
+          ctx.fillStyle = "#87CEEB";
           ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
-          // soft sun + rays
-          const sunX = 1120;
-          const sunY = 108;
-          for (let i = 0; i < 8; i += 1) {
-            ctx.save();
-            ctx.translate(sunX, sunY);
-            ctx.rotate((Math.PI * 2 * i) / 8 + t);
-            ctx.fillStyle = "rgba(255, 214, 80, 0.15)";
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(16, -6);
-            ctx.lineTo(160, -3);
-            ctx.lineTo(160, 3);
-            ctx.lineTo(16, 6);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-          }
-          const sunGrad = ctx.createRadialGradient(sunX, sunY, 6, sunX, sunY, 56);
-          sunGrad.addColorStop(0, "#ffd700");
-          sunGrad.addColorStop(1, "#ff8c00");
-          ctx.fillStyle = sunGrad;
+          ctx.fillStyle = "#FFD700";
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(sunX, sunY, 44, 0, Math.PI * 2);
+          ctx.arc(1120, 104, 44, 0, Math.PI * 2);
           ctx.fill();
+          ctx.stroke();
 
-          drawCloud(130 + Math.sin(t * 5) * 12, 88, 1.12);
-          drawCloud(320 + Math.cos(t * 4.2) * 10, 66, 0.86);
-          drawCloud(890 + Math.sin(t * 3.2) * 8, 126, 0.98);
-          drawCloud(1020 + Math.cos(t * 2.3) * 7, 82, 0.76);
+          drawCloud(140, 92, 1.25);
+          drawCloud(330, 72, 0.94);
+          drawCloud(880, 132, 1.05);
+          drawCloud(1010, 84, 0.86);
         }
 
         function drawCloud(x, y, s) {
-          ctx.fillStyle = "rgba(220, 230, 240, 0.45)";
-          ctx.beginPath();
-          ctx.ellipse(x, y + 10 * s, 40 * s, 11 * s, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.arc(x, y, 28 * s, 0, Math.PI * 2);
           ctx.arc(x + 30 * s, y + 2 * s, 22 * s, 0, Math.PI * 2);
           ctx.arc(x - 24 * s, y + 6 * s, 20 * s, 0, Math.PI * 2);
           ctx.fill();
+          ctx.stroke();
         }
 
         function drawField() {
@@ -1964,8 +1963,11 @@
           drawStadiumStands(wallTop);
 
           // Outfield wall + top padding blocks
-          ctx.fillStyle = "#1a5c1a";
+          ctx.fillStyle = "#1B5E20";
           ctx.fillRect(0, wallTop, VIRTUAL_WIDTH, wallHeight);
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(0, wallTop, VIRTUAL_WIDTH, wallHeight);
           const padColors = ["#356f41", "#2f6240", "#457d4d", "#2b5d38"];
           for (let x = 0; x < VIRTUAL_WIDTH; x += 10) {
             ctx.fillStyle = padColors[Math.floor(x / 10) % padColors.length];
@@ -1989,6 +1991,9 @@
           // Warning track
           ctx.fillStyle = "#8B4513";
           ctx.fillRect(0, warningTrackTop, VIRTUAL_WIDTH, warningTrackHeight);
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(0, warningTrackTop, VIRTUAL_WIDTH, warningTrackHeight);
 
           for (let wy = warningTrackTop + 4; wy < warningTrackTop + warningTrackHeight; wy += 5) {
             ctx.strokeStyle = "rgba(40, 20, 5, 0.24)";
@@ -2000,10 +2005,10 @@
           }
 
           // Outfield grass + visible mowing stripes
-          ctx.fillStyle = "#2d8a2d";
+          ctx.fillStyle = "#4CAF50";
           ctx.fillRect(0, grassTop, VIRTUAL_WIDTH, VIRTUAL_HEIGHT - grassTop);
           for (let x = 0; x < VIRTUAL_WIDTH; x += 50) {
-            ctx.fillStyle = (Math.floor(x / 40) % 2 === 0) ? "rgba(38, 115, 38, 0.45)" : "rgba(51, 153, 51, 0.42)";
+            ctx.fillStyle = (Math.floor(x / 50) % 2 === 0) ? "rgba(56, 142, 60, 0.42)" : "rgba(76, 175, 80, 0.2)";
             ctx.fillRect(x, grassTop, 24, VIRTUAL_HEIGHT - grassTop);
           }
 
@@ -2014,7 +2019,7 @@
           const infieldCenter = { x: BASES.mound.x, y: BASES.mound.y + 20 };
 
           // Infield dirt diamond
-          ctx.fillStyle = "#C49A6C";
+          ctx.fillStyle = "#D2A679";
           ctx.beginPath();
           ctx.moveTo(dirtHome.x, dirtHome.y);
           ctx.lineTo(dirtFirst.x, dirtFirst.y);
@@ -2022,6 +2027,9 @@
           ctx.lineTo(dirtThird.x, dirtThird.y);
           ctx.closePath();
           ctx.fill();
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 3;
+          ctx.stroke();
 
           // Infield grass wedges
           ctx.fillStyle = "#3E9850";
@@ -2031,7 +2039,7 @@
           fillTriangle(infieldCenter, BASES.third, BASES.home);
 
           // Base paths
-          ctx.strokeStyle = "#B88A5A";
+          ctx.strokeStyle = "#b8865a";
           ctx.lineWidth = 22;
           ctx.lineJoin = "round";
           ctx.beginPath();
@@ -2048,14 +2056,17 @@
           drawHomePlate(BASES.home.x, BASES.home.y);
 
           // Mound + rubber strip
-          ctx.fillStyle = "#B98A5A";
+          ctx.fillStyle = "#C4956A";
           ctx.beginPath();
           ctx.arc(BASES.mound.x, BASES.mound.y + 18, 44, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = "#CDA172";
+          ctx.fillStyle = "#C4956A";
           ctx.beginPath();
           ctx.arc(BASES.mound.x, BASES.mound.y + 16, 35, 0, Math.PI * 2);
           ctx.fill();
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 2;
+          ctx.stroke();
           ctx.fillStyle = "#ffffff";
           ctx.fillRect(BASES.mound.x - 13, BASES.mound.y + 12, 26, 4);
 
@@ -2071,7 +2082,7 @@
 
           const vignette = ctx.createRadialGradient(640, 420, 240, 640, 420, 760);
           vignette.addColorStop(0, "rgba(0,0,0,0)");
-          vignette.addColorStop(1, "rgba(0,0,0,0.2)");
+          vignette.addColorStop(1, "rgba(0,0,0,0.16)");
           ctx.fillStyle = vignette;
           ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         }
@@ -2107,36 +2118,48 @@
           const rows = 5;
           const rowH = (standsBottom - standsTop) / rows;
 
-          ctx.fillStyle = "#2f4a34";
+          ctx.fillStyle = "#21432a";
           ctx.fillRect(0, standsTop, VIRTUAL_WIDTH, standsBottom - standsTop);
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(0, standsTop, VIRTUAL_WIDTH, standsBottom - standsTop);
 
+          const crowdColors = ["#E8272A", "#1E6FD9", "#FFD84D", "#FFFFFF"];
           for (let r = 0; r < rows; r += 1) {
             const y = standsTop + r * rowH;
-            ctx.fillStyle = r % 2 === 0 ? "#33573a" : "#27452e";
+            ctx.fillStyle = r % 2 === 0 ? "#2d5535" : "#264a2f";
             ctx.fillRect(0, y, VIRTUAL_WIDTH, rowH - 2);
-            for (let x = 6; x < VIRTUAL_WIDTH - 6; x += 9) {
+            for (let x = 8; x < VIRTUAL_WIDTH - 8; x += 10) {
               const ci = (x + r) % game.crowd.length;
               const fan = game.crowd[ci];
               const waveY = fan.wave > 0 ? -3 * Math.sin((1 - fan.wave) * Math.PI) : 0;
               const moodDrop = game.crowdMoodDown * 2;
               const jumpY = game.crowdJump > 0 ? -6 * Math.sin(game.crowdJump * Math.PI) : 0;
-              const fy = y + rowH * 0.56 + waveY + jumpY + moodDrop;
-              ctx.fillStyle = "#f7d5b0";
-              ctx.fillRect(x, fy - 4, 2, 2);
-              ctx.fillStyle = fan.color;
-              ctx.fillRect(x - 1, fy - 2, 4, 4);
+              const fy = y + rowH * 0.6 + waveY + jumpY + moodDrop;
+              const color = fan?.color || crowdColors[(x + r) % crowdColors.length];
+              ctx.fillStyle = color;
+              ctx.beginPath();
+              ctx.arc(x, fy, 3, 0, Math.PI * 2);
+              ctx.fill();
             }
           }
 
-          ctx.fillStyle = "#20374a";
-          roundRect(ctx, VIRTUAL_WIDTH / 2 - 74, standsTop - 20, 148, 18, 4);
+          // press box / scoreboard
+          ctx.fillStyle = "#1d2f46";
+          roundRect(ctx, VIRTUAL_WIDTH / 2 - 92, standsTop - 22, 184, 20, 4);
           ctx.fill();
-          ctx.fillStyle = "#f1f6ff";
+          ctx.strokeStyle = "#111";
+          ctx.stroke();
+          ctx.fillStyle = "#3ec5ff";
+          ctx.fillRect(VIRTUAL_WIDTH / 2 - 78, standsTop - 16, 56, 8);
+          ctx.fillRect(VIRTUAL_WIDTH / 2 + 22, standsTop - 16, 56, 8);
+          ctx.fillStyle = "#ff9b3d";
           ctx.font = '8px "Press Start 2P"';
           ctx.textAlign = "center";
-          ctx.fillText("CITY PARK", VIRTUAL_WIDTH / 2, standsTop - 7);
+          ctx.fillText(`${game.score.comets}-${game.score.foxes}`, VIRTUAL_WIDTH / 2, standsTop - 7);
           ctx.textAlign = "left";
         }
+
         function drawBase(x, y, occupied = false) {
           ctx.save();
           const pulse = (Math.sin(performance.now() / 260) + 1) * 0.5;
@@ -2445,6 +2468,35 @@
           }
           ctx.globalAlpha = 1;
         }
+
+        function drawTimingBar() {
+          if (!(game.phase === PHASE.PITCH_FLIGHT || game.phase === PHASE.BATTING_WINDOW) || !game.pitchBall) return;
+          const barW = 120;
+          const barH = 9;
+          const barX = BASES.home.x - barW / 2;
+          const barY = BASES.home.y + 18;
+
+          roundRect(ctx, barX - 3, barY - 3, barW + 6, barH + 6, 4);
+          ctx.fillStyle = "rgba(0,0,0,0.34)";
+          ctx.fill();
+
+          ctx.fillStyle = "#d84a4a";
+          ctx.fillRect(barX, barY, barW, barH);
+          ctx.fillStyle = "#f0c24b";
+          ctx.fillRect(barX + barW * 0.18, barY, barW * 0.64, barH);
+          ctx.fillStyle = "#4fdb64";
+          ctx.fillRect(barX + barW * 0.44, barY, barW * 0.12, barH);
+
+          const dotT = Math.max(0, Math.min(1, game.pitchBall.t));
+          const dotX = barX + dotT * barW;
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(dotX, barY + barH / 2, 4.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
         function drawPopups() {
           for (const p of game.popupTexts) {
             const progress = Math.min(1, p.age / p.duration);
@@ -2452,18 +2504,18 @@
             let scale = 1;
 
             if (p.kind === "result") {
-              if (progress < 0.18) {
-                scale = 0.5 + (1.2 - 0.5) * (progress / 0.18);
-              } else if (progress < 0.34) {
-                scale = 1.2 + (1.0 - 1.2) * ((progress - 0.18) / 0.16);
+              if (progress < 0.2) {
+                scale = 0.3 + (1.1 - 0.3) * (progress / 0.2);
+              } else if (progress < 0.36) {
+                scale = 1.1 + (1.0 - 1.1) * ((progress - 0.2) / 0.16);
               }
 
-              if (progress < 0.08) {
-                alpha = 0.78 * (progress / 0.08);
+              if (progress < 0.1) {
+                alpha = 0.9 * (progress / 0.1);
               } else if (progress < 0.86) {
-                alpha = 0.78;
+                alpha = 0.9;
               } else {
-                alpha = 0.78 * (1 - ((progress - 0.86) / 0.14));
+                alpha = 0.9 * (1 - ((progress - 0.86) / 0.14));
               }
             }
 
@@ -2476,7 +2528,12 @@
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.shadowColor = "rgba(0, 0, 0, 0.88)";
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = p.kind === "result" ? 16 : 10;
+            if (p.kind === "result") {
+              ctx.strokeStyle = "#111";
+              ctx.lineWidth = 5;
+              ctx.strokeText(p.text, 0, 0);
+            }
             ctx.fillText(p.text, 0, 0);
             ctx.restore();
           }
