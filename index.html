@@ -342,8 +342,26 @@
       text-transform: uppercase;
       cursor: inherit;
       transition: 200ms ease;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
     }
     .shop-tab.active { color: #ecf9ff; border-color: var(--green-bright); box-shadow: inset 0 -2px 0 var(--green-bright); }
+    .tab-badge {
+      min-width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #e4ae39;
+      color: #101820;
+      font-size: 0.68rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+      box-shadow: 0 0 8px rgba(228, 174, 57, 0.45);
+    }
 
     .tab-content {
       overflow: auto;
@@ -482,6 +500,7 @@
         radial-gradient(circle at 20% 0%, rgba(68, 112, 158, 0.18), transparent 45%),
         linear-gradient(180deg, #101a24, #080d13);
       border: 1px solid #2f4f64;
+      position: relative;
     }
 
     .case-top { display: grid; justify-items: center; gap: 4px; }
@@ -583,6 +602,18 @@
       justify-items: center;
       gap: 3px;
     }
+    .drop-details.knife-drop-card {
+      border-color: #e4ae39;
+      box-shadow: 0 0 16px rgba(228, 174, 57, 0.25);
+      background: rgba(20, 16, 8, 0.88);
+    }
+    .drop-special {
+      color: #e4ae39;
+      font-weight: 800;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(228, 174, 57, 0.35);
+    }
     .drop-name { font-size: 1.2rem; font-weight: 700; }
     .drop-rarity { font-size: 0.94rem; }
     .drop-extra { color: #88f7af; font-size: 0.9rem; }
@@ -592,10 +623,40 @@
     .wear-fill { height: 100%; width: 30%; }
     .wear-label { color: #c9dced; font-size: 0.8rem; }
 
-    .drop-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-    .case-action-add { background: linear-gradient(180deg, #2b5b33, #1b3920); border-color: #5eb46c; }
-    .case-action-open { background: linear-gradient(180deg, #2b4f71, #1a344e); border-color: #5a97d1; }
-    .case-action-sell { background: linear-gradient(180deg, #3b3b3b, #252525); border-color: #5b5b5b; }
+    .drop-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      pointer-events: none;
+    }
+    .drop-actions.show-actions {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .case-action-add { background: #4caf50; border-color: #4caf50; color: #ffffff; }
+    .case-action-open { background: #1a5fa8; border-color: #1a5fa8; color: #ffffff; }
+    .case-action-sell { background: #333333; border-color: #4d4d4d; color: #f0a500; }
+
+    .case-close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid #3f6278;
+      background: rgba(12, 22, 31, 0.85);
+      color: #d0e2ef;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+      z-index: 12;
+    }
 
     .case-particles { position: absolute; inset: 0; pointer-events: none; z-index: 9; }
     .case-particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; animation: caseParticle .9s ease-out forwards; box-shadow: 0 0 8px currentColor; }
@@ -819,6 +880,7 @@
       </div>
       <div id="drop-banner" class="drop-banner">ITEM DROPPED</div>
       <div id="reveal-details" class="drop-details hidden">
+        <div id="reveal-special-header" class="drop-special hidden">★ KNIFE DROPPED ★</div>
         <div id="reveal-item-name" class="drop-name">AK-47 | Ember Core</div>
         <div id="reveal-item-meta" class="drop-rarity">★ Covert</div>
         <div id="reveal-item-cps" class="drop-extra"></div>
@@ -832,7 +894,7 @@
         <button id="open-another-btn" class="case-action-btn case-action-open" data-open-another="1">OPEN ANOTHER</button>
         <button id="sell-drop-btn" class="case-action-btn case-action-sell" data-sell-drop="1">SELL FOR $0</button>
       </div>
-      <button id="case-close-btn" class="case-close-btn hidden">Close</button>
+      <button id="case-close-btn" class="case-close-btn" aria-label="Close case overlay">✕</button>
     </div>
   </div>
 
@@ -963,6 +1025,10 @@
       casePendingDrop: null,
       casePendingWear: null,
       caseWinnerNode: null,
+      caseRevealTimer: null,
+      caseActionDelayTimer: null,
+      caseFailsafeTimer: null,
+      inventoryBadgeCount: 0,
       coinFlip: {
         selectedRef: null,
         opponent: null,
@@ -1008,6 +1074,7 @@
       caseCloseBtn: document.getElementById("case-close-btn"),
       caseParticles: document.getElementById("case-particles"),
       revealDetails: document.getElementById("reveal-details"),
+      revealSpecialHeader: document.getElementById("reveal-special-header"),
       revealItemName: document.getElementById("reveal-item-name"),
       revealItemMeta: document.getElementById("reveal-item-meta"),
       revealItemCps: document.getElementById("reveal-item-cps"),
@@ -1507,12 +1574,15 @@
     }
 
     function renderShopTabs() {
+      const inventoryBadge = state.inventoryBadgeCount > 0
+        ? `<span class="tab-badge">+${state.inventoryBadgeCount}</span>`
+        : "";
       return `
         <div class="shop-tabs">
           <button class="shop-tab ${state.activeTab === "shop" ? "active" : ""}" data-tab="shop">Shop</button>
           <button class="shop-tab ${state.activeTab === "cases" ? "active" : ""}" data-tab="cases">Cases</button>
           <button class="shop-tab ${state.activeTab === "knives" ? "active" : ""}" data-tab="knives">Knives</button>
-          <button class="shop-tab ${state.activeTab === "inventory" ? "active" : ""}" data-tab="inventory">Inventory</button>
+          <button class="shop-tab ${state.activeTab === "inventory" ? "active" : ""}" data-tab="inventory">Inventory ${inventoryBadge}</button>
           <button class="shop-tab ${state.activeTab === "coinflip" ? "active" : ""}" data-tab="coinflip">Coin Flip</button>
         </div>
       `;
@@ -1806,13 +1876,17 @@
     }
 
     function revealCaseResult(drop, winnerEl) {
+      clearCaseTimers();
       const wearInfo = getWear();
       state.casePendingDrop = drop;
       state.casePendingWear = wearInfo;
       state.caseWinnerNode = winnerEl;
       el.revealDetails.classList.remove("hidden");
-      el.caseActionRow.classList.remove("hidden");
-      el.caseCloseBtn.classList.add("hidden");
+      el.revealDetails.classList.toggle("knife-drop-card", drop.kind === "knife");
+      el.revealSpecialHeader.classList.toggle("hidden", drop.kind !== "knife");
+      el.caseActionRow.classList.add("hidden");
+      el.caseActionRow.classList.remove("show-actions");
+      el.caseCloseBtn.classList.remove("hidden");
 
       const rarity = rarityMeta[drop.rarity];
       el.revealItemName.textContent = getDropDisplayName(drop);
@@ -1826,7 +1900,18 @@
       if (winnerEl) winnerEl.classList.add("win-zoom");
       const value = getItemValue(drop);
       el.sellDropBtn.textContent = `SELL FOR $${formatMoney(value)}`;
-      el.openAnotherBtn.disabled = state.caseInventory <= 0;
+      el.addInvBtn.textContent = drop.kind === "knife" ? "EQUIP KNIFE" : "ADD TO INVENTORY";
+      const hasMoreCases = state.caseInventory > 0;
+      el.openAnotherBtn.disabled = !hasMoreCases;
+      el.openAnotherBtn.textContent = hasMoreCases ? "OPEN ANOTHER" : "NO CASES LEFT";
+      state.caseAnimating = false;
+      state.caseActionDelayTimer = setTimeout(() => {
+        if (!state.casePendingDrop || el.caseModal.classList.contains("hidden")) return;
+        el.caseActionRow.classList.remove("hidden");
+        requestAnimationFrame(() => {
+          el.caseActionRow.classList.add("show-actions");
+        });
+      }, 1500);
 
       if (drop.rarity === "restricted") showCaseParticles("#9f6aff", 28);
       if (drop.rarity === "classified") {
@@ -1843,6 +1928,32 @@
       }
     }
 
+    function clearCaseTimers() {
+      if (state.caseRevealTimer) {
+        clearTimeout(state.caseRevealTimer);
+        state.caseRevealTimer = null;
+      }
+      if (state.caseActionDelayTimer) {
+        clearTimeout(state.caseActionDelayTimer);
+        state.caseActionDelayTimer = null;
+      }
+      if (state.caseFailsafeTimer) {
+        clearTimeout(state.caseFailsafeTimer);
+        state.caseFailsafeTimer = null;
+      }
+    }
+
+    function finalizeCaseReveal(drop, winnerIndex) {
+      if (!state.caseAnimating || state.casePendingDrop) return;
+      const winnerEl = el.reelTrack.children[winnerIndex] || null;
+      if (winnerEl) winnerEl.classList.add("winner");
+      el.dropBanner.textContent = drop.kind === "knife"
+        ? `KNIFE DROPPED: ${drop.name} | ${drop.finish}`
+        : `ITEM DROPPED: ${drop.name}`;
+      el.dropBanner.classList.add("show");
+      revealCaseResult(drop, winnerEl);
+    }
+
     function buildReel(drop) {
       const items = [];
       const winnerIndex = 28;
@@ -1857,6 +1968,7 @@
       state.caseAnimating = true;
       initAudio();
       playCaseSpinSound();
+      clearCaseTimers();
       state.casePendingDrop = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
@@ -1866,8 +1978,11 @@
       el.dropBanner.classList.remove("show");
       el.dropBanner.textContent = "OPENING...";
       el.revealDetails.classList.add("hidden");
+      el.revealDetails.classList.remove("knife-drop-card");
+      el.revealSpecialHeader.classList.add("hidden");
       el.caseActionRow.classList.add("hidden");
-      el.caseCloseBtn.classList.add("hidden");
+      el.caseActionRow.classList.remove("show-actions");
+      el.caseCloseBtn.classList.remove("hidden");
       el.caseParticles.innerHTML = "";
       el.caseModal.classList.remove("hidden");
       el.caseModal.setAttribute("aria-hidden", "false");
@@ -1901,21 +2016,23 @@
         setTimeout(() => { el.reelTrack.style.filter = "blur(0px)"; }, 5400);
       });
 
-      setTimeout(() => {
-        const winnerEl = el.reelTrack.children[winnerIndex];
-        winnerEl.classList.add("winner");
-        el.dropBanner.textContent = drop.kind === "knife"
-          ? `KNIFE DROPPED: ${drop.name} | ${drop.finish}`
-          : `ITEM DROPPED: ${drop.name}`;
-        el.dropBanner.classList.add("show");
-        revealCaseResult(drop, winnerEl);
+      state.caseRevealTimer = setTimeout(() => {
+        finalizeCaseReveal(drop, winnerIndex);
       }, 7000);
+      state.caseFailsafeTimer = setTimeout(() => {
+        finalizeCaseReveal(drop, winnerIndex);
+      }, 12000);
     }
 
     function closeCaseModal() {
+      clearCaseTimers();
       el.caseModal.classList.add("hidden");
       el.caseModal.setAttribute("aria-hidden", "true");
       state.caseAnimating = false;
+      state.casePendingDrop = null;
+      state.casePendingWear = null;
+      state.caseWinnerNode = null;
+      state.activeTab = "cases";
       renderShopView();
     }
 
@@ -2055,7 +2172,9 @@
       state.inventorySkins = [];
       state.knifeInventory = [];
       state.equippedKnifeId = null;
+      state.inventoryBadgeCount = 0;
       state.activeTab = "shop";
+      clearCaseTimers();
       for (const key of Object.keys(state.upgradesOwned)) {
         state.upgradesOwned[key] = 0;
       }
@@ -2090,6 +2209,9 @@
 
       if (button.dataset.tab) {
         state.activeTab = button.dataset.tab;
+        if (state.activeTab === "inventory") {
+          state.inventoryBadgeCount = 0;
+        }
         renderShopView();
         return;
       }
@@ -2136,11 +2258,13 @@
     }
 
     function commitPendingCaseDrop() {
-      if (!state.casePendingDrop) return;
+      if (!state.casePendingDrop) return false;
       applyDrop(state.casePendingDrop, "CASE OPENING");
+      state.inventoryBadgeCount += 1;
       state.casePendingDrop = null;
       state.casePendingWear = null;
       state.caseWinnerNode = null;
+      return true;
     }
 
     function sellPendingCaseDrop() {
@@ -2153,7 +2277,6 @@
       state.caseWinnerNode = null;
       updatePrestigeHud();
       closeCaseModal();
-      renderShopView();
     }
 
     function openCasePreview() {
@@ -2425,8 +2548,8 @@
         closeCaseModal();
       });
       el.openAnotherBtn.addEventListener("click", () => {
-        commitPendingCaseDrop();
-        if (state.caseInventory > 0) {
+        const committed = commitPendingCaseDrop();
+        if (committed && state.caseInventory > 0) {
           openCase();
         } else {
           closeCaseModal();
@@ -2436,6 +2559,11 @@
       el.previewCloseBtn.addEventListener("click", closeCasePreview);
       el.coinflipCloseBtn.addEventListener("click", closeCoinFlipModal);
       el.coinflipStep.addEventListener("click", handleCoinflipClick);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !el.caseModal.classList.contains("hidden")) {
+          closeCaseModal();
+        }
+      });
     }
 
     function init() {
