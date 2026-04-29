@@ -1849,6 +1849,26 @@
       updateOperatorStats();
     }
 
+    function sellInventoryItemById(itemId) {
+      if (!itemId) return false;
+      const idx = inventory.findIndex((item) => item.id === itemId);
+      if (idx === -1) return false;
+
+      const [soldItem] = inventory.splice(idx, 1);
+      refreshInventoryBuckets();
+      updateEquippedKnife();
+      updateEquippedKnifeHud();
+      updateOperatorStats();
+      saveInventory();
+
+      const value = Number(soldItem.value ?? getItemValue(soldItem) ?? 0);
+      addMoney(value);
+      showKillFeed(`<span class="weapon">SOLD</span> ${getDropDisplayName(soldItem)} <span class="event">+$${formatMoney(value)}</span>`);
+
+      renderShopView();
+      return true;
+    }
+
     function addWonTag(item, label = "WON IN FLIP") {
       return { ...item, wonTag: label, wonInFlip: true };
     }
@@ -2012,11 +2032,12 @@
             const meta = rarityMeta[normalizeRarity(entry.rarity)] || rarityMeta.milspec;
             const isKnife = entry.type === "knife" || entry.kind === "knife";
             return `
-              <div style="
+              <button type="button" data-sell-inventory="${entry.id}" style="
                 display:flex;justify-content:space-between;align-items:center;
                 background:#162030;
                 border-left:4px solid ${rarityColors[tier] || "#555"};
                 border-radius:4px;padding:10px 12px;margin-bottom:6px;
+                width:100%;border:none;cursor:inherit;text-align:left;
               ">
                 <div>
                   <div style="color:#e8eef4;font-size:13px;font-weight:bold;">${getDropDisplayName(entry)}</div>
@@ -2028,9 +2049,10 @@
                 </div>
                 <div style="text-align:right;flex-shrink:0;margin-left:8px;">
                   <div style="color:#f0a500;font-size:12px;">$${(entry.value || 0).toLocaleString()}</div>
+                  <div style="color:#86a8bf;font-size:10px;">Click to sell</div>
                   ${isKnife ? `<div style="color:#e4ae39;font-size:10px;">★ KNIFE</div>` : ""}
                 </div>
-              </div>
+              </button>
             `;
           }).join("")}
         </div>
@@ -2553,6 +2575,11 @@
       if (button.dataset.goCases) {
         state.activeTab = "cases";
         renderShopView();
+        return;
+      }
+
+      if (button.dataset.sellInventory) {
+        sellInventoryItemById(button.dataset.sellInventory);
       }
     }
 
