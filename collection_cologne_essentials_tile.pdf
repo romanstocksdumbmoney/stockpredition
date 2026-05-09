@@ -1,0 +1,88 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1200 1200] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 540 >>
+stream
+0.06 0.09 0.18 rg
+0 0 1200 1200 re
+f
+
+0.12 0.20 0.38 rg
+960 980 180 180 re
+f
+
+0.10 0.16 0.30 rg
+120 950 120 120 re
+f
+
+0.05 0.08 0.14 rg
+300 360 600 70 re
+f
+
+0.72 0.85 1.00 rg
+400 430 400 520 re
+f
+
+0.97 0.82 0.54 rg
+430 430 340 250 re
+f
+
+0.06 0.09 0.18 rg
+510 950 180 90 re
+f
+
+0.07 0.09 0.13 rg
+545 1035 110 60 re
+f
+
+1 1 1 rg
+452 492 28 410 re
+f
+
+0.92 0.95 0.99 rg
+710 492 12 410 re
+f
+
+0.95 0.98 1 rg
+BT
+/F1 78 Tf
+300 205 Td
+(Cologne Essentials) Tj
+ET
+
+0.80 0.85 0.92 rg
+BT
+/F2 30 Tf
+300 155 Td
+(Premium picks for everyday confidence) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000253 00000 n 
+0000000843 00000 n 
+0000000914 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+984
+%%EOF
