@@ -281,7 +281,7 @@ export default function DashboardPage() {
                     <Cell key={entry.category} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatMoney(value)} />
+                <Tooltip formatter={(value) => formatMoney(Number(value) || 0)} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="date" tickFormatter={(value) => value.slice(5)} />
                 <YAxis tickFormatter={(value) => `$${value}`} />
                 <Tooltip
-                  formatter={(value: number) => formatMoney(value)}
+                  formatter={(value) => formatMoney(Number(value) || 0)}
                   labelFormatter={(label) => formatDate(String(label))}
                 />
                 <Area type="monotone" dataKey="amount" stroke="#6366f1" fill="#c7d2fe" />

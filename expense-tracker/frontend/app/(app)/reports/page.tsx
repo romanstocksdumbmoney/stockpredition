@@ -1,6 +1,6 @@
 "use client";
 
-import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
+import { format, startOfMonth, subMonths } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -197,7 +197,7 @@ export default function ReportsPage() {
                         <Cell key={entry.category} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatMoney(value)} />
+                    <Tooltip formatter={(value) => formatMoney(Number(value) || 0)} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -222,7 +222,7 @@ export default function ReportsPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="date" tickFormatter={(value) => String(value).slice(5)} />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => formatMoney(value)} />
+                      <Tooltip formatter={(value) => formatMoney(Number(value) || 0)} />
                       <Bar dataKey="amount" fill="#6366f1" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   ) : (
@@ -230,7 +230,7 @@ export default function ReportsPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="date" tickFormatter={(value) => String(value).slice(5)} />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => formatMoney(value)} />
+                      <Tooltip formatter={(value) => formatMoney(Number(value) || 0)} />
                       <Line type="monotone" dataKey="amount" stroke="#6366f1" strokeWidth={3} />
                     </LineChart>
                   )}

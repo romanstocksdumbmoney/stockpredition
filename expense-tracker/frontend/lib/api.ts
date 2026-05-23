@@ -1,19 +1,24 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type ApiOptions = RequestInit & {
+type JsonLike = Record<string, unknown> | Array<unknown>;
+
+type ApiOptions = Omit<RequestInit, "body" | "headers"> & {
+  body?: BodyInit | JsonLike;
+  headers?: HeadersInit;
   rawResponse?: boolean;
 };
 
 export async function apiFetch<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
   const { rawResponse, headers, body, ...rest } = options;
   const nextHeaders = new Headers(headers || {});
-  let finalBody = body;
+  let finalBody: BodyInit | undefined;
 
-  if (body && !(body instanceof FormData) && !nextHeaders.has("Content-Type")) {
-    nextHeaders.set("Content-Type", "application/json");
-  }
-
-  if (body && typeof body === "object" && !(body instanceof FormData) && !(body instanceof Blob)) {
+  if (body instanceof FormData || body instanceof Blob || typeof body === "string") {
+    finalBody = body;
+  } else if (body !== undefined) {
+    if (!nextHeaders.has("Content-Type")) {
+      nextHeaders.set("Content-Type", "application/json");
+    }
     finalBody = JSON.stringify(body);
   }
 
