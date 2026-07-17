@@ -1,0 +1,8 @@
+anthropic
+fastapi
+pandas
+numpy
+requests
+sqlalchemy
+uvicorn[standard]
+yfinance
