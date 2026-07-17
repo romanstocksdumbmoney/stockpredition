@@ -1,8 +1,12 @@
-import type { AnalysisResult } from "../lib/types";
+import type { AnalysisResult, TickerQuote } from "../lib/types";
+import { QuoteAsOfIndicator } from "./QuoteAsOfIndicator";
 import { PriceChart } from "./PriceChart";
 
 type Props = {
   analysis: AnalysisResult;
+  quote?: TickerQuote;
+  quoteStatus: "idle" | "ok" | "error";
+  quotePulse: number;
 };
 
 function caseColumn(title: string, points: string[], theme: "bull" | "bear") {
@@ -26,11 +30,15 @@ function caseColumn(title: string, points: string[], theme: "bull" | "bear") {
   );
 }
 
-export function AnalysisView({ analysis }: Props) {
+export function AnalysisView({ analysis, quote, quoteStatus, quotePulse }: Props) {
   const flowData = analysis.flow_data ?? {};
   const flowAvailable = flowData.available === true;
-  const lastPrice = Number(analysis.market_context?.last_price ?? 0);
-  const dayChange = Number(analysis.market_context?.day_change_pct ?? 0);
+  const fallbackPrice = Number(analysis.market_context?.last_price ?? 0);
+  const fallbackChange = Number(analysis.market_context?.day_change_pct ?? 0);
+  const lastPrice = quote?.price ?? fallbackPrice;
+  const dayChangeRaw = quote?.change_pct ?? fallbackChange;
+  const dayChange = Number.isFinite(dayChangeRaw) ? dayChangeRaw : 0;
+  const marketState = quote?.market_state;
   const verdictColor =
     analysis.confidence_direction === "bullish"
       ? "border-bull text-bull"
@@ -55,6 +63,15 @@ export function AnalysisView({ analysis }: Props) {
               <p className={`mono-numeric text-lg ${dayChange >= 0 ? "text-bull" : "text-bear"}`}>
                 {lastPrice ? `${lastPrice.toFixed(2)} · ${dayChange >= 0 ? "+" : ""}${dayChange.toFixed(2)}%` : "—"}
               </p>
+              {marketState === "closed" && (
+                <span className="rounded-full border border-hairline px-2 py-1 text-[10px] tracking-[0.14em] text-textMuted">
+                  MARKET CLOSED
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <QuoteAsOfIndicator asOf={quote?.as_of} status={quoteStatus} pulse={quotePulse} />
+              <span className="text-[11px] text-textMuted">Quotes may be delayed up to 15 minutes.</span>
             </div>
           </div>
           <div className="flex flex-col items-start gap-2 md:items-end">

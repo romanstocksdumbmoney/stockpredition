@@ -47,6 +47,16 @@ export type AnalysisResult = {
   };
 };
 
+export type MarketState = "open" | "closed" | "pre" | "post";
+
+export type TickerQuote = {
+  price: number;
+  change_pct: number | null;
+  volume: number | null;
+  as_of: string;
+  market_state: MarketState;
+};
+
 export type HistoryItem = {
   id: number;
   ticker: string;
