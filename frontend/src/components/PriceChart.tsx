@@ -4,6 +4,7 @@ type Props = {
   data: OhlcvPoint[];
   supportLevels: number[];
   resistanceLevels: number[];
+  priceAtHighs?: boolean;
 };
 
 const WIDTH = 760;
@@ -25,9 +26,9 @@ function levelY(level: number, minPrice: number, maxPrice: number): number {
   return PADDING + ((maxPrice - level) / (maxPrice - minPrice)) * (HEIGHT - PADDING * 2);
 }
 
-export function PriceChart({ data, supportLevels, resistanceLevels }: Props) {
+export function PriceChart({ data, supportLevels, resistanceLevels, priceAtHighs = false }: Props) {
   if (!data.length) {
-    return <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 text-slate-300">No chart data.</div>;
+    return <div className="terminal-panel rounded-md p-4 text-sm text-textSecondary">No chart data.</div>;
   }
 
   const prices = data.map((point) => point.close);
@@ -36,12 +37,19 @@ export function PriceChart({ data, supportLevels, resistanceLevels }: Props) {
   const path = toLinePath(data, minPrice, maxPrice);
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
-      <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
-        <span>Price chart (close)</span>
-        <span>{new Date(data[data.length - 1].timestamp).toLocaleString()}</span>
+    <div className="terminal-panel rounded-md p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-textMuted">
+        <span className="terminal-label">Price chart</span>
+        <div className="flex items-center gap-2">
+          {priceAtHighs && (
+            <span className="rounded-sm border border-bull px-2 py-0.5 text-[10px] font-semibold tracking-[0.14em] text-bull">
+              AT 52-WEEK HIGHS
+            </span>
+          )}
+          <span>{new Date(data[data.length - 1].timestamp).toLocaleString()}</span>
+        </div>
       </div>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-72 w-full rounded-lg bg-slate-950">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-72 w-full rounded-sm border border-hairline bg-page">
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="transparent" />
         {supportLevels.map((level, idx) => (
           <g key={`support-${idx}`}>
@@ -50,11 +58,11 @@ export function PriceChart({ data, supportLevels, resistanceLevels }: Props) {
               y1={levelY(level, minPrice, maxPrice)}
               x2={WIDTH - PADDING}
               y2={levelY(level, minPrice, maxPrice)}
-              stroke="#22c55e"
+              stroke="#2DD4A8"
               strokeDasharray="6 6"
-              strokeOpacity="0.5"
+              strokeOpacity="0.9"
             />
-            <text x={PADDING + 4} y={levelY(level, minPrice, maxPrice) - 4} fontSize="10" fill="#22c55e">
+            <text x={PADDING + 4} y={levelY(level, minPrice, maxPrice) - 4} fontSize="10" fill="#2DD4A8">
               S {level.toFixed(2)}
             </text>
           </g>
@@ -66,16 +74,16 @@ export function PriceChart({ data, supportLevels, resistanceLevels }: Props) {
               y1={levelY(level, minPrice, maxPrice)}
               x2={WIDTH - PADDING}
               y2={levelY(level, minPrice, maxPrice)}
-              stroke="#ef4444"
+              stroke="#E25D4B"
               strokeDasharray="6 6"
-              strokeOpacity="0.5"
+              strokeOpacity="0.9"
             />
-            <text x={WIDTH - 120} y={levelY(level, minPrice, maxPrice) - 4} fontSize="10" fill="#ef4444">
+            <text x={WIDTH - 120} y={levelY(level, minPrice, maxPrice) - 4} fontSize="10" fill="#E25D4B">
               R {level.toFixed(2)}
             </text>
           </g>
         ))}
-        <path d={path} fill="none" stroke="#38bdf8" strokeWidth="2.5" />
+        <path d={path} fill="none" stroke="#F2F5F9" strokeWidth="2.2" />
       </svg>
     </div>
   );

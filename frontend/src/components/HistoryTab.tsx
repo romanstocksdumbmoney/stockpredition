@@ -9,9 +9,9 @@ type Props = {
 };
 
 const outcomeClass: Record<string, string> = {
-  right: "bg-bull/20 text-bull border-bull/40",
-  wrong: "bg-bear/20 text-bear border-bear/40",
-  mixed: "bg-amber-500/20 text-amber-200 border-amber-300/40"
+  right: "border-bull text-bull",
+  wrong: "border-bear text-bear",
+  mixed: "border-hairline text-textSecondary"
 };
 
 const outcomes: Outcome[] = ["right", "wrong", "mixed"];
@@ -19,45 +19,74 @@ const outcomes: Outcome[] = ["right", "wrong", "mixed"];
 export function HistoryTab({ items, onMarkOutcome, busyId }: Props) {
   if (!items.length) {
     return (
-      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">
+      <div className="terminal-panel rounded-md p-4 text-sm text-textSecondary">
         No analyses saved yet. Run an analysis to build your personal track record.
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <article key={item.id} className="rounded-xl border border-slate-700 bg-slate-900 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-100">{item.ticker}</h3>
-              <p className="text-xs text-slate-400">{new Date(item.created_at).toLocaleString()}</p>
-            </div>
-            {item.outcome ? (
-              <span className={`rounded-full border px-2 py-1 text-xs capitalize ${outcomeClass[item.outcome]}`}>
-                {item.outcome}
-              </span>
-            ) : (
-              <span className="rounded-full border border-slate-600 px-2 py-1 text-xs text-slate-400">Unmarked</span>
-            )}
-          </div>
-
-          <p className="mb-3 text-sm text-slate-300">{item.result.summary}</p>
-          <div className="flex flex-wrap gap-2">
-            {outcomes.map((outcome) => (
-              <button
-                key={`${item.id}-${outcome}`}
-                disabled={busyId === item.id}
-                onClick={() => onMarkOutcome(item.id, outcome)}
-                className="rounded-md border border-slate-600 px-3 py-1 text-xs capitalize text-slate-200 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Mark {outcome}
-              </button>
-            ))}
-          </div>
-        </article>
-      ))}
+    <div className="terminal-panel overflow-x-auto rounded-md">
+      <table className="min-w-[980px] w-full border-collapse">
+        <thead>
+          <tr className="border-b border-hairline">
+            <th className="terminal-label px-4 py-3 text-left">Ticker</th>
+            <th className="terminal-label px-4 py-3 text-left">Verdict</th>
+            <th className="terminal-label px-4 py-3 text-left">Summary</th>
+            <th className="terminal-label px-4 py-3 text-left">Outcome</th>
+            <th className="terminal-label px-4 py-3 text-left">Marked</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const directionClass =
+              item.result.confidence_direction === "bullish"
+                ? "text-bull"
+                : item.result.confidence_direction === "bearish"
+                  ? "text-bear"
+                  : "text-textSecondary";
+            return (
+              <tr key={item.id} className="border-b border-hairline/70">
+                <td className="px-4 py-3 align-top">
+                  <p className="mono-numeric text-sm text-textPrimary">${item.ticker}</p>
+                  <p className="text-xs text-textMuted">{new Date(item.created_at).toLocaleString()}</p>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <p className={`mono-numeric text-sm ${directionClass}`}>
+                    {item.result.confidence_direction.toUpperCase()} · {item.result.confidence_pct}%
+                  </p>
+                </td>
+                <td className="px-4 py-3 align-top text-sm text-textSecondary">{item.result.summary}</td>
+                <td className="px-4 py-3 align-top">
+                  <div className="flex flex-wrap gap-2">
+                    {outcomes.map((outcome) => (
+                      <button
+                        key={`${item.id}-${outcome}`}
+                        disabled={busyId === item.id}
+                        onClick={() => onMarkOutcome(item.id, outcome)}
+                        className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 ${
+                          outcomeClass[outcome]
+                        }`}
+                      >
+                        {outcome}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  {item.outcome ? (
+                    <span className={`rounded-full border px-3 py-1 text-xs capitalize ${outcomeClass[item.outcome]}`}>
+                      {item.outcome}
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-hairline px-3 py-1 text-xs text-textMuted">unmarked</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
