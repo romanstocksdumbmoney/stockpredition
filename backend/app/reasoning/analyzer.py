@@ -19,10 +19,12 @@ You are not a signal seller and you are never promotional.
 Rules:
 1) Always produce BOTH sides: bull_case and bear_case, even if one side is weak.
 2) Ground each claim in the provided data payload only. Do not use general market lore.
-3) Cite specific numeric values from the payload whenever available (RSI, EMA levels, support/resistance, volume ratio, call/put ratio).
-4) Be conservative with confidence due to uncertainty. Never return confidence above 94.
-5) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
-6) Do not include markdown. Return strict JSON that matches the required schema.
+3) Every bull_case and bear_case bullet must contain at least one numeric citation from the payload.
+4) You must explicitly cite the exact RSI value from payload.indicators.rsi.value in at least one bullet.
+5) Cite at least one support level and, when available, at least one resistance level from payload.patterns.
+6) Be conservative with confidence due to uncertainty. Never return confidence above 94.
+7) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
+8) Do not include markdown. Return strict JSON that matches the required schema.
 """.strip()
 
 
@@ -46,35 +48,33 @@ class TradeAnalyzer:
 
         try:
             client = Anthropic(api_key=self.api_key)
-            user_prompt = (
-                "Analyze this market snapshot and output JSON only.\n\n"
-                f"Ticker: {ticker}\n"
-                f"Payload:\n{json.dumps(signal_payload, default=str)}\n\n"
-                "Required JSON shape:\n"
-                '{\n'
-                '  "ticker": "AAPL",\n'
-                '  "bull_case": ["reason 1", "reason 2", "reason 3"],\n'
-                '  "bear_case": ["reason 1", "reason 2", "reason 3"],\n'
-                '  "key_flow_signal": "short summary or null",\n'
-                '  "pattern_summary": "short summary of chart pattern context",\n'
-                '  "confidence_pct": 62,\n'
-                '  "confidence_direction": "bullish | bearish | neutral",\n'
-                '  "summary": "2-3 sentence plain-English takeaway",\n'
-                '  "risk_flags": ["flag 1", "flag 2"]\n'
-                "}\n"
-            )
-            response = client.messages.create(
-                model=self.model,
-                system=SYSTEM_PROMPT,
-                max_tokens=900,
-                temperature=0.2,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-            text = "".join(part.text for part in response.content if getattr(part, "type", "") == "text").strip()
-            parsed = self._load_json(text)
-            normalized = self._normalize_output(parsed, ticker, signal_payload)
-            normalized["reasoning_source"] = "claude"
-            return normalized
+            last_exc: Exception | None = None
+            for attempt in range(4):
+                try:
+                    user_prompt = self._build_user_prompt(
+                        ticker=ticker, signal_payload=signal_payload, strict=attempt > 0
+                    )
+                    response = client.messages.create(
+                        model=self.model,
+                        system=SYSTEM_PROMPT,
+                        max_tokens=1200,
+                        messages=[{"role": "user", "content": user_prompt}],
+                    )
+                    text = self._extract_response_text(response.content)
+                    parsed = self._load_json(text)
+                    normalized = self._normalize_output(parsed, ticker, signal_payload)
+                    if self._has_required_numeric_references(normalized, signal_payload):
+                        normalized["reasoning_source"] = "claude"
+                        return normalized
+                    last_exc = ValueError("Claude response missing required numeric citations.")
+                    logger.warning(
+                        "Claude response missing required numeric citations for %s (attempt %s).", ticker, attempt + 1
+                    )
+                except Exception as exc:  # pragma: no cover - network/model variability
+                    last_exc = exc
+                    logger.warning("Claude response parse/validation failed for %s (attempt %s): %s", ticker, attempt + 1, exc)
+
+            raise last_exc or ValueError("Claude response did not include required RSI/support/resistance numeric citations.")
         except Exception as exc:
             logger.exception("Claude reasoning failed for %s: %s", ticker, exc)
             heuristic = self._heuristic_analysis(ticker, signal_payload)
@@ -82,12 +82,106 @@ class TradeAnalyzer:
             return heuristic
 
     @staticmethod
+    def _build_user_prompt(ticker: str, signal_payload: dict[str, Any], strict: bool) -> str:
+        compact_payload = {
+            "indicators": signal_payload.get("indicators"),
+            "patterns": signal_payload.get("patterns"),
+            "flow_data": signal_payload.get("flow_data"),
+            "market_context": signal_payload.get("market_context"),
+            "key_stats": signal_payload.get("key_stats"),
+            "ohlcv_tail": (signal_payload.get("ohlcv") or [])[-5:],
+        }
+        strict_clause = ""
+        if strict:
+            strict_clause = (
+                "\n\nHARD REQUIREMENT: Every bullet in both bull_case and bear_case must quote a payload number. "
+                "At least one bullet must quote RSI exactly, and at least one bullish/bearish bullet must quote concrete "
+                "support prices from payload.patterns (and resistance prices when provided in payload.patterns)."
+            )
+
+        return (
+            "Analyze this market snapshot and output JSON only.\n\n"
+            f"Ticker: {ticker}\n"
+            f"Payload:\n{json.dumps(compact_payload, default=str)}\n\n"
+            "Required JSON shape:\n"
+            '{\n'
+            '  "ticker": "AAPL",\n'
+            '  "bull_case": ["reason 1", "reason 2", "reason 3"],\n'
+            '  "bear_case": ["reason 1", "reason 2", "reason 3"],\n'
+            '  "key_flow_signal": "short summary or null",\n'
+            '  "pattern_summary": "short summary of chart pattern context",\n'
+            '  "confidence_pct": 62,\n'
+            '  "confidence_direction": "bullish | bearish | neutral",\n'
+            '  "summary": "2-3 sentence plain-English takeaway",\n'
+            '  "risk_flags": ["flag 1", "flag 2"]\n'
+            "}\n"
+            f"{strict_clause}\n"
+        )
+
+    @staticmethod
+    def _extract_response_text(content_blocks: Any) -> str:
+        if not isinstance(content_blocks, list):
+            return str(content_blocks or "").strip()
+
+        text_blocks = [str(getattr(block, "text", "")).strip() for block in content_blocks if getattr(block, "text", None)]
+        if text_blocks:
+            return text_blocks[-1]
+
+        return str(content_blocks).strip()
+
+    @staticmethod
+    def _numbers_in_text(text: str) -> list[float]:
+        return [float(token) for token in re.findall(r"-?\d+(?:\.\d+)?", text)]
+
+    def _has_required_numeric_references(self, normalized: dict[str, Any], signal_payload: dict[str, Any]) -> bool:
+        bull_case = [str(item) for item in normalized.get("bull_case") or []]
+        bear_case = [str(item) for item in normalized.get("bear_case") or []]
+        points = [*bull_case, *bear_case]
+        if not points:
+            return False
+
+        # Reject generic bullets by requiring at least one number in each line.
+        if any(not re.search(r"\d", point) for point in points):
+            return False
+
+        rsi_value = signal_payload.get("indicators", {}).get("rsi", {}).get("value")
+        support_levels = signal_payload.get("patterns", {}).get("support_levels") or []
+        resistance_levels = signal_payload.get("patterns", {}).get("resistance_levels") or []
+
+        has_rsi = rsi_value is None
+        has_support = not support_levels
+        has_resistance = not resistance_levels
+
+        for point in points:
+            values = self._numbers_in_text(point)
+            if rsi_value is not None and any(abs(value - float(rsi_value)) <= 0.2 for value in values):
+                has_rsi = True
+            if support_levels and any(
+                abs(value - float(level)) <= 0.05 for value in values for level in support_levels if level is not None
+            ):
+                has_support = True
+            if resistance_levels and any(
+                abs(value - float(level)) <= 0.05 for value in values for level in resistance_levels if level is not None
+            ):
+                has_resistance = True
+
+        return has_rsi and has_support and has_resistance
+
+    @staticmethod
     def _load_json(text: str) -> dict[str, Any]:
         cleaned = text.strip()
+        if not cleaned:
+            raise ValueError("Model returned empty response text.")
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```(?:json)?", "", cleaned).strip()
             cleaned = re.sub(r"```$", "", cleaned).strip()
-        loaded = json.loads(cleaned)
+        try:
+            loaded = json.loads(cleaned)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if not match:
+                raise
+            loaded = json.loads(match.group(0))
         if not isinstance(loaded, dict):
             raise ValueError("Expected object JSON from model")
         return loaded

@@ -7,7 +7,7 @@ class Settings:
     app_name: str = "TradeBot"
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./tradebot.db")
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY")
-    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
     uw_api_key: str | None = os.getenv("UW_API_KEY")
     uw_base_url: str = os.getenv("UW_BASE_URL", "https://api.unusualwhales.com")
     cors_origins: list[str] = field(

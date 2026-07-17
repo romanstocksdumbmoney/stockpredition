@@ -113,8 +113,12 @@ def compute_indicators(history: pd.DataFrame) -> dict[str, Any]:
     loss = -delta.clip(upper=0)
     avg_gain = gain.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
+    avg_loss_safe = avg_loss.replace(0, np.nan)
+    rs = avg_gain / avg_loss_safe
     rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.where(~((avg_loss == 0) & (avg_gain > 0)), 100.0)
+    rsi = rsi.where(~((avg_gain == 0) & (avg_loss > 0)), 0.0)
+    rsi = rsi.where(~((avg_gain == 0) & (avg_loss == 0)), 50.0)
 
     ema12 = close.ewm(span=12, adjust=False).mean()
     ema26 = close.ewm(span=26, adjust=False).mean()
