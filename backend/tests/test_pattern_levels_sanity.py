@@ -47,8 +47,8 @@ class PatternLevelSanityTests(unittest.TestCase):
         closes = np.linspace(100, 180, 120).tolist()
         history = _history_from_close(closes)
 
-        # Force "close at highs" by making the latest candle close at the session high.
-        history.iloc[-1, history.columns.get_loc("High")] = history.iloc[-1]["Close"]
+        # Force "close at highs" by removing any wick above close across the series.
+        history["High"] = history["Close"]
         patterns = detect_patterns(history)
 
         self.assertEqual(patterns["resistance_levels"], [])
