@@ -48,23 +48,33 @@ class TradeAnalyzer:
 
         try:
             client = Anthropic(api_key=self.api_key)
-            for attempt in range(2):
-                user_prompt = self._build_user_prompt(ticker=ticker, signal_payload=signal_payload, strict=attempt > 0)
-                response = client.messages.create(
-                    model=self.model,
-                    system=SYSTEM_PROMPT,
-                    max_tokens=900,
-                    messages=[{"role": "user", "content": user_prompt}],
-                )
-                text = "".join(part.text for part in response.content if getattr(part, "type", "") == "text").strip()
-                parsed = self._load_json(text)
-                normalized = self._normalize_output(parsed, ticker, signal_payload)
-                if self._has_required_numeric_references(normalized, signal_payload):
-                    normalized["reasoning_source"] = "claude"
-                    return normalized
-                logger.warning("Claude response missing required numeric citations for %s (attempt %s).", ticker, attempt + 1)
+            last_exc: Exception | None = None
+            for attempt in range(4):
+                try:
+                    user_prompt = self._build_user_prompt(
+                        ticker=ticker, signal_payload=signal_payload, strict=attempt > 0
+                    )
+                    response = client.messages.create(
+                        model=self.model,
+                        system=SYSTEM_PROMPT,
+                        max_tokens=1200,
+                        messages=[{"role": "user", "content": user_prompt}],
+                    )
+                    text = self._extract_response_text(response.content)
+                    parsed = self._load_json(text)
+                    normalized = self._normalize_output(parsed, ticker, signal_payload)
+                    if self._has_required_numeric_references(normalized, signal_payload):
+                        normalized["reasoning_source"] = "claude"
+                        return normalized
+                    last_exc = ValueError("Claude response missing required numeric citations.")
+                    logger.warning(
+                        "Claude response missing required numeric citations for %s (attempt %s).", ticker, attempt + 1
+                    )
+                except Exception as exc:  # pragma: no cover - network/model variability
+                    last_exc = exc
+                    logger.warning("Claude response parse/validation failed for %s (attempt %s): %s", ticker, attempt + 1, exc)
 
-            raise ValueError("Claude response did not include required RSI/support/resistance numeric citations.")
+            raise last_exc or ValueError("Claude response did not include required RSI/support/resistance numeric citations.")
         except Exception as exc:
             logger.exception("Claude reasoning failed for %s: %s", ticker, exc)
             heuristic = self._heuristic_analysis(ticker, signal_payload)
@@ -73,6 +83,14 @@ class TradeAnalyzer:
 
     @staticmethod
     def _build_user_prompt(ticker: str, signal_payload: dict[str, Any], strict: bool) -> str:
+        compact_payload = {
+            "indicators": signal_payload.get("indicators"),
+            "patterns": signal_payload.get("patterns"),
+            "flow_data": signal_payload.get("flow_data"),
+            "market_context": signal_payload.get("market_context"),
+            "key_stats": signal_payload.get("key_stats"),
+            "ohlcv_tail": (signal_payload.get("ohlcv") or [])[-5:],
+        }
         strict_clause = ""
         if strict:
             strict_clause = (
@@ -84,7 +102,7 @@ class TradeAnalyzer:
         return (
             "Analyze this market snapshot and output JSON only.\n\n"
             f"Ticker: {ticker}\n"
-            f"Payload:\n{json.dumps(signal_payload, default=str)}\n\n"
+            f"Payload:\n{json.dumps(compact_payload, default=str)}\n\n"
             "Required JSON shape:\n"
             '{\n'
             '  "ticker": "AAPL",\n'
@@ -99,6 +117,17 @@ class TradeAnalyzer:
             "}\n"
             f"{strict_clause}\n"
         )
+
+    @staticmethod
+    def _extract_response_text(content_blocks: Any) -> str:
+        if not isinstance(content_blocks, list):
+            return str(content_blocks or "").strip()
+
+        text_blocks = [str(getattr(block, "text", "")).strip() for block in content_blocks if getattr(block, "text", None)]
+        if text_blocks:
+            return text_blocks[-1]
+
+        return str(content_blocks).strip()
 
     @staticmethod
     def _numbers_in_text(text: str) -> list[float]:
@@ -141,10 +170,18 @@ class TradeAnalyzer:
     @staticmethod
     def _load_json(text: str) -> dict[str, Any]:
         cleaned = text.strip()
+        if not cleaned:
+            raise ValueError("Model returned empty response text.")
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```(?:json)?", "", cleaned).strip()
             cleaned = re.sub(r"```$", "", cleaned).strip()
-        loaded = json.loads(cleaned)
+        try:
+            loaded = json.loads(cleaned)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if not match:
+                raise
+            loaded = json.loads(match.group(0))
         if not isinstance(loaded, dict):
             raise ValueError("Expected object JSON from model")
         return loaded
