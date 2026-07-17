@@ -29,9 +29,22 @@ export type AnalysisResult = {
     resistance_levels: number[];
   };
   indicators: Record<string, unknown>;
-  patterns: Record<string, unknown>;
-  flow_data: Record<string, unknown>;
-  market_context: Record<string, unknown>;
+  patterns: {
+    support_levels?: number[];
+    resistance_levels?: number[];
+    price_at_highs?: boolean;
+    [key: string]: unknown;
+  };
+  flow_data: {
+    available?: boolean;
+    message?: string;
+    [key: string]: unknown;
+  };
+  market_context: {
+    last_price?: number;
+    day_change_pct?: number;
+    [key: string]: unknown;
+  };
 };
 
 export type HistoryItem = {

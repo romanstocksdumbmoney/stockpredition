@@ -3,9 +3,10 @@ import { FormEvent, useState } from "react";
 type Props = {
   onSubmit: (query: string) => Promise<void>;
   loading: boolean;
+  centered?: boolean;
 };
 
-export function SearchBar({ onSubmit, loading }: Props) {
+export function SearchBar({ onSubmit, loading, centered = false }: Props) {
   const [query, setQuery] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -18,16 +19,18 @@ export function SearchBar({ onSubmit, loading }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full rounded-xl border border-slate-700 bg-slate-900/70 p-4 shadow-lg">
-      <label htmlFor="tradebot-query" className="mb-2 block text-sm font-medium text-slate-300">
-        TradeBot, look at this...
-      </label>
-      <div className="flex flex-col gap-3 md:flex-row">
+    <form
+      onSubmit={handleSubmit}
+      className={`w-full ${centered ? "mx-auto max-w-3xl" : ""}`}
+    >
+      <div className={`flex ${centered ? "flex-col gap-4 md:flex-row" : "flex-col gap-3 md:flex-row"}`}>
         <input
           id="tradebot-query"
           type="text"
-          placeholder="Try: TradeBot, look at $AAPL or paste a flow alert"
-          className="flex-1 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none"
+          placeholder="$TICKER"
+          className={`mono-numeric h-12 flex-1 rounded-md border border-hairline bg-inset px-4 text-textPrimary placeholder:text-textMuted focus:border-bull focus:outline-none transition-colors duration-150 ${
+            centered ? "text-center text-lg" : "text-base"
+          }`}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           disabled={loading}
@@ -35,7 +38,7 @@ export function SearchBar({ onSubmit, loading }: Props) {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-accent px-5 py-2 font-semibold text-slate-950 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+          className="h-12 rounded-md border border-bull bg-bull px-7 font-semibold text-page transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:border-hairline disabled:bg-inset disabled:text-textMuted"
         >
           {loading ? "Analyzing..." : "Analyze"}
         </button>
