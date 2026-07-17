@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -35,11 +36,29 @@ app.add_middleware(
 yahoo_client = YahooClient()
 uw_client = UnusualWhalesClient(api_key=settings.uw_api_key, base_url=settings.uw_base_url)
 trade_analyzer = TradeAnalyzer(api_key=settings.anthropic_api_key, model=settings.anthropic_model)
+logger = logging.getLogger(__name__)
+
+
+def _ensure_analysis_schema() -> None:
+    if not settings.database_url.startswith("sqlite"):
+        return
+
+    with engine.begin() as connection:
+        columns = [row[1] for row in connection.exec_driver_sql("PRAGMA table_info(analyses)").fetchall()]
+        if "reasoning_source" not in columns:
+            connection.exec_driver_sql("ALTER TABLE analyses ADD COLUMN reasoning_source VARCHAR(16)")
+        connection.exec_driver_sql(
+            "UPDATE analyses SET reasoning_source = 'fallback' WHERE reasoning_source IS NULL OR reasoning_source = ''"
+        )
 
 
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    try:
+        _ensure_analysis_schema()
+    except Exception as exc:  # pragma: no cover - defensive startup logging
+        logger.exception("Failed to ensure analysis schema migration: %s", exc)
 
 
 def _extract_ticker(text: str) -> str | None:
@@ -94,6 +113,27 @@ def _build_signal_payload(symbol: str, period: str = "6mo", interval: str = "1d"
     }
 
 
+def _normalize_reasoning_source(value: Any) -> str:
+    source = str(value or "fallback").lower().strip()
+    if source not in {"claude", "fallback"}:
+        return "fallback"
+    return source
+
+
+def _history_item_from_row(row: Analysis) -> HistoryItem:
+    result_payload = dict(row.result_json or {})
+    source = _normalize_reasoning_source(result_payload.get("reasoning_source") or row.reasoning_source)
+    result_payload["reasoning_source"] = source
+    return HistoryItem(
+        id=row.id,
+        ticker=row.ticker,
+        query_text=row.query_text,
+        created_at=row.created_at,
+        outcome=row.outcome,
+        result=result_payload,
+    )
+
+
 @app.post("/api/analyze", response_model=AnalysisResult)
 def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
     raw_input = request.ticker or request.query
@@ -112,6 +152,8 @@ def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=502, detail=f"Data pipeline error: {exc}") from exc
 
     analysis = trade_analyzer.analyze(ticker=ticker, signal_payload=payload)
+    reasoning_source = _normalize_reasoning_source(analysis.get("reasoning_source"))
+    analysis["reasoning_source"] = reasoning_source
     full_result: dict[str, Any] = {
         **analysis,
         "disclaimer": DISCLAIMER,
@@ -134,6 +176,7 @@ def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
         ticker=ticker,
         query_text=request.query,
         result_json=full_result,
+        reasoning_source=reasoning_source,
         outcome=None,
     )
     db.add(row)
@@ -146,17 +189,7 @@ def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
 @app.get("/api/history", response_model=list[HistoryItem])
 def history(db: Session = Depends(get_db)):
     rows = db.query(Analysis).order_by(Analysis.created_at.desc()).limit(200).all()
-    return [
-        HistoryItem(
-            id=row.id,
-            ticker=row.ticker,
-            query_text=row.query_text,
-            created_at=row.created_at,
-            outcome=row.outcome,
-            result=row.result_json,
-        )
-        for row in rows
-    ]
+    return [_history_item_from_row(row) for row in rows]
 
 
 @app.post("/api/history/{analysis_id}/outcome", response_model=HistoryItem)
@@ -171,14 +204,7 @@ def mark_outcome(analysis_id: int, request: OutcomeRequest, db: Session = Depend
     db.commit()
     db.refresh(row)
 
-    return HistoryItem(
-        id=row.id,
-        ticker=row.ticker,
-        query_text=row.query_text,
-        created_at=row.created_at,
-        outcome=row.outcome,
-        result=row.result_json,
-    )
+    return _history_item_from_row(row)
 
 
 @app.get("/api/ticker/{symbol}/chart")

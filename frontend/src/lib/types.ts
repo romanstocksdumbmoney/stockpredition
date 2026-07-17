@@ -18,6 +18,7 @@ export type AnalysisResult = {
   pattern_summary: string;
   confidence_pct: number;
   confidence_direction: ConfidenceDirection;
+  reasoning_source: "claude" | "fallback";
   summary: string;
   risk_flags: string[];
   disclaimer: string;

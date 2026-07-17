@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -18,10 +19,14 @@ You are not a signal seller and you are never promotional.
 Rules:
 1) Always produce BOTH sides: bull_case and bear_case, even if one side is weak.
 2) Ground each claim in the provided data payload only. Do not use general market lore.
-3) Be conservative with confidence due to uncertainty. Never return confidence above 94.
-4) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
-5) Do not include markdown. Return strict JSON that matches the required schema.
+3) Cite specific numeric values from the payload whenever available (RSI, EMA levels, support/resistance, volume ratio, call/put ratio).
+4) Be conservative with confidence due to uncertainty. Never return confidence above 94.
+5) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
+6) Do not include markdown. Return strict JSON that matches the required schema.
 """.strip()
+
+
+logger = logging.getLogger(__name__)
 
 
 class TradeAnalyzer:
@@ -31,6 +36,10 @@ class TradeAnalyzer:
 
     def analyze(self, ticker: str, signal_payload: dict[str, Any]) -> dict[str, Any]:
         if not self.api_key or Anthropic is None:
+            if not self.api_key:
+                logger.warning("Anthropic API key is missing; using fallback reasoning for %s.", ticker)
+            if Anthropic is None:
+                logger.warning("Anthropic SDK import unavailable; using fallback reasoning for %s.", ticker)
             heuristic = self._heuristic_analysis(ticker, signal_payload)
             heuristic["risk_flags"].append("LLM layer unavailable; using deterministic fallback analysis.")
             return heuristic
@@ -63,10 +72,13 @@ class TradeAnalyzer:
             )
             text = "".join(part.text for part in response.content if getattr(part, "type", "") == "text").strip()
             parsed = self._load_json(text)
-            return self._normalize_output(parsed, ticker, signal_payload)
+            normalized = self._normalize_output(parsed, ticker, signal_payload)
+            normalized["reasoning_source"] = "claude"
+            return normalized
         except Exception as exc:
+            logger.exception("Claude reasoning failed for %s: %s", ticker, exc)
             heuristic = self._heuristic_analysis(ticker, signal_payload)
-            heuristic["risk_flags"].append(f"Claude call failed; fallback analysis used ({exc.__class__.__name__}).")
+            heuristic["risk_flags"].append(f"Claude call failed; fallback analysis used ({exc.__class__.__name__}: {exc}).")
             return heuristic
 
     @staticmethod
@@ -133,6 +145,7 @@ class TradeAnalyzer:
             "confidence_direction": direction,
             "summary": summary,
             "risk_flags": risk_flags[:6],
+            "reasoning_source": "claude",
         }
 
     @staticmethod
@@ -278,6 +291,7 @@ class TradeAnalyzer:
             "confidence_direction": direction,
             "summary": summary,
             "risk_flags": risk_flags[:6],
+            "reasoning_source": "fallback",
         }
 
 

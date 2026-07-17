@@ -23,6 +23,7 @@ class AnalysisResult(BaseModel):
     confidence_direction: Literal["bullish", "bearish", "neutral"]
     summary: str
     risk_flags: list[str]
+    reasoning_source: Literal["claude", "fallback"]
     disclaimer: str
     generated_at: datetime
     chart: dict[str, Any]

@@ -25,6 +25,9 @@ function caseColumn(title: string, points: string[], theme: "bull" | "bear") {
 }
 
 export function AnalysisView({ analysis }: Props) {
+  const flowData = (analysis.flow_data ?? {}) as { available?: boolean; message?: string };
+  const flowAvailable = flowData.available === true;
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border border-slate-700 bg-slate-900/70 p-4 md:flex-row md:items-center md:justify-between">
@@ -33,7 +36,18 @@ export function AnalysisView({ analysis }: Props) {
           <h2 className="text-2xl font-bold text-slate-100">{analysis.ticker}</h2>
           <p className="mt-1 text-sm text-slate-300">{analysis.summary}</p>
         </div>
-        <ConfidenceGauge confidence={analysis.confidence_pct} direction={analysis.confidence_direction} />
+        <div className="space-y-2">
+          <ConfidenceGauge confidence={analysis.confidence_pct} direction={analysis.confidence_direction} />
+          {analysis.reasoning_source === "claude" ? (
+            <span className="inline-flex rounded-full border border-emerald-400/50 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+              Claude reasoning active
+            </span>
+          ) : (
+            <span className="inline-flex rounded-full border border-amber-300/60 bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-100">
+              Fallback analysis — AI reasoning unavailable
+            </span>
+          )}
+        </div>
       </div>
 
       <PriceChart
@@ -61,11 +75,17 @@ export function AnalysisView({ analysis }: Props) {
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
         <p className="text-xs uppercase tracking-wide text-slate-400">Pattern summary</p>
         <p className="mt-1 text-sm text-slate-200">{analysis.pattern_summary}</p>
-        {analysis.key_flow_signal && (
+        {flowAvailable && analysis.key_flow_signal && (
           <>
             <p className="mt-3 text-xs uppercase tracking-wide text-slate-400">Options flow</p>
             <p className="mt-1 text-sm text-slate-200">{analysis.key_flow_signal}</p>
           </>
+        )}
+        {!flowAvailable && (
+          <div className="mt-3 rounded-md border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            Flow data unavailable. Set <code>UW_API_KEY</code> to enable Unusual Whales options-flow context.
+            {flowData.message ? ` (${flowData.message})` : ""}
+          </div>
         )}
       </div>
     </section>
