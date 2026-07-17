@@ -21,10 +21,10 @@ Rules:
 2) Ground each claim in the provided data payload only. Do not use general market lore.
 3) Every bull_case and bear_case bullet must contain at least one numeric citation from the payload.
 4) You must explicitly cite the exact RSI value from payload.indicators.rsi.value in at least one bullet.
-5) You must explicitly cite at least one support level and one resistance level from payload.patterns.
-4) Be conservative with confidence due to uncertainty. Never return confidence above 94.
-5) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
-6) Do not include markdown. Return strict JSON that matches the required schema.
+5) Cite at least one support level and, when available, at least one resistance level from payload.patterns.
+6) Be conservative with confidence due to uncertainty. Never return confidence above 94.
+7) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
+8) Do not include markdown. Return strict JSON that matches the required schema.
 """.strip()
 
 
@@ -96,7 +96,7 @@ class TradeAnalyzer:
             strict_clause = (
                 "\n\nHARD REQUIREMENT: Every bullet in both bull_case and bear_case must quote a payload number. "
                 "At least one bullet must quote RSI exactly, and at least one bullish/bearish bullet must quote concrete "
-                "support/resistance prices from payload.patterns."
+                "support prices from payload.patterns (and resistance prices when provided in payload.patterns)."
             )
 
         return (
