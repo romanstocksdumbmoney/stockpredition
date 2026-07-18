@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
-import type { AnalysisResult, HistoryItem } from "../lib/types";
+import type { AnalysisResult, HistoryItem, TickerQuote } from "../lib/types";
+import { QuoteAsOfIndicator } from "./QuoteAsOfIndicator";
 
 type Outcome = "right" | "wrong" | "mixed";
 
@@ -9,6 +10,9 @@ type Props = {
   onOpenAnalysis: (analysis: AnalysisResult) => void;
   onMarkOutcome: (id: number, outcome: Outcome) => Promise<void>;
   busyId: number | null;
+  quoteBySymbol: Record<string, TickerQuote | undefined>;
+  quoteStatusBySymbol: Record<string, "idle" | "ok" | "error">;
+  quotePulseBySymbol: Record<string, number>;
 };
 
 const outcomes: Outcome[] = ["right", "wrong", "mixed"];
@@ -31,7 +35,15 @@ function outcomeClass(outcome: Outcome): string {
   return "border-hairline text-textSecondary";
 }
 
-export function WatchlistDesk({ items, onOpenAnalysis, onMarkOutcome, busyId }: Props) {
+export function WatchlistDesk({
+  items,
+  onOpenAnalysis,
+  onMarkOutcome,
+  busyId,
+  quoteBySymbol,
+  quoteStatusBySymbol,
+  quotePulseBySymbol,
+}: Props) {
   const latestByTicker = useMemo(() => {
     const seen = new Set<string>();
     return items.filter((item) => {
@@ -69,6 +81,15 @@ export function WatchlistDesk({ items, onOpenAnalysis, onMarkOutcome, busyId }: 
             {latestByTicker.map((item) => {
               const direction = item.result.confidence_direction;
               const confidence = Math.max(0, Math.min(100, item.result.confidence_pct));
+              const symbol = item.ticker.toUpperCase();
+              const quote = quoteBySymbol[symbol];
+              const quoteStatus = quoteStatusBySymbol[symbol] ?? "idle";
+              const quotePulse = quotePulseBySymbol[symbol] ?? 0;
+              const fallbackPrice = Number(item.result.market_context?.last_price ?? 0);
+              const fallbackChange = Number(item.result.market_context?.day_change_pct ?? 0);
+              const livePrice = quote?.price ?? fallbackPrice;
+              const liveChangeRaw = quote?.change_pct ?? fallbackChange;
+              const liveChange = Number.isFinite(liveChangeRaw) ? liveChangeRaw : 0;
               return (
                 <tr
                   key={item.id}
@@ -78,6 +99,19 @@ export function WatchlistDesk({ items, onOpenAnalysis, onMarkOutcome, busyId }: 
                   <td className="px-4 py-3 align-top">
                     <p className="mono-numeric text-sm text-textPrimary">${item.ticker}</p>
                     <p className="text-xs text-textMuted">{new Date(item.created_at).toLocaleDateString()}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className={`mono-numeric text-xs ${liveChange >= 0 ? "text-bull" : "text-bear"}`}>
+                        {livePrice ? `${livePrice.toFixed(2)} · ${liveChange >= 0 ? "+" : ""}${liveChange.toFixed(2)}%` : "—"}
+                      </p>
+                      {quote?.market_state === "closed" && (
+                        <span className="rounded-full border border-hairline px-1.5 py-0.5 text-[10px] tracking-[0.14em] text-textMuted">
+                          MARKET CLOSED
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1">
+                      <QuoteAsOfIndicator asOf={quote?.as_of} status={quoteStatus} pulse={quotePulse} />
+                    </div>
                   </td>
                   <td className={`px-4 py-3 align-top mono-numeric text-sm ${verdictClass(direction)}`}>
                     {direction.toUpperCase()}

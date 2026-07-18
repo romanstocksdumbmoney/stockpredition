@@ -5,10 +5,16 @@ import { HistoryTab } from "./components/HistoryTab";
 import { SearchBar } from "./components/SearchBar";
 import { TerminalBrand } from "./components/TerminalBrand";
 import { WatchlistDesk } from "./components/WatchlistDesk";
-import { analyze, getHistory, markOutcome } from "./lib/api";
-import type { AnalysisResult, HistoryItem } from "./lib/types";
+import { analyze, getHistory, getTickerQuote, markOutcome } from "./lib/api";
+import type { AnalysisResult, HistoryItem, TickerQuote } from "./lib/types";
 
 type Tab = "analyze" | "watchlist" | "history";
+type QuoteStatus = "idle" | "ok" | "error";
+
+const QUOTE_POLL_MS = 20_000;
+const MIN_QUOTE_POLL_MS = 10_000;
+const CLOSED_MARKET_POLL_MS = 5 * 60_000;
+const EFFECTIVE_QUOTE_POLL_MS = Math.max(QUOTE_POLL_MS, MIN_QUOTE_POLL_MS);
 
 function landingStats(history: HistoryItem[]) {
   const latest = history[0]?.result;
@@ -28,6 +34,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [historyBusyId, setHistoryBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [quoteBySymbol, setQuoteBySymbol] = useState<Record<string, TickerQuote | undefined>>({});
+  const [quoteStatusBySymbol, setQuoteStatusBySymbol] = useState<Record<string, QuoteStatus>>({});
+  const [quotePulseBySymbol, setQuotePulseBySymbol] = useState<Record<string, number>>({});
+  const [isPageVisible, setIsPageVisible] = useState<boolean>(() =>
+    typeof document === "undefined" ? true : document.visibilityState === "visible"
+  );
 
   async function refreshHistory() {
     const rows = await getHistory();
@@ -38,6 +50,12 @@ function App() {
     refreshHistory().catch((err: unknown) => {
       setError(err instanceof Error ? err.message : "Failed to load history.");
     });
+  }, []);
+
+  useEffect(() => {
+    const onVisibility = () => setIsPageVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   async function onAnalyze(query: string) {
@@ -75,6 +93,68 @@ function App() {
     [analysis]
   );
   const stats = useMemo(() => landingStats(history), [history]);
+  const watchlistSymbols = useMemo(() => {
+    const seen = new Set<string>();
+    const symbols: string[] = [];
+    for (const item of history) {
+      const symbol = item.ticker.toUpperCase();
+      if (seen.has(symbol)) continue;
+      seen.add(symbol);
+      symbols.push(symbol);
+    }
+    return symbols;
+  }, [history]);
+
+  const visibleSymbols = useMemo(() => {
+    if (!isPageVisible) return [];
+    if (activeTab === "analyze" && analysis) return [analysis.ticker.toUpperCase()];
+    if (activeTab === "watchlist") return watchlistSymbols;
+    return [];
+  }, [activeTab, analysis, isPageVisible, watchlistSymbols]);
+  const visibleSymbolsKey = useMemo(() => visibleSymbols.join(","), [visibleSymbols]);
+  const allVisibleClosed = useMemo(
+    () =>
+      visibleSymbols.length > 0 &&
+      visibleSymbols.every((symbol) => quoteBySymbol[symbol]?.market_state === "closed"),
+    [visibleSymbols, quoteBySymbol]
+  );
+  const quotePollDelay = allVisibleClosed ? CLOSED_MARKET_POLL_MS : EFFECTIVE_QUOTE_POLL_MS;
+
+  useEffect(() => {
+    if (!visibleSymbolsKey || !isPageVisible) return;
+
+    const symbols = visibleSymbolsKey.split(",").filter(Boolean);
+    if (!symbols.length) return;
+
+    let cancelled = false;
+    let timerId: number | undefined;
+
+    const updateQuotes = async () => {
+      await Promise.all(
+        symbols.map(async (symbol) => {
+          try {
+            const quote = await getTickerQuote(symbol);
+            if (cancelled) return;
+            setQuoteBySymbol((prev) => ({ ...prev, [symbol]: quote }));
+            setQuoteStatusBySymbol((prev) => ({ ...prev, [symbol]: "ok" }));
+            setQuotePulseBySymbol((prev) => ({ ...prev, [symbol]: (prev[symbol] ?? 0) + 1 }));
+          } catch {
+            if (cancelled) return;
+            setQuoteStatusBySymbol((prev) => ({ ...prev, [symbol]: "error" }));
+          }
+        })
+      );
+
+      if (cancelled) return;
+      timerId = window.setTimeout(updateQuotes, quotePollDelay);
+    };
+
+    updateQuotes();
+    return () => {
+      cancelled = true;
+      if (timerId) window.clearTimeout(timerId);
+    };
+  }, [visibleSymbolsKey, isPageVisible, quotePollDelay]);
 
   const linkClass = (tab: Tab) =>
     `mono-numeric text-sm transition-colors duration-150 ${activeTab === tab ? "text-bull" : "text-textMuted hover:text-textSecondary"}`;
@@ -133,7 +213,12 @@ function App() {
         {activeTab === "analyze" && analysis && (
           <section className="space-y-4">
             <SearchBar onSubmit={onAnalyze} loading={loading} />
-            <AnalysisView analysis={analysis} />
+            <AnalysisView
+              analysis={analysis}
+              quote={quoteBySymbol[analysis.ticker.toUpperCase()]}
+              quoteStatus={quoteStatusBySymbol[analysis.ticker.toUpperCase()] ?? "idle"}
+              quotePulse={quotePulseBySymbol[analysis.ticker.toUpperCase()] ?? 0}
+            />
           </section>
         )}
 
@@ -142,6 +227,9 @@ function App() {
             items={history}
             busyId={historyBusyId}
             onMarkOutcome={onMarkOutcome}
+            quoteBySymbol={quoteBySymbol}
+            quoteStatusBySymbol={quoteStatusBySymbol}
+            quotePulseBySymbol={quotePulseBySymbol}
             onOpenAnalysis={(itemAnalysis) => {
               setAnalysis(itemAnalysis);
               setActiveTab("analyze");

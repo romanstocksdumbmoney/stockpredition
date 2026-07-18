@@ -1,4 +1,4 @@
-import type { AnalysisResult, HistoryItem } from "./types";
+import type { AnalysisResult, HistoryItem, TickerQuote } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -40,4 +40,9 @@ export async function markOutcome(id: number, outcome: "right" | "wrong" | "mixe
     body: JSON.stringify({ outcome })
   });
   return parseResponse<HistoryItem>(response);
+}
+
+export async function getTickerQuote(symbol: string): Promise<TickerQuote> {
+  const response = await fetch(`${API_BASE}/api/ticker/${encodeURIComponent(symbol)}/quote`);
+  return parseResponse<TickerQuote>(response);
 }

@@ -41,3 +41,11 @@ class HistoryItem(BaseModel):
     created_at: datetime
     outcome: str | None
     result: dict[str, Any]
+
+
+class TickerQuote(BaseModel):
+    price: float
+    change_pct: float | None
+    volume: int | None
+    as_of: datetime
+    market_state: Literal["open", "closed", "pre", "post"]

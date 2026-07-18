@@ -17,7 +17,7 @@ from app.data.yahoo_client import YahooClient
 from app.database import Base, engine, get_db
 from app.models import Analysis
 from app.reasoning.analyzer import TradeAnalyzer
-from app.schemas import AnalysisResult, AnalyzeRequest, HistoryItem, OutcomeRequest
+from app.schemas import AnalysisResult, AnalyzeRequest, HistoryItem, OutcomeRequest, TickerQuote
 
 DISCLAIMER = (
     "TradeBot weighs signals but doesn't predict the future. "
@@ -226,3 +226,13 @@ def ticker_chart(
         "interval": interval,
         "ohlcv": yahoo_client.to_ohlcv_records(history),
     }
+
+
+@app.get("/api/ticker/{symbol}/quote", response_model=TickerQuote)
+def ticker_quote(symbol: str):
+    try:
+        return yahoo_client.fetch_quote(symbol=symbol.upper())
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Unable to fetch quote data: {exc}") from exc
