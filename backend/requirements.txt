@@ -1,4 +1,5 @@
 anthropic
+apscheduler
 fastapi
 pandas
 numpy

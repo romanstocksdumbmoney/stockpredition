@@ -104,6 +104,32 @@ export type TickerQuote = {
   market_state: MarketState;
 };
 
+export type WatchlistItem = {
+  symbol: string;
+  added_at: string;
+};
+
+export type BriefingItem = {
+  symbol: string;
+  note: string;
+  severity: "action" | "watch" | "quiet";
+  analysis_id?: number | null;
+  scan_failed?: boolean;
+};
+
+export type BriefingPayload = {
+  headline: string;
+  market_note: string;
+  items: BriefingItem[];
+  quiet_tickers: string[];
+};
+
+export type BriefingRecord = {
+  date: string;
+  created_at: string;
+  briefing: BriefingPayload;
+};
+
 export type HistoryItem = {
   id: number;
   ticker: string;
