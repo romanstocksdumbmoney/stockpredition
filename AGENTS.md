@@ -28,3 +28,8 @@
   - `cd backend && python3 -m unittest tests.test_indicator_sanity -v`
 - Run a live analysis:
   - `curl -sS -X POST http://127.0.0.1:8000/api/analyze -H 'Content-Type: application/json' -d '{"ticker":"AAPL"}'`
+
+## Data integrity rules
+
+- yfinance news payloads can be nested and can also be empty/unreliable by symbol/time. Parse what is present, and if no valid entries are returned, keep `recent_news` empty/null so the headlines UI stays hidden.
+- Never inject fake, sample, or placeholder data to make a feature appear to work. Missing data hides the feature. This is a financial analysis app — fabricated data is worse than no data.

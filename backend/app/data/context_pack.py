@@ -112,17 +112,32 @@ def get_catalysts(symbol: str) -> dict[str, Any]:
         for item in raw_news[:5]:
             if not isinstance(item, dict):
                 continue
-            title = _to_str_or_none(item.get("title"))
+            content = item.get("content") if isinstance(item.get("content"), dict) else {}
+            title = _to_str_or_none(item.get("title")) or _to_str_or_none(content.get("title"))
             if not title:
                 continue
-            publisher = _to_str_or_none(item.get("publisher"))
-            published_dt = _parse_datetime(item.get("providerPublishTime") or item.get("publishedAt") or item.get("pubDate"))
+            publisher = _to_str_or_none(item.get("publisher")) or _to_str_or_none(
+                (content.get("provider") or {}).get("displayName") if isinstance(content.get("provider"), dict) else None
+            )
+            published_dt = _parse_datetime(
+                item.get("providerPublishTime")
+                or item.get("publishedAt")
+                or item.get("pubDate")
+                or content.get("pubDate")
+                or content.get("displayTime")
+            )
+            canonical_url = None
+            if isinstance(content.get("canonicalUrl"), dict):
+                canonical_url = content.get("canonicalUrl", {}).get("url")
+            click_url = None
+            if isinstance(content.get("clickThroughUrl"), dict):
+                click_url = content.get("clickThroughUrl", {}).get("url")
             news_rows.append(
                 {
                     "title": title,
                     "publisher": publisher,
                     "published_at": published_dt.isoformat() if published_dt else None,
-                    "url": _to_str_or_none(item.get("link") or item.get("url")),
+                    "url": _to_str_or_none(item.get("link") or item.get("url") or canonical_url or click_url),
                 }
             )
     except Exception:

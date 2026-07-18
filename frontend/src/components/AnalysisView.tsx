@@ -304,9 +304,9 @@ export function AnalysisView({ analysis, quote, quoteStatus, quotePulse }: Props
         )}
       </div>
 
-      <details className="terminal-panel rounded-md p-4">
-        <summary className="terminal-label cursor-pointer select-none">Recent headlines</summary>
-        {recentNews.length > 0 ? (
+      {recentNews.length > 0 && (
+        <details className="terminal-panel rounded-md p-4">
+          <summary className="terminal-label cursor-pointer select-none">Recent headlines</summary>
           <ul className="mt-3 space-y-3">
             {recentNews.map((item, idx) => (
               <li key={`headline-${idx}`} className="border-b border-hairline/60 pb-2 last:border-none last:pb-0">
@@ -324,10 +324,8 @@ export function AnalysisView({ analysis, quote, quoteStatus, quotePulse }: Props
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="mt-3 text-xs text-textMuted">No recent headlines available from the feed.</p>
-        )}
-      </details>
+        </details>
+      )}
     </section>
   );
 }
