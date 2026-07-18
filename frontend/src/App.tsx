@@ -46,7 +46,7 @@ function App() {
   const [briefing, setBriefing] = useState<BriefingRecord | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [briefingRunning, setBriefingRunning] = useState(false);
-  const [viewedBriefingDate, setViewedBriefingDate] = useState<string | null>(null);
+  const [viewedBriefingKey, setViewedBriefingKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [historyBusyId, setHistoryBusyId] = useState<number | null>(null);
   const [watchlistBusySymbol, setWatchlistBusySymbol] = useState<string | null>(null);
@@ -193,7 +193,8 @@ function App() {
     }
     return map;
   }, [history]);
-  const hasUnreadBriefing = Boolean(briefing && briefing.date !== viewedBriefingDate);
+  const currentBriefingKey = briefing ? `${briefing.date}:${briefing.created_at}` : null;
+  const hasUnreadBriefing = Boolean(currentBriefingKey && currentBriefingKey !== viewedBriefingKey);
 
   const visibleSymbols = useMemo(() => {
     if (!isPageVisible) return [];
@@ -211,10 +212,10 @@ function App() {
   const quotePollDelay = allVisibleClosed ? CLOSED_MARKET_POLL_MS : EFFECTIVE_QUOTE_POLL_MS;
 
   useEffect(() => {
-    if (activeTab === "briefing" && briefing?.date) {
-      setViewedBriefingDate(briefing.date);
+    if (activeTab === "briefing" && currentBriefingKey) {
+      setViewedBriefingKey(currentBriefingKey);
     }
-  }, [activeTab, briefing?.date]);
+  }, [activeTab, currentBriefingKey]);
 
   useEffect(() => {
     if (!visibleSymbolsKey || !isPageVisible) return;
