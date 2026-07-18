@@ -1,4 +1,10 @@
-import type { AnalysisResult, HistoryItem, TickerQuote } from "./types";
+import type {
+  AnalysisResult,
+  BriefingRecord,
+  HistoryItem,
+  TickerQuote,
+  WatchlistItem,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -45,4 +51,42 @@ export async function markOutcome(id: number, outcome: "right" | "wrong" | "mixe
 export async function getTickerQuote(symbol: string): Promise<TickerQuote> {
   const response = await fetch(`${API_BASE}/api/ticker/${encodeURIComponent(symbol)}/quote`);
   return parseResponse<TickerQuote>(response);
+}
+
+export async function getWatchlist(): Promise<WatchlistItem[]> {
+  const response = await fetch(`${API_BASE}/api/watchlist`);
+  return parseResponse<WatchlistItem[]>(response);
+}
+
+export async function addWatchlistSymbol(symbol: string): Promise<WatchlistItem> {
+  const response = await fetch(`${API_BASE}/api/watchlist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol })
+  });
+  return parseResponse<WatchlistItem>(response);
+}
+
+export async function removeWatchlistSymbol(symbol: string): Promise<WatchlistItem> {
+  const response = await fetch(`${API_BASE}/api/watchlist/${encodeURIComponent(symbol)}`, {
+    method: "DELETE"
+  });
+  return parseResponse<WatchlistItem>(response);
+}
+
+export async function getLatestBriefing(): Promise<BriefingRecord> {
+  const response = await fetch(`${API_BASE}/api/briefing/latest`);
+  return parseResponse<BriefingRecord>(response);
+}
+
+export async function getBriefingByDate(date: string): Promise<BriefingRecord> {
+  const response = await fetch(`${API_BASE}/api/briefing/${encodeURIComponent(date)}`);
+  return parseResponse<BriefingRecord>(response);
+}
+
+export async function runBriefingScan(): Promise<BriefingRecord> {
+  const response = await fetch(`${API_BASE}/api/briefing/run`, {
+    method: "POST"
+  });
+  return parseResponse<BriefingRecord>(response);
 }

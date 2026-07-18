@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from datetime import date
+
+from sqlalchemy import Date, DateTime, String
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,3 +20,19 @@ class Analysis(Base):
     reasoning_source: Mapped[str] = mapped_column(String(16), default="fallback", server_default="fallback", index=True)
     outcome: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     outcome_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Watchlist(Base):
+    __tablename__ = "watchlist"
+
+    symbol: Mapped[str] = mapped_column(String(16), primary_key=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class Briefing(Base):
+    __tablename__ = "briefings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    briefing_date: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    briefing_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

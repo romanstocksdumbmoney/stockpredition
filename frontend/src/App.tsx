@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AnalysisView } from "./components/AnalysisView";
+import { BriefingTab } from "./components/BriefingTab";
 import { HistoryTab } from "./components/HistoryTab";
 import { SearchBar } from "./components/SearchBar";
 import { TerminalBrand } from "./components/TerminalBrand";
 import { WatchlistDesk } from "./components/WatchlistDesk";
-import { analyze, getHistory, getTickerQuote, markOutcome } from "./lib/api";
-import type { AnalysisResult, HistoryItem, TickerQuote } from "./lib/types";
+import {
+  addWatchlistSymbol,
+  analyze,
+  getHistory,
+  getLatestBriefing,
+  getTickerQuote,
+  getWatchlist,
+  markOutcome,
+  removeWatchlistSymbol,
+  runBriefingScan
+} from "./lib/api";
+import type { AnalysisResult, BriefingRecord, HistoryItem, TickerQuote, WatchlistItem } from "./lib/types";
 
-type Tab = "analyze" | "watchlist" | "history";
+type Tab = "briefing" | "analyze" | "watchlist" | "history";
 type QuoteStatus = "idle" | "ok" | "error";
 
 const QUOTE_POLL_MS = 20_000;
@@ -28,11 +39,18 @@ function landingStats(history: HistoryItem[]) {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("analyze");
+  const [activeTab, setActiveTab] = useState<Tab>("briefing");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [briefing, setBriefing] = useState<BriefingRecord | null>(null);
+  const [briefingLoading, setBriefingLoading] = useState(true);
+  const [briefingRunning, setBriefingRunning] = useState(false);
+  const [viewedBriefingDate, setViewedBriefingDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [historyBusyId, setHistoryBusyId] = useState<number | null>(null);
+  const [watchlistBusySymbol, setWatchlistBusySymbol] = useState<string | null>(null);
+  const [watchlistUpdating, setWatchlistUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quoteBySymbol, setQuoteBySymbol] = useState<Record<string, TickerQuote | undefined>>({});
   const [quoteStatusBySymbol, setQuoteStatusBySymbol] = useState<Record<string, QuoteStatus>>({});
@@ -46,9 +64,30 @@ function App() {
     setHistory(rows);
   }
 
+  async function refreshWatchlist() {
+    const rows = await getWatchlist();
+    setWatchlist(rows);
+  }
+
+  async function refreshBriefing() {
+    try {
+      const latest = await getLatestBriefing();
+      setBriefing(latest);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("No briefing available yet")) {
+        setBriefing(null);
+        return;
+      }
+      throw err;
+    } finally {
+      setBriefingLoading(false);
+    }
+  }
+
   useEffect(() => {
-    refreshHistory().catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to load history.");
+    Promise.all([refreshHistory(), refreshWatchlist(), refreshBriefing()]).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to load startup data.");
+      setBriefingLoading(false);
     });
   }, []);
 
@@ -86,6 +125,55 @@ function App() {
     }
   }
 
+  async function onAddWatchlist(symbol: string) {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) return;
+    setWatchlistUpdating(true);
+    setWatchlistBusySymbol(normalized);
+    setError(null);
+    try {
+      await addWatchlistSymbol(normalized);
+      await refreshWatchlist();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to add watchlist symbol.");
+      throw err;
+    } finally {
+      setWatchlistUpdating(false);
+      setWatchlistBusySymbol(null);
+    }
+  }
+
+  async function onRemoveWatchlist(symbol: string) {
+    const normalized = symbol.trim().toUpperCase();
+    setWatchlistBusySymbol(normalized);
+    setError(null);
+    try {
+      await removeWatchlistSymbol(normalized);
+      await refreshWatchlist();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to remove watchlist symbol.");
+      throw err;
+    } finally {
+      setWatchlistBusySymbol(null);
+    }
+  }
+
+  async function onRunBriefing() {
+    setBriefingRunning(true);
+    setError(null);
+    try {
+      const latest = await runBriefingScan();
+      setBriefing(latest);
+      await refreshHistory();
+      setActiveTab("briefing");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to run morning scan.");
+      throw err;
+    } finally {
+      setBriefingRunning(false);
+    }
+  }
+
   const disclaimer = useMemo(
     () =>
       analysis?.disclaimer ??
@@ -93,17 +181,19 @@ function App() {
     [analysis]
   );
   const stats = useMemo(() => landingStats(history), [history]);
-  const watchlistSymbols = useMemo(() => {
-    const seen = new Set<string>();
-    const symbols: string[] = [];
+  const watchlistSymbols = useMemo(() => watchlist.map((entry) => entry.symbol.toUpperCase()), [watchlist]);
+  const watchedSet = useMemo(() => new Set(watchlistSymbols), [watchlistSymbols]);
+  const latestHistoryBySymbol = useMemo(() => {
+    const map: Record<string, HistoryItem | undefined> = {};
     for (const item of history) {
       const symbol = item.ticker.toUpperCase();
-      if (seen.has(symbol)) continue;
-      seen.add(symbol);
-      symbols.push(symbol);
+      if (!map[symbol]) {
+        map[symbol] = item;
+      }
     }
-    return symbols;
+    return map;
   }, [history]);
+  const hasUnreadBriefing = Boolean(briefing && briefing.date !== viewedBriefingDate);
 
   const visibleSymbols = useMemo(() => {
     if (!isPageVisible) return [];
@@ -119,6 +209,12 @@ function App() {
     [visibleSymbols, quoteBySymbol]
   );
   const quotePollDelay = allVisibleClosed ? CLOSED_MARKET_POLL_MS : EFFECTIVE_QUOTE_POLL_MS;
+
+  useEffect(() => {
+    if (activeTab === "briefing" && briefing?.date) {
+      setViewedBriefingDate(briefing.date);
+    }
+  }, [activeTab, briefing?.date]);
 
   useEffect(() => {
     if (!visibleSymbolsKey || !isPageVisible) return;
@@ -159,6 +255,21 @@ function App() {
   const linkClass = (tab: Tab) =>
     `mono-numeric text-sm transition-colors duration-150 ${activeTab === tab ? "text-bull" : "text-textMuted hover:text-textSecondary"}`;
 
+  function openTickerFromBriefing(symbol: string) {
+    const item = latestHistoryBySymbol[symbol.toUpperCase()];
+    if (item) {
+      setAnalysis(item.result);
+      setActiveTab("analyze");
+      return;
+    }
+    onAnalyze(symbol).catch(() => undefined);
+  }
+
+  function discussTicker(symbol: string) {
+    const prompt = `walk me through the briefing on $${symbol.toUpperCase()}`;
+    window.location.href = `/chat?prompt=${encodeURIComponent(prompt)}`;
+  }
+
   return (
     <div className="min-h-screen bg-page text-textPrimary">
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 pb-24 md:px-6">
@@ -166,6 +277,10 @@ function App() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TerminalBrand compact />
             <nav className="flex items-center gap-5">
+              <button onClick={() => setActiveTab("briefing")} className={linkClass("briefing")}>
+                Briefing
+                {hasUnreadBriefing && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-bull align-middle" />}
+              </button>
               <button onClick={() => setActiveTab("analyze")} className={linkClass("analyze")}>
                 Analyze
               </button>
@@ -183,6 +298,17 @@ function App() {
           <div className="rounded-md border border-bear px-4 py-3 text-sm text-bear">
             <strong>Error:</strong> {error}
           </div>
+        )}
+
+        {activeTab === "briefing" && (
+          <BriefingTab
+            briefing={briefing}
+            loading={briefingLoading}
+            running={briefingRunning}
+            onRunScan={onRunBriefing}
+            onOpenTicker={openTickerFromBriefing}
+            onDiscussTicker={discussTicker}
+          />
         )}
 
         {activeTab === "analyze" && !analysis && (
@@ -218,6 +344,9 @@ function App() {
               quote={quoteBySymbol[analysis.ticker.toUpperCase()]}
               quoteStatus={quoteStatusBySymbol[analysis.ticker.toUpperCase()] ?? "idle"}
               quotePulse={quotePulseBySymbol[analysis.ticker.toUpperCase()] ?? 0}
+              isWatched={watchedSet.has(analysis.ticker.toUpperCase())}
+              watchUpdating={watchlistUpdating}
+              onAddToWatchlist={onAddWatchlist}
             />
           </section>
         )}
@@ -225,8 +354,13 @@ function App() {
         {activeTab === "watchlist" && (
           <WatchlistDesk
             items={history}
+            watchlist={watchlist}
             busyId={historyBusyId}
             onMarkOutcome={onMarkOutcome}
+            onAddWatchlistSymbol={onAddWatchlist}
+            onRemoveWatchlistSymbol={onRemoveWatchlist}
+            watchlistBusySymbol={watchlistBusySymbol}
+            watchlistUpdating={watchlistUpdating}
             quoteBySymbol={quoteBySymbol}
             quoteStatusBySymbol={quoteStatusBySymbol}
             quotePulseBySymbol={quotePulseBySymbol}

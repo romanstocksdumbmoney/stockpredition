@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -53,3 +53,33 @@ class TickerQuote(BaseModel):
     volume: int | None
     as_of: datetime
     market_state: Literal["open", "closed", "pre", "post"]
+
+
+class WatchlistRequest(BaseModel):
+    symbol: str
+
+
+class WatchlistItem(BaseModel):
+    symbol: str
+    added_at: datetime
+
+
+class BriefingItem(BaseModel):
+    symbol: str
+    note: str
+    severity: Literal["action", "watch", "quiet"]
+    analysis_id: int | None = None
+    scan_failed: bool = False
+
+
+class BriefingPayload(BaseModel):
+    headline: str
+    market_note: str
+    items: list[BriefingItem]
+    quiet_tickers: list[str]
+
+
+class BriefingRecord(BaseModel):
+    date: date
+    created_at: datetime
+    briefing: BriefingPayload

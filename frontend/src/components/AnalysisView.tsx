@@ -7,6 +7,9 @@ type Props = {
   quote?: TickerQuote;
   quoteStatus: "idle" | "ok" | "error";
   quotePulse: number;
+  isWatched: boolean;
+  watchUpdating: boolean;
+  onAddToWatchlist: (symbol: string) => Promise<void>;
 };
 
 function caseColumn(title: string, points: string[], theme: "bull" | "bear") {
@@ -91,7 +94,7 @@ function vixClass(bucket: string | null | undefined): string {
   return "text-textMuted";
 }
 
-export function AnalysisView({ analysis, quote, quoteStatus, quotePulse }: Props) {
+export function AnalysisView({ analysis, quote, quoteStatus, quotePulse, isWatched, watchUpdating, onAddToWatchlist }: Props) {
   const flowData = analysis.flow_data ?? {};
   const flowAvailable = flowData.available === true;
   const fallbackPrice = Number(analysis.market_context?.last_price ?? 0);
@@ -164,6 +167,16 @@ export function AnalysisView({ analysis, quote, quoteStatus, quotePulse }: Props
             <span className={`mono-numeric rounded-full border px-3 py-1 text-xs uppercase tracking-[0.16em] ${verdictColor}`}>
               {verdictLabel} · {analysis.confidence_pct}%
             </span>
+            {!isWatched && (
+              <button
+                type="button"
+                disabled={watchUpdating}
+                onClick={() => onAddToWatchlist(analysis.ticker)}
+                className="rounded-full border border-hairline px-3 py-1 text-xs text-textSecondary transition-colors duration-150 hover:border-bull hover:text-bull disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Watch
+              </button>
+            )}
             {analysis.reasoning_source === "claude" ? (
               <span className="rounded-full border border-bull px-3 py-1 text-xs text-bull">Claude reasoning</span>
             ) : (
