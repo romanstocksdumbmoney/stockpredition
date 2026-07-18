@@ -3,12 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 type QuoteStatus = "idle" | "ok" | "error";
 
 type Props = {
-  asOf?: string;
+  asOf?: string | null;
   status: QuoteStatus;
   pulse: number;
 };
 
-function formatAsOf(value?: string): string {
+function formatAsOf(value?: string | null): string {
   if (!value) return "as of --";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "as of --";

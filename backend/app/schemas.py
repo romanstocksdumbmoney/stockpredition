@@ -51,7 +51,7 @@ class TickerQuote(BaseModel):
     price: float
     change_pct: float | None
     volume: int | None
-    as_of: datetime
+    as_of: datetime | None
     market_state: Literal["open", "closed", "pre", "post"]
 
 
