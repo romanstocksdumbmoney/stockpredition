@@ -17,6 +17,9 @@ class AnalysisResult(BaseModel):
     ticker: str
     bull_case: list[str]
     bear_case: list[str]
+    scenarios: dict[str, str]
+    context_factors: list[str]
+    earnings_warning: bool
     key_flow_signal: str | None
     pattern_summary: str
     confidence_pct: int
@@ -30,6 +33,7 @@ class AnalysisResult(BaseModel):
     indicators: dict[str, Any]
     patterns: dict[str, Any]
     flow_data: dict[str, Any]
+    context_pack: dict[str, Any]
     market_context: dict[str, Any]
     analysis_id: int | None = None
 

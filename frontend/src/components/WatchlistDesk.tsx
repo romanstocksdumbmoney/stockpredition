@@ -97,7 +97,10 @@ export function WatchlistDesk({
                   onClick={() => onOpenAnalysis(item.result)}
                 >
                   <td className="px-4 py-3 align-top">
-                    <p className="mono-numeric text-sm text-textPrimary">${item.ticker}</p>
+                    <p className="mono-numeric flex items-center gap-1.5 text-sm text-textPrimary">
+                      {item.result.earnings_warning && <span className="h-2 w-2 rounded-full bg-warn" aria-hidden />}
+                      <span>${item.ticker}</span>
+                    </p>
                     <p className="text-xs text-textMuted">{new Date(item.created_at).toLocaleDateString()}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <p className={`mono-numeric text-xs ${liveChange >= 0 ? "text-bull" : "text-bear"}`}>
