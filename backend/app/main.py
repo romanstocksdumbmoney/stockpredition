@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.data.context_pack import get_catalysts, get_fundamentals, get_market_regime
 from app.data.indicators import compute_indicators
 from app.data.patterns import detect_patterns
 from app.data.unusual_whales_client import UnusualWhalesClient
@@ -90,6 +91,9 @@ def _build_signal_payload(symbol: str, period: str = "6mo", interval: str = "1d"
     indicators = compute_indicators(history)
     patterns = detect_patterns(history)
     flow_data = uw_client.fetch_symbol_flow(symbol)
+    fundamentals = get_fundamentals(symbol)
+    catalysts = get_catalysts(symbol)
+    market_regime = get_market_regime(fundamentals.get("sector"))
 
     close = history["Close"]
     last_price = _to_float(close.iloc[-1])
@@ -104,6 +108,11 @@ def _build_signal_payload(symbol: str, period: str = "6mo", interval: str = "1d"
         "indicators": indicators,
         "patterns": patterns,
         "flow_data": flow_data,
+        "context_pack": {
+            "fundamentals": fundamentals,
+            "catalysts": catalysts,
+            "market_regime": market_regime,
+        },
         "market_context": {
             "last_price": last_price,
             "previous_close": prev_price,
@@ -166,6 +175,7 @@ def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
         "indicators": payload["indicators"],
         "patterns": payload["patterns"],
         "flow_data": payload["flow_data"],
+        "context_pack": payload["context_pack"],
         "market_context": {
             **payload["market_context"],
             "fundamentals": payload["key_stats"],

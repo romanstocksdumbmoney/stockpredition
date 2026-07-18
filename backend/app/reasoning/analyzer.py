@@ -22,13 +22,63 @@ Rules:
 3) Every bull_case and bear_case bullet must contain at least one numeric citation from the payload.
 4) You must explicitly cite the exact RSI value from payload.indicators.rsi.value in at least one bullet.
 5) Cite at least one support level and, when available, at least one resistance level from payload.patterns.
-6) Be conservative with confidence due to uncertainty. Never return confidence above 94.
-7) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
-8) Do not include markdown. Return strict JSON that matches the required schema.
+6) Scenario levels in scenarios.bull_trigger / bear_trigger / invalidation must come from payload.patterns support/resistance values.
+7) If payload.context_pack.catalysts.days_to_earnings <= 7, explicitly mention earnings proximity as a major risk regardless of technicals.
+8) Reference fundamentals when they reinforce OR conflict with technicals.
+9) Reference market regime explicitly (SPY trend + VIX bucket). In stressed/below-trend regimes, discount bullish conviction.
+10) News titles can be cited as catalysts, but do not invent details beyond the provided titles.
+11) Return context_factors as 2-4 concise non-chart drivers.
+12) Be conservative with confidence due to uncertainty. Never return confidence above 94.
+13) If data is thin/conflicting, say so in risk_flags and keep confidence moderate.
+14) Do not include markdown. Return strict JSON that matches the required schema.
 """.strip()
 
 
 logger = logging.getLogger(__name__)
+
+ANALYSIS_TOOL = {
+    "name": "submit_trade_analysis",
+    "description": "Return the final TradeBot analysis payload in structured form.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {"type": "string"},
+            "bull_case": {"type": "array", "items": {"type": "string"}},
+            "bear_case": {"type": "array", "items": {"type": "string"}},
+            "key_flow_signal": {"type": ["string", "null"]},
+            "pattern_summary": {"type": "string"},
+            "confidence_pct": {"type": "integer"},
+            "confidence_direction": {"type": "string"},
+            "summary": {"type": "string"},
+            "risk_flags": {"type": "array", "items": {"type": "string"}},
+            "scenarios": {
+                "type": "object",
+                "properties": {
+                    "bull_trigger": {"type": "string"},
+                    "bear_trigger": {"type": "string"},
+                    "invalidation": {"type": "string"},
+                },
+                "required": ["bull_trigger", "bear_trigger", "invalidation"],
+            },
+            "context_factors": {"type": "array", "items": {"type": "string"}},
+            "earnings_warning": {"type": "boolean"},
+        },
+        "required": [
+            "ticker",
+            "bull_case",
+            "bear_case",
+            "key_flow_signal",
+            "pattern_summary",
+            "confidence_pct",
+            "confidence_direction",
+            "summary",
+            "risk_flags",
+            "scenarios",
+            "context_factors",
+            "earnings_warning",
+        ],
+    },
+}
 
 
 class TradeAnalyzer:
@@ -57,11 +107,15 @@ class TradeAnalyzer:
                     response = client.messages.create(
                         model=self.model,
                         system=SYSTEM_PROMPT,
-                        max_tokens=1200,
+                        max_tokens=1600,
                         messages=[{"role": "user", "content": user_prompt}],
+                        tools=[ANALYSIS_TOOL],
+                        tool_choice={"type": "tool", "name": ANALYSIS_TOOL["name"]},
                     )
-                    text = self._extract_response_text(response.content)
-                    parsed = self._load_json(text)
+                    parsed = self._extract_structured_payload(response.content)
+                    if parsed is None:
+                        text = self._extract_response_text(response.content)
+                        parsed = self._load_json(text)
                     normalized = self._normalize_output(parsed, ticker, signal_payload)
                     if self._has_required_numeric_references(normalized, signal_payload):
                         normalized["reasoning_source"] = "claude"
@@ -87,16 +141,20 @@ class TradeAnalyzer:
             "indicators": signal_payload.get("indicators"),
             "patterns": signal_payload.get("patterns"),
             "flow_data": signal_payload.get("flow_data"),
+            "context_pack": signal_payload.get("context_pack"),
             "market_context": signal_payload.get("market_context"),
             "key_stats": signal_payload.get("key_stats"),
             "ohlcv_tail": (signal_payload.get("ohlcv") or [])[-5:],
         }
+        compact_payload = TradeAnalyzer._compact_payload(compact_payload)
         strict_clause = ""
         if strict:
             strict_clause = (
                 "\n\nHARD REQUIREMENT: Every bullet in both bull_case and bear_case must quote a payload number. "
                 "At least one bullet must quote RSI exactly, and at least one bullish/bearish bullet must quote concrete "
-                "support prices from payload.patterns (and resistance prices when provided in payload.patterns)."
+                "support prices from payload.patterns (and resistance prices when provided in payload.patterns). "
+                "All scenario levels must come from payload.patterns support_levels/resistance_levels. "
+                "If days_to_earnings <= 7 you MUST mark earnings_warning=true and cite earnings timing as major risk."
             )
 
         return (
@@ -113,10 +171,35 @@ class TradeAnalyzer:
             '  "confidence_pct": 62,\n'
             '  "confidence_direction": "bullish | bearish | neutral",\n'
             '  "summary": "2-3 sentence plain-English takeaway",\n'
-            '  "risk_flags": ["flag 1", "flag 2"]\n'
+            '  "risk_flags": ["flag 1", "flag 2"],\n'
+            '  "scenarios": {\n'
+            '    "bull_trigger": "specific if/then upside trigger using payload levels",\n'
+            '    "bear_trigger": "specific if/then downside trigger using payload levels",\n'
+            '    "invalidation": "the condition/level that invalidates current lean"\n'
+            "  },\n"
+            '  "context_factors": ["factor 1", "factor 2"],\n'
+            '  "earnings_warning": false\n'
             "}\n"
             f"{strict_clause}\n"
         )
+
+    @staticmethod
+    def _compact_payload(value: Any) -> Any:
+        if isinstance(value, dict):
+            compact = {}
+            for key, item in value.items():
+                nested = TradeAnalyzer._compact_payload(item)
+                if nested is None:
+                    continue
+                if nested == {} or nested == []:
+                    continue
+                compact[key] = nested
+            return compact
+        if isinstance(value, list):
+            compact_list = [TradeAnalyzer._compact_payload(item) for item in value]
+            compact_list = [item for item in compact_list if item not in (None, {}, [])]
+            return compact_list
+        return value
 
     @staticmethod
     def _extract_response_text(content_blocks: Any) -> str:
@@ -128,6 +211,19 @@ class TradeAnalyzer:
             return text_blocks[-1]
 
         return str(content_blocks).strip()
+
+    @staticmethod
+    def _extract_structured_payload(content_blocks: Any) -> dict[str, Any] | None:
+        if not isinstance(content_blocks, list):
+            return None
+        for block in content_blocks:
+            block_type = str(getattr(block, "type", "")).lower().strip()
+            if block_type != "tool_use":
+                continue
+            tool_input = getattr(block, "input", None)
+            if isinstance(tool_input, dict):
+                return tool_input
+        return None
 
     @staticmethod
     def _numbers_in_text(text: str) -> list[float]:
@@ -165,7 +261,20 @@ class TradeAnalyzer:
             ):
                 has_resistance = True
 
-        return has_rsi and has_support and has_resistance
+        scenario_values = self._numbers_in_text(" ".join(str(v) for v in (normalized.get("scenarios") or {}).values()))
+        level_pool = [float(level) for level in [*support_levels, *resistance_levels] if level is not None]
+        has_scenario_level = not level_pool or any(
+            any(abs(value - level) <= 0.05 for level in level_pool) for value in scenario_values
+        )
+
+        catalysts = (signal_payload.get("context_pack") or {}).get("catalysts") or {}
+        days_to_earnings = catalysts.get("days_to_earnings")
+        needs_earnings_warning = isinstance(days_to_earnings, int) and days_to_earnings <= 7
+        earnings_warning = bool(normalized.get("earnings_warning"))
+
+        return has_rsi and has_support and has_resistance and has_scenario_level and (
+            not needs_earnings_warning or earnings_warning
+        )
 
     @staticmethod
     def _load_json(text: str) -> dict[str, Any]:
@@ -187,6 +296,14 @@ class TradeAnalyzer:
         return loaded
 
     def _normalize_output(self, raw: dict[str, Any], ticker: str, signal_payload: dict[str, Any]) -> dict[str, Any]:
+        patterns = signal_payload.get("patterns") or {}
+        fallback_scenarios = self._fallback_scenarios(
+            patterns=patterns,
+            direction_hint=str(raw.get("confidence_direction") or "neutral").lower().strip(),
+        )
+        fallback_context_factors = self._fallback_context_factors(signal_payload)
+        computed_earnings_warning = self._earnings_warning_from_payload(signal_payload)
+
         bull_case = [str(item) for item in (raw.get("bull_case") or []) if str(item).strip()]
         bear_case = [str(item) for item in (raw.get("bear_case") or []) if str(item).strip()]
         if len(bull_case) < 3:
@@ -229,6 +346,34 @@ class TradeAnalyzer:
         if not risk_flags:
             risk_flags = ["Model returned limited risk detail; treat confidence as uncertain."]
 
+        scenarios_raw = raw.get("scenarios") if isinstance(raw.get("scenarios"), dict) else {}
+        scenarios = {
+            "bull_trigger": str(scenarios_raw.get("bull_trigger") or fallback_scenarios["bull_trigger"]).strip(),
+            "bear_trigger": str(scenarios_raw.get("bear_trigger") or fallback_scenarios["bear_trigger"]).strip(),
+            "invalidation": str(scenarios_raw.get("invalidation") or fallback_scenarios["invalidation"]).strip(),
+        }
+        if not self._scenario_references_known_levels(scenarios, patterns):
+            scenarios = fallback_scenarios
+
+        raw_context_factors = [str(item).strip() for item in (raw.get("context_factors") or []) if str(item).strip()]
+        context_factors: list[str] = []
+        for factor in [*raw_context_factors, *fallback_context_factors]:
+            if factor and factor not in context_factors:
+                context_factors.append(factor)
+        if len(context_factors) < 2:
+            context_factors.extend(
+                [
+                    "Flow and macro context are mixed; position sizing should stay conservative.",
+                    "Signal quality is constrained by noisy short-term data.",
+                ][: 2 - len(context_factors)]
+            )
+        context_factors = context_factors[:4]
+
+        raw_earnings_warning = raw.get("earnings_warning")
+        earnings_warning = (
+            raw_earnings_warning if isinstance(raw_earnings_warning, bool) else computed_earnings_warning
+        ) or computed_earnings_warning
+
         return {
             "ticker": ticker,
             "bull_case": bull_case[:5],
@@ -239,6 +384,9 @@ class TradeAnalyzer:
             "confidence_direction": direction,
             "summary": summary,
             "risk_flags": risk_flags[:6],
+            "scenarios": scenarios,
+            "context_factors": context_factors,
+            "earnings_warning": earnings_warning,
             "reasoning_source": "claude",
         }
 
@@ -250,11 +398,138 @@ class TradeAnalyzer:
             return f"Trend: {trend}. Notable chart flags: {', '.join(str(flag) for flag in flags[:3])}."
         return f"Trend: {trend}. No strong breakout/breakdown flag detected."
 
+    @staticmethod
+    def _earnings_warning_from_payload(signal_payload: dict[str, Any]) -> bool:
+        context_pack = signal_payload.get("context_pack") or {}
+        catalysts = context_pack.get("catalysts") or {}
+        days_to_earnings = catalysts.get("days_to_earnings")
+        return isinstance(days_to_earnings, int) and days_to_earnings <= 7
+
+    @staticmethod
+    def _scenario_references_known_levels(scenarios: dict[str, str], patterns: dict[str, Any]) -> bool:
+        levels = [float(level) for level in [*(patterns.get("support_levels") or []), *(patterns.get("resistance_levels") or [])] if level is not None]
+        if not levels:
+            return True
+        text = " ".join(str(value) for value in scenarios.values())
+        numbers = [float(token) for token in re.findall(r"-?\d+(?:\.\d+)?", text)]
+        return any(any(abs(value - level) <= 0.05 for level in levels) for value in numbers)
+
+    @staticmethod
+    def _fallback_scenarios(patterns: dict[str, Any], direction_hint: str) -> dict[str, str]:
+        support_levels = [float(level) for level in (patterns.get("support_levels") or []) if level is not None]
+        resistance_levels = [float(level) for level in (patterns.get("resistance_levels") or []) if level is not None]
+        nearest_support = support_levels[0] if support_levels else None
+        nearest_resistance = resistance_levels[0] if resistance_levels else None
+        second_resistance = resistance_levels[1] if len(resistance_levels) > 1 else None
+        second_support = support_levels[1] if len(support_levels) > 1 else None
+
+        if nearest_resistance is not None:
+            bull_target = f"{second_resistance:.2f}" if second_resistance is not None else "higher resistance"
+            bull_trigger = (
+                f"If price breaks above {nearest_resistance:.2f} on volume above its 20-day average, "
+                f"upside can extend toward {bull_target}."
+            )
+        elif nearest_support is not None:
+            bull_trigger = (
+                f"If price holds above support {nearest_support:.2f} and buying pressure improves, "
+                "the trend can continue to new highs."
+            )
+        else:
+            bull_trigger = "If buyers reclaim momentum and volume confirms, upside continuation remains possible."
+
+        if nearest_support is not None:
+            bear_target = f"{second_support:.2f}" if second_support is not None else "lower support"
+            bear_trigger = (
+                f"If price loses support at {nearest_support:.2f}, downside can accelerate toward {bear_target}."
+            )
+        elif nearest_resistance is not None:
+            bear_trigger = (
+                f"If price fails to hold above {nearest_resistance:.2f} after a test, a pullback scenario strengthens."
+            )
+        else:
+            bear_trigger = "If momentum deteriorates and buyers fail to defend dips, downside risk increases."
+
+        if direction_hint == "bullish" and nearest_support is not None:
+            invalidation = f"Current bullish lean is invalid if price closes below support {nearest_support:.2f}."
+        elif direction_hint == "bearish" and nearest_resistance is not None:
+            invalidation = f"Current bearish lean is invalid if price reclaims resistance {nearest_resistance:.2f}."
+        elif nearest_support is not None and nearest_resistance is not None:
+            invalidation = (
+                f"Current lean is invalid if price breaks outside the {nearest_support:.2f} to "
+                f"{nearest_resistance:.2f} decision zone."
+            )
+        else:
+            invalidation = "Current lean is invalid if momentum flips and confirmation volume contradicts this setup."
+
+        return {
+            "bull_trigger": bull_trigger,
+            "bear_trigger": bear_trigger,
+            "invalidation": invalidation,
+        }
+
+    @staticmethod
+    def _fallback_context_factors(signal_payload: dict[str, Any]) -> list[str]:
+        context_pack = signal_payload.get("context_pack") or {}
+        fundamentals = context_pack.get("fundamentals") or {}
+        catalysts = context_pack.get("catalysts") or {}
+        regime = context_pack.get("market_regime") or {}
+        factors: list[str] = []
+
+        days_to_earnings = catalysts.get("days_to_earnings")
+        if isinstance(days_to_earnings, int):
+            if days_to_earnings <= 7:
+                factors.append(f"Earnings in {days_to_earnings} day(s) elevates event risk materially.")
+            elif days_to_earnings <= 21:
+                factors.append(f"Earnings in {days_to_earnings} day(s) can cap conviction.")
+
+        forward_pe = fundamentals.get("pe_forward")
+        revenue_growth = fundamentals.get("revenue_growth_yoy")
+        profit_margin = fundamentals.get("profit_margin")
+        short_float = fundamentals.get("short_percent_float")
+        if isinstance(forward_pe, (int, float)):
+            if forward_pe >= 30:
+                factors.append(f"Forward P/E near {forward_pe:.1f} implies rich valuation sensitivity.")
+            elif forward_pe <= 15:
+                factors.append(f"Forward P/E near {forward_pe:.1f} suggests less demanding valuation.")
+        if isinstance(revenue_growth, (int, float)):
+            factors.append(f"Revenue growth YoY is {revenue_growth * 100:.1f}%.")
+        if isinstance(profit_margin, (int, float)):
+            factors.append(f"Profit margin is {profit_margin * 100:.1f}%.")
+        if isinstance(short_float, (int, float)) and short_float >= 0.08:
+            factors.append(f"Short interest near {short_float * 100:.1f}% of float can amplify volatility.")
+
+        spy = regime.get("spy") or {}
+        vix = regime.get("vix") or {}
+        sector_etf = regime.get("sector_etf") or {}
+        if spy.get("trend"):
+            factors.append(f"SPY sits {spy['trend']} its 50-day EMA regime filter.")
+        if vix.get("bucket") and isinstance(vix.get("last_close"), (int, float)):
+            factors.append(f"VIX is {vix['last_close']:.1f} ({vix['bucket']}) for broader risk tone.")
+        if sector_etf.get("symbol") and isinstance(sector_etf.get("performance_1mo_pct"), (int, float)):
+            factors.append(
+                f"{sector_etf['symbol']} is {sector_etf['performance_1mo_pct']:+.1f}% over 1 month."
+            )
+
+        recent_news = catalysts.get("recent_news") or []
+        if isinstance(recent_news, list) and recent_news:
+            title = str(recent_news[0].get("title") or "").strip()
+            if title:
+                factors.append(f"Recent headline catalyst: {title[:120]}.")
+
+        deduped: list[str] = []
+        for factor in factors:
+            if factor and factor not in deduped:
+                deduped.append(factor)
+        return deduped[:4]
+
     def _heuristic_analysis(self, ticker: str, signal_payload: dict[str, Any]) -> dict[str, Any]:
         indicators = signal_payload.get("indicators", {})
         patterns = signal_payload.get("patterns", {})
         flow = signal_payload.get("flow_data", {})
         context = signal_payload.get("market_context", {})
+        context_pack = signal_payload.get("context_pack", {})
+        catalysts = context_pack.get("catalysts", {}) or {}
+        market_regime = context_pack.get("market_regime", {}) or {}
 
         ema_state = indicators.get("ema", {}).get("state")
         macd_state = indicators.get("macd", {}).get("state")
@@ -341,6 +616,18 @@ class TradeAnalyzer:
         else:
             risk_flags.append("Options flow data unavailable or thin; conviction should be lower.")
 
+        days_to_earnings = catalysts.get("days_to_earnings")
+        earnings_warning = isinstance(days_to_earnings, int) and days_to_earnings <= 7
+        if earnings_warning:
+            bear_score += 1
+            risk_flags.append(f"Earnings are in {days_to_earnings} day(s), which can overwhelm technical setups.")
+
+        vix_bucket = ((market_regime.get("vix") or {}).get("bucket") or "").lower()
+        spy_trend = ((market_regime.get("spy") or {}).get("trend") or "").lower()
+        if vix_bucket == "stressed" or spy_trend == "below":
+            bear_score += 1
+            risk_flags.append("Market regime is risk-off (VIX stressed and/or SPY below trend).")
+
         if not bull_case:
             bull_case = [
                 "A rebound remains possible if support levels hold and momentum stabilizes.",
@@ -374,6 +661,15 @@ class TradeAnalyzer:
             f" Last price {last_price} with day change {change_pct}%."
             " Treat this as a scenario-weighting exercise, not a prediction."
         )
+        scenarios = self._fallback_scenarios(patterns=patterns, direction_hint=direction)
+        context_factors = self._fallback_context_factors(signal_payload)
+        if len(context_factors) < 2:
+            context_factors.extend(
+                [
+                    "Macro and event risk remain significant drivers of outcome variance.",
+                    "Signal confidence depends on confirmation at nearby technical levels.",
+                ][: 2 - len(context_factors)]
+            )
 
         return {
             "ticker": ticker,
@@ -385,6 +681,9 @@ class TradeAnalyzer:
             "confidence_direction": direction,
             "summary": summary,
             "risk_flags": risk_flags[:6],
+            "scenarios": scenarios,
+            "context_factors": context_factors[:4],
+            "earnings_warning": earnings_warning,
             "reasoning_source": "fallback",
         }
 
