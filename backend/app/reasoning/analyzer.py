@@ -36,6 +36,50 @@ Rules:
 
 logger = logging.getLogger(__name__)
 
+ANALYSIS_TOOL = {
+    "name": "submit_trade_analysis",
+    "description": "Return the final TradeBot analysis payload in structured form.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {"type": "string"},
+            "bull_case": {"type": "array", "items": {"type": "string"}},
+            "bear_case": {"type": "array", "items": {"type": "string"}},
+            "key_flow_signal": {"type": ["string", "null"]},
+            "pattern_summary": {"type": "string"},
+            "confidence_pct": {"type": "integer"},
+            "confidence_direction": {"type": "string"},
+            "summary": {"type": "string"},
+            "risk_flags": {"type": "array", "items": {"type": "string"}},
+            "scenarios": {
+                "type": "object",
+                "properties": {
+                    "bull_trigger": {"type": "string"},
+                    "bear_trigger": {"type": "string"},
+                    "invalidation": {"type": "string"},
+                },
+                "required": ["bull_trigger", "bear_trigger", "invalidation"],
+            },
+            "context_factors": {"type": "array", "items": {"type": "string"}},
+            "earnings_warning": {"type": "boolean"},
+        },
+        "required": [
+            "ticker",
+            "bull_case",
+            "bear_case",
+            "key_flow_signal",
+            "pattern_summary",
+            "confidence_pct",
+            "confidence_direction",
+            "summary",
+            "risk_flags",
+            "scenarios",
+            "context_factors",
+            "earnings_warning",
+        ],
+    },
+}
+
 
 class TradeAnalyzer:
     def __init__(self, api_key: str | None, model: str):
@@ -63,11 +107,15 @@ class TradeAnalyzer:
                     response = client.messages.create(
                         model=self.model,
                         system=SYSTEM_PROMPT,
-                        max_tokens=1200,
+                        max_tokens=1600,
                         messages=[{"role": "user", "content": user_prompt}],
+                        tools=[ANALYSIS_TOOL],
+                        tool_choice={"type": "tool", "name": ANALYSIS_TOOL["name"]},
                     )
-                    text = self._extract_response_text(response.content)
-                    parsed = self._load_json(text)
+                    parsed = self._extract_structured_payload(response.content)
+                    if parsed is None:
+                        text = self._extract_response_text(response.content)
+                        parsed = self._load_json(text)
                     normalized = self._normalize_output(parsed, ticker, signal_payload)
                     if self._has_required_numeric_references(normalized, signal_payload):
                         normalized["reasoning_source"] = "claude"
@@ -163,6 +211,19 @@ class TradeAnalyzer:
             return text_blocks[-1]
 
         return str(content_blocks).strip()
+
+    @staticmethod
+    def _extract_structured_payload(content_blocks: Any) -> dict[str, Any] | None:
+        if not isinstance(content_blocks, list):
+            return None
+        for block in content_blocks:
+            block_type = str(getattr(block, "type", "")).lower().strip()
+            if block_type != "tool_use":
+                continue
+            tool_input = getattr(block, "input", None)
+            if isinstance(tool_input, dict):
+                return tool_input
+        return None
 
     @staticmethod
     def _numbers_in_text(text: str) -> list[float]:
