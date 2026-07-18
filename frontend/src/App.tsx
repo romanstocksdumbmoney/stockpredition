@@ -5,10 +5,12 @@ import { BriefingTab } from "./components/BriefingTab";
 import { HistoryTab } from "./components/HistoryTab";
 import { SearchBar } from "./components/SearchBar";
 import { TerminalBrand } from "./components/TerminalBrand";
+import { TodaysTape } from "./components/TodaysTape";
 import { WatchlistDesk } from "./components/WatchlistDesk";
 import {
   addWatchlistSymbol,
   analyze,
+  getMarketMovers,
   getHistory,
   getLatestBriefing,
   getTickerQuote,
@@ -17,7 +19,14 @@ import {
   removeWatchlistSymbol,
   runBriefingScan
 } from "./lib/api";
-import type { AnalysisResult, BriefingRecord, HistoryItem, TickerQuote, WatchlistItem } from "./lib/types";
+import type {
+  AnalysisResult,
+  BriefingRecord,
+  HistoryItem,
+  MarketMoversResponse,
+  TickerQuote,
+  WatchlistItem,
+} from "./lib/types";
 
 type Tab = "briefing" | "analyze" | "watchlist" | "history";
 type QuoteStatus = "idle" | "ok" | "error";
@@ -44,6 +53,7 @@ function App() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [briefing, setBriefing] = useState<BriefingRecord | null>(null);
+  const [marketMovers, setMarketMovers] = useState<MarketMoversResponse | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [briefingRunning, setBriefingRunning] = useState(false);
   const [viewedBriefingKey, setViewedBriefingKey] = useState<string | null>(null);
@@ -84,11 +94,22 @@ function App() {
     }
   }
 
+  async function refreshMarketMovers() {
+    try {
+      const payload = await getMarketMovers();
+      setMarketMovers(payload);
+    } catch (err) {
+      console.warn("Market movers unavailable:", err);
+      setMarketMovers(null);
+    }
+  }
+
   useEffect(() => {
     Promise.all([refreshHistory(), refreshWatchlist(), refreshBriefing()]).catch((err: unknown) => {
       setError(err instanceof Error ? err.message : "Failed to load startup data.");
       setBriefingLoading(false);
     });
+    refreshMarketMovers();
   }, []);
 
   useEffect(() => {
@@ -334,6 +355,15 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {marketMovers && (
+              <TodaysTape
+                movers={marketMovers}
+                onSelectSymbol={(symbol) => {
+                  onAnalyze(symbol).catch(() => undefined);
+                }}
+              />
+            )}
           </section>
         )}
 

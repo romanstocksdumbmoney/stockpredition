@@ -55,6 +55,31 @@ class TickerQuote(BaseModel):
     market_state: Literal["open", "closed", "pre", "post"]
 
 
+class MarketMoverItem(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    change_pct: float
+    volume: int
+    market_cap: int
+
+
+class MarketHeadline(BaseModel):
+    title: str
+    publisher: str | None = None
+    published_at: datetime | None = None
+    url: str | None = None
+
+
+class MarketMoversResponse(BaseModel):
+    gainers: list[MarketMoverItem]
+    losers: list[MarketMoverItem]
+    most_active: list[MarketMoverItem]
+    as_of: datetime | None
+    session_label: Literal["LIVE", "LAST SESSION"]
+    market_news: list[MarketHeadline]
+
+
 class WatchlistRequest(BaseModel):
     symbol: str
 

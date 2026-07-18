@@ -25,6 +25,7 @@ from app.briefing import (
 from app.config import settings
 from app.data.context_pack import get_catalysts, get_fundamentals, get_market_regime
 from app.data.indicators import compute_indicators
+from app.data.market_movers import get_market_movers
 from app.data.patterns import detect_patterns
 from app.data.unusual_whales_client import UnusualWhalesClient
 from app.data.yahoo_client import YahooClient
@@ -37,6 +38,7 @@ from app.schemas import (
     BriefingRecord,
     BriefingPayload,
     HistoryItem,
+    MarketMoversResponse,
     OutcomeRequest,
     TickerQuote,
     WatchlistItem,
@@ -550,3 +552,19 @@ def ticker_quote(symbol: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Unable to fetch quote data: {exc}") from exc
+
+
+@app.get("/api/market/movers", response_model=MarketMoversResponse)
+def market_movers():
+    try:
+        return get_market_movers()
+    except Exception as exc:  # pragma: no cover - defensive API resilience
+        logger.exception("Market movers endpoint failed: %s", exc)
+        return {
+            "gainers": [],
+            "losers": [],
+            "most_active": [],
+            "as_of": None,
+            "session_label": "LAST SESSION",
+            "market_news": [],
+        }
