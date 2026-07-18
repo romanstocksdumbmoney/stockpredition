@@ -97,12 +97,13 @@ class YahooClient:
             raise ValueError(f"Unable to fetch fast quote for '{symbol}': {exc}") from exc
 
         price = self._pick_float(fast_info, "lastPrice", "last_price", "regularMarketPrice", "regular_market_price")
+        # Keep day-change aligned with regular-session broker convention.
         previous_close = self._pick_float(
             fast_info,
-            "previousClose",
-            "previous_close",
             "regularMarketPreviousClose",
             "regular_market_previous_close",
+            "previousClose",
+            "previous_close",
         )
         if price is None:
             raise ValueError(f"No quote price returned for '{symbol}'")
@@ -112,14 +113,22 @@ class YahooClient:
             change_pct = round(((price - previous_close) / previous_close) * 100, 4)
 
         volume = self._pick_int(fast_info, "lastVolume", "last_volume", "regularMarketVolume", "regular_market_volume", "volume")
-        as_of_dt = self._pick_timestamp(fast_info, now)
-        market_state = self._market_state_from_fast_info(fast_info, as_of_dt)
+        as_of_dt = self._pick_timestamp(fast_info)
+        if as_of_dt is None:
+            info_for_time: dict[str, Any] = {}
+            try:
+                info_for_time = ticker.info or {}
+            except Exception:
+                info_for_time = {}
+            as_of_dt = self._pick_timestamp(info_for_time)
+
+        market_state = self._market_state_from_fast_info(fast_info, as_of_dt or now)
 
         payload = {
             "price": price,
             "change_pct": change_pct,
             "volume": volume,
-            "as_of": as_of_dt.isoformat(),
+            "as_of": as_of_dt.isoformat() if as_of_dt else None,
             "market_state": market_state,
         }
 
@@ -169,7 +178,7 @@ class YahooClient:
         return None
 
     @staticmethod
-    def _pick_timestamp(payload: dict[str, Any], fallback: datetime) -> datetime:
+    def _pick_timestamp(payload: dict[str, Any]) -> datetime | None:
         for key in ("lastTradeTime", "last_trade_time", "regularMarketTime", "regular_market_time"):
             value = payload.get(key)
             if value is None:
@@ -191,7 +200,7 @@ class YahooClient:
                 return dt
             except Exception:
                 continue
-        return fallback
+        return None
 
     @staticmethod
     def _market_state_from_fast_info(payload: dict[str, Any], as_of: datetime) -> str:

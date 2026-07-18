@@ -100,7 +100,7 @@ export type TickerQuote = {
   price: number;
   change_pct: number | null;
   volume: number | null;
-  as_of: string;
+  as_of: string | null;
   market_state: MarketState;
 };
 

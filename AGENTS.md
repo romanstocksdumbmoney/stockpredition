@@ -32,5 +32,6 @@
 ## Data integrity rules
 
 - yfinance news payloads can be nested and can also be empty/unreliable by symbol/time. Parse what is present, and if no valid entries are returned, keep `recent_news` empty/null so the headlines UI stays hidden.
+- Price-series consistency rule: use unadjusted OHLCV (`auto_adjust=False`) for chart candles, indicators, and support/resistance detection so all displayed levels are in the same traded-price basis.
 - Never inject fake, sample, or placeholder data to make a feature appear to work. Missing data hides the feature. This is a financial analysis app — fabricated data is worse than no data.
 - Morning scan cost guardrail: explicit watchlist is capped at 10 symbols to keep the pre-market scan to roughly 11 Claude calls max (10 ticker analyses + 1 briefing synthesis).

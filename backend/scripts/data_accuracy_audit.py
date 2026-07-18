@@ -145,9 +145,6 @@ def audit_symbol(symbol: str) -> tuple[list[AuditRow], list[Finding]]:
         info = {}
 
     raw_hist_unadj = _normalize_history(ticker.history(period="6mo", interval="1d", auto_adjust=False))
-    raw_hist_adj = _normalize_history(ticker.history(period="6mo", interval="1d", auto_adjust=True))
-    indicators_adj = compute_indicators(raw_hist_adj)
-    patterns_adj = detect_patterns(raw_hist_adj)
 
     price_key, raw_fast_price = _pick_value(
         fast_info,
@@ -155,7 +152,7 @@ def audit_symbol(symbol: str) -> tuple[list[AuditRow], list[Finding]]:
     )
     prev_key, raw_prev_close = _pick_value(
         fast_info,
-        ["previousClose", "previous_close", "regularMarketPreviousClose", "regular_market_previous_close"],
+        ["regularMarketPreviousClose", "regular_market_previous_close", "previousClose", "previous_close"],
     )
     raw_change_pct_fast = None
     if raw_fast_price not in (None, "") and raw_prev_close not in (None, "", 0):
@@ -198,7 +195,7 @@ def audit_symbol(symbol: str) -> tuple[list[AuditRow], list[Finding]]:
                     f"regular change={_fmt_num(raw_change_pct_regular,4)}% via {reg_prev_key}; "
                     f"history close-to-close={_fmt_num(history_day_change,4)}%"
                 ),
-                computation=f"((price - previous_close)/previous_close)*100 where previous_close from key order [previousClose,previous_close,regularMarketPreviousClose,regular_market_previous_close]; chosen={prev_key}",
+                computation=f"((price - previous_close)/previous_close)*100 where previous_close from key order [regularMarketPreviousClose,regular_market_previous_close,previousClose,previous_close]; chosen={prev_key}",
             ),
             AuditRow(
                 metric="quote.volume",
@@ -303,21 +300,28 @@ def audit_symbol(symbol: str) -> tuple[list[AuditRow], list[Finding]]:
                 raw_source=f"latest_close={_fmt_num(close_unadj.iloc[-1],4)} | low/high pivots from last 90 bars",
                 computation="Local extrema clustered (~0.7% tolerance), then filtered to levels above latest close and sorted by proximity",
             ),
+            AuditRow(
+                metric="price_series_basis",
+                displayed="unadjusted",
+                raw_source="yfinance history(auto_adjust=False) used by fetch_price_history",
+                computation="Indicators and support/resistance are both computed from the same unadjusted OHLCV series",
+            ),
         ]
     )
 
     quote_change_pct = _to_float(quote.get("change_pct"))
-    if quote_change_pct is not None and raw_change_pct_regular is not None and abs(quote_change_pct - raw_change_pct_regular) > 0.2:
+    expected_change_pct = raw_change_pct_regular if raw_change_pct_regular is not None else raw_change_pct_fast
+    if quote_change_pct is not None and expected_change_pct is not None and abs(quote_change_pct - expected_change_pct) > 0.2:
         findings.append(
             Finding(
                 symbol=symbol,
-                category="change_pct reference mismatch",
+                category="change_pct formula mismatch",
                 detail=(
-                    f"Displayed quote change_pct={_fmt_num(quote_change_pct,4)}% differs from regular-market baseline "
-                    f"{_fmt_num(raw_change_pct_regular,4)}% by {_fmt_num(abs(quote_change_pct - raw_change_pct_regular),4)} pts."
+                    f"Displayed quote change_pct={_fmt_num(quote_change_pct,4)}% differs from expected baseline "
+                    f"{_fmt_num(expected_change_pct,4)}% by {_fmt_num(abs(quote_change_pct - expected_change_pct),4)} pts."
                 ),
                 root_cause=(
-                    f"Quote endpoint prioritizes `{prev_key}` over regular-market previous close; this can mix extended-hours vs regular-session references."
+                    "Displayed change_pct should match the endpoint formula against regular-market previous close (fallback to previous close)."
                 ),
             )
         )
@@ -423,52 +427,6 @@ def audit_symbol(symbol: str) -> tuple[list[AuditRow], list[Finding]]:
                     root_cause="Quote endpoint falls back to current time when fast_info lacks timestamp, so `as_of` can represent fetch time instead of exchange trade time.",
                 )
             )
-
-    adj_rsi = _to_float(indicators_adj.get("rsi", {}).get("value"))
-    unadj_rsi = _to_float(indicators_unadj.get("rsi", {}).get("value"))
-    if adj_rsi is not None and unadj_rsi is not None and abs(adj_rsi - unadj_rsi) > 2:
-        findings.append(
-            Finding(
-                symbol=symbol,
-                category="indicator adjusted-vs-unadjusted divergence",
-                detail=(
-                    f"RSI unadjusted={_fmt_num(unadj_rsi,4)} vs adjusted={_fmt_num(adj_rsi,4)} "
-                    f"(delta={_fmt_num(abs(unadj_rsi - adj_rsi),4)})."
-                ),
-                root_cause="Indicators are computed from unadjusted OHLC (`auto_adjust=False`), which can diverge from adjusted series around splits/dividends.",
-            )
-        )
-
-    unadj_ema50 = _to_float(indicators_unadj.get("ema", {}).get("ema50"))
-    adj_ema50 = _to_float(indicators_adj.get("ema", {}).get("ema50"))
-    if unadj_ema50 is not None and adj_ema50 is not None and unadj_ema50 != 0:
-        ema50_diff_pct = abs(unadj_ema50 - adj_ema50) / abs(unadj_ema50) * 100
-        if ema50_diff_pct > 0.5:
-            findings.append(
-                Finding(
-                    symbol=symbol,
-                    category="indicator adjusted-vs-unadjusted divergence",
-                    detail=(
-                        f"EMA50 unadjusted={_fmt_num(unadj_ema50,4)} vs adjusted={_fmt_num(adj_ema50,4)} "
-                        f"({ema50_diff_pct:.2f}% difference)."
-                    ),
-                    root_cause="App uses unadjusted close by design; adjusted close can materially change long-window moving averages.",
-                )
-            )
-
-    unadj_res = patterns_unadj.get("resistance_levels") or []
-    adj_res = patterns_adj.get("resistance_levels") or []
-    unadj_sup = patterns_unadj.get("support_levels") or []
-    adj_sup = patterns_adj.get("support_levels") or []
-    if unadj_res != adj_res or unadj_sup != adj_sup:
-        findings.append(
-            Finding(
-                symbol=symbol,
-                category="support/resistance adjusted-vs-unadjusted divergence",
-                detail=f"unadjusted support/resistance={unadj_sup}/{unadj_res}; adjusted={adj_sup}/{adj_res}.",
-                root_cause="Pivot clustering uses raw highs/lows from unadjusted history; adjusted candles can move level locations.",
-            )
-        )
 
     return rows, findings
 
