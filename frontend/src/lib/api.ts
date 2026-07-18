@@ -2,6 +2,7 @@ import type {
   AnalysisResult,
   BriefingRecord,
   HistoryItem,
+  MarketMoversResponse,
   TickerQuote,
   WatchlistItem,
 } from "./types";
@@ -51,6 +52,11 @@ export async function markOutcome(id: number, outcome: "right" | "wrong" | "mixe
 export async function getTickerQuote(symbol: string): Promise<TickerQuote> {
   const response = await fetch(`${API_BASE}/api/ticker/${encodeURIComponent(symbol)}/quote`);
   return parseResponse<TickerQuote>(response);
+}
+
+export async function getMarketMovers(): Promise<MarketMoversResponse> {
+  const response = await fetch(`${API_BASE}/api/market/movers`);
+  return parseResponse<MarketMoversResponse>(response);
 }
 
 export async function getWatchlist(): Promise<WatchlistItem[]> {

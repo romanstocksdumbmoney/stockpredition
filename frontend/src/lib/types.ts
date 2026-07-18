@@ -104,6 +104,31 @@ export type TickerQuote = {
   market_state: MarketState;
 };
 
+export type MarketMoverItem = {
+  symbol: string;
+  name: string;
+  price: number;
+  change_pct: number;
+  volume: number;
+  market_cap: number;
+};
+
+export type MarketHeadline = {
+  title: string;
+  publisher?: string | null;
+  published_at?: string | null;
+  url?: string | null;
+};
+
+export type MarketMoversResponse = {
+  gainers: MarketMoverItem[];
+  losers: MarketMoverItem[];
+  most_active: MarketMoverItem[];
+  as_of: string | null;
+  session_label: "LIVE" | "LAST SESSION";
+  market_news: MarketHeadline[];
+};
+
 export type WatchlistItem = {
   symbol: string;
   added_at: string;
