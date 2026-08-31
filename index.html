@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Slugger</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="hud">
+        <h1>NEON SLUGGER DELUXE</h1>
+        <div class="score-block scoreboard-bar">
+          <div class="score-line">
+            <span class="away" id="awayTeamName">Away</span>
+            <strong id="awayScoreValue">0</strong>
+            <span class="sep">|</span>
+            <span class="home" id="homeTeamName">Home</span>
+            <strong id="homeScoreValue">0</strong>
+          </div>
+          <div class="stats">
+            <span class="stat-item">Inning: <strong id="inningValue">1</strong></span>
+            <span class="stat-item">Half: <strong id="halfValue">top</strong></span>
+            <span class="stat-item">B: <strong id="ballsValue">0</strong></span>
+            <span class="stat-item">S: <strong id="strikesValue">0</strong></span>
+            <span class="stat-item">O: <strong id="outsValue">0</strong></span>
+          </div>
+        </div>
+      </header>
+
+      <section id="startScreen" class="overlay">
+        <h2>Pick Your Matchup</h2>
+        <p>Choose away and home teams, then start the game.</p>
+        <div class="team-select">
+          <label>
+            Away Team
+            <select id="teamSelectA"></select>
+          </label>
+          <label>
+            Home Team
+            <select id="teamSelectB"></select>
+          </label>
+        </div>
+        <ul>
+          <li><strong>SPACE</strong>: Swing (when batting) / Throw nearest base (fielding)</li>
+          <li><strong>A / D</strong> or <strong>Left / Right</strong>: Pitch aim and hit direction</li>
+          <li><strong>WASD / Arrows</strong>: Move selected fielder on balls in play</li>
+          <li><strong>1,2,3,4</strong>: Throw to Home, 1st, 2nd, 3rd base</li>
+        </ul>
+        <p class="hint">Original art + code only. No copyrighted assets used.</p>
+        <button id="startButton" type="button">Start Game</button>
+      </section>
+
+      <section id="gameOverScreen" class="overlay hidden">
+        <h2>Game Over</h2>
+        <p id="finalScoreText">Away 0 - Home 0</p>
+        <p>Press Enter to play again.</p>
+        <button id="restartButton" type="button">Play Again</button>
+      </section>
+
+      <canvas id="gameCanvas" width="1080" height="620"></canvas>
+      <div class="bottom-ui-panel">
+        <p id="messageBar" class="message">Select teams and press Start.</p>
+      </div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
