@@ -1,0 +1,3005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS:GO Clicker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #0a0f14;
+      --bg-panel: #0f1923;
+      --bg-card: #162030;
+      --border: #1e3a4a;
+      --green: #4caf50;
+      --green-bright: #00ff88;
+      --gold: #f0a500;
+      --cyan: #00bfff;
+      --red: #ff4444;
+      --text-primary: #e8eef4;
+      --text-secondary: #7a9bb5;
+      --rarity-blue: #4b69ff;
+      --rarity-purple: #8847ff;
+      --rarity-pink: #d32ce6;
+      --rarity-red: #eb4b4b;
+      --rarity-gold: #e4ae39;
+      --led-speed: 1.2s;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      font-family: "Rajdhani", sans-serif;
+      color: var(--text-primary);
+      background: radial-gradient(circle at 30% 10%, #101c28, var(--bg-deep) 50%, #060b11 100%);
+      overflow: hidden;
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg stroke='%2300bfff' stroke-width='2' fill='none'%3E%3Cline x1='16' y1='2' x2='16' y2='11'/%3E%3Cline x1='16' y1='21' x2='16' y2='30'/%3E%3Cline x1='2' y1='16' x2='11' y2='16'/%3E%3Cline x1='21' y1='16' x2='30' y2='16'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3C/g%3E%3C/svg%3E") 16 16, crosshair;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at center, rgba(0, 191, 255, 0.03) 0 2px, transparent 2px),
+        linear-gradient(90deg, transparent 49%, rgba(0, 191, 255, 0.03) 50%, transparent 51%),
+        linear-gradient(transparent 49%, rgba(0, 191, 255, 0.03) 50%, transparent 51%);
+      background-size: 44px 44px, 64px 64px, 64px 64px;
+      pointer-events: none;
+      opacity: 0.65;
+      z-index: 0;
+    }
+
+    .hidden { display: none !important; }
+
+    .screen-flash, .knife-flash {
+      position: fixed;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 120;
+    }
+
+    #click-flash { background: rgba(255, 90, 90, 0.2); }
+    #he-flash { background: rgba(0, 255, 136, 0.2); }
+    .knife-flash { background: rgba(228, 174, 57, 0.23); }
+
+    .screen-flash.active, .knife-flash.active { animation: fadeflash 220ms ease-out; }
+    @keyframes fadeflash { from { opacity: 1; } to { opacity: 0; } }
+
+    .hud-top {
+      position: relative;
+      z-index: 20;
+      height: 80px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      background: linear-gradient(180deg, #060d14, #09131d);
+      border-bottom: 1px solid var(--cyan);
+      box-shadow: inset 0 -1px 0 rgba(0, 191, 255, 0.2), 0 4px 20px rgba(0,0,0,0.35);
+    }
+
+    .hud-card {
+      height: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: linear-gradient(180deg, rgba(14, 27, 38, 0.92), rgba(9, 19, 29, 0.95));
+      box-shadow: inset 0 0 20px rgba(0, 191, 255, 0.06);
+      padding: 6px 12px;
+      display: grid;
+      align-content: center;
+    }
+
+    .money-wrap { justify-items: start; }
+    .money-label { color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-size: 0.78rem; }
+    .money-value { color: var(--gold); font-size: 2rem; font-weight: 700; font-family: "Orbitron", sans-serif; }
+
+    .round-wrap { justify-items: center; text-align: center; }
+    .round-title { color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.2px; }
+    .round-time { color: var(--green-bright); font-family: "Orbitron", sans-serif; font-size: 1.6rem; font-weight: 700; }
+    .round-time.danger { color: var(--red); text-shadow: 0 0 10px rgba(255, 68, 68, 0.75); }
+    .round-num { color: #9ab3c8; font-size: 0.8rem; }
+
+    .stats-wrap { gap: 6px; display: grid; align-content: center; }
+    .bar-row { display: grid; grid-template-columns: 62px 1fr 34px; align-items: center; gap: 6px; }
+    .bar-row span:first-child { color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+    .bar { height: 8px; border-radius: 12px; border: 1px solid #294a5a; background: #0b1118; overflow: hidden; }
+    .bar-fill { height: 100%; width: 100%; }
+    .health .bar-fill { background: linear-gradient(90deg, #28a745, #73ff9c); }
+    .armor .bar-fill { background: linear-gradient(90deg, #2f67d1, #59a8ff); }
+    .bar-val { color: #dce9f5; font-size: 0.78rem; text-align: right; }
+
+    .kill-feed {
+      position: fixed;
+      top: 8px;
+      right: 18px;
+      width: min(360px, 40vw);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .kill-entry {
+      align-self: flex-end;
+      background: rgba(7, 13, 19, 0.88);
+      border: 1px solid #23485b;
+      border-right: 3px solid var(--cyan);
+      color: #e6f2fb;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.82rem;
+      animation: killFade 3.2s forwards;
+    }
+    .kill-entry .weapon { color: var(--gold); font-weight: 700; }
+    .kill-entry .event { color: #8af3b0; margin-left: 4px; }
+    @keyframes killFade {
+      0% { opacity: 0; transform: translateX(18px); }
+      10%, 70% { opacity: 1; transform: translateX(0); }
+      100% { opacity: 0; transform: translateX(22px); }
+    }
+
+    .arena {
+      position: relative;
+      z-index: 2;
+      height: calc(100vh - 80px);
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 12px;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .left-sidebar, .buy-panel {
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(15, 25, 35, 0.95), rgba(10, 19, 28, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: inset 0 0 0 1px rgba(52, 98, 124, 0.3), inset 0 0 24px rgba(0, 191, 255, 0.04);
+    }
+
+    .left-sidebar {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .side-indicator, .prestige-box, .stats-panel, .equipped-knife-display {
+      border: 1px solid #244c61;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(18, 34, 48, 0.95), rgba(12, 22, 31, 0.95));
+      padding: 10px;
+    }
+
+    .side-indicator { text-align: center; text-transform: uppercase; letter-spacing: 1px; color: #95b6cc; }
+    .side-value { color: var(--green-bright); font-size: 1.28rem; font-family: "Orbitron", sans-serif; margin-top: 2px; }
+
+    .prestige-box { display: grid; gap: 10px; }
+    .rank-wrap { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; }
+    .rank-icon {
+      width: 52px; height: 52px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-weight: 700; color: #fff;
+      border: 2px solid #8094a2;
+      background: radial-gradient(circle at 30% 30%, #72818b, #3a4650);
+    }
+    .rank-1 { background: radial-gradient(circle at 30% 30%, #76a8d6, #2f5575); border-color: #8ec7ff; }
+    .rank-2 { background: radial-gradient(circle at 30% 30%, #d57e5f, #8a3a25); border-color: #f4a087; }
+    .rank-3 { background: radial-gradient(circle at 30% 30%, #d9bf6f, #7a6634); border-color: #f0d67c; }
+    .rank-4 { background: radial-gradient(circle at 30% 30%, #cdb0ff, #6b4f9a); border-color: #efe1ff; }
+    .rank-name { font-size: 1.08rem; font-weight: 700; color: var(--text-primary); }
+    .rank-multi { color: #80e9a5; font-size: 0.84rem; }
+
+    .prestige-btn {
+      border: 1px solid #b78b2f;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #2b2414, #171109);
+      color: #ffd67f;
+      font-family: "Rajdhani", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      padding: 10px 12px;
+      text-transform: uppercase;
+      cursor: inherit;
+      transition: transform 0.1s ease, filter 0.2s ease;
+    }
+    .prestige-btn:active { transform: scale(0.96); }
+    .prestige-btn:disabled { opacity: 0.6; color: #8b7a56; border-color: #615337; }
+
+    .stats-panel { display: grid; gap: 8px; align-content: start; }
+    .stats-title { color: #9ec4dd; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 1px; }
+    .stat-row {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      color: #d5e5f1;
+      font-size: 0.9rem;
+    }
+    .stat-icon { opacity: 0.9; display: inline-flex; align-items: center; justify-content: center; width: 18px; }
+    .stat-dots { border-bottom: 1px dotted #3e6275; align-self: center; height: 1px; }
+    .stat-value { color: var(--green-bright); font-family: "Orbitron", sans-serif; font-size: 0.82rem; }
+
+    .equipped-knife-display { border-color: #7a6022; }
+    .equipped-knife-display .label { color: #d0aa58; text-transform: uppercase; letter-spacing: 0.8px; font-size: 0.74rem; }
+    .knife-mini-icon {
+      width: 24px; height: 10px; border-radius: 3px;
+      display: inline-block;
+      background: linear-gradient(90deg, #c6c6c6, #fefefe);
+      clip-path: polygon(0 45%, 56% 45%, 76% 12%, 100% 50%, 76% 88%, 56% 55%, 0 55%);
+    }
+    .equipped-knife-display .knife-name { color: #ffd67f; font-weight: 700; }
+    .knife-cps { color: #83f6ab; font-size: 0.84rem; }
+
+    .center-zone {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(14, 27, 38, 0.9), rgba(8, 17, 25, 0.95));
+      box-shadow: inset 0 0 22px rgba(0, 191, 255, 0.04);
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 12px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .click-label { color: var(--green-bright); letter-spacing: 2px; font-size: 0.84rem; text-transform: uppercase; }
+    .bomb-button {
+      border: none;
+      border-radius: 14px;
+      padding: 0;
+      background: transparent;
+      width: 220px;
+      height: 280px;
+      cursor: inherit;
+      transition: transform 0.15s ease;
+    }
+    .bomb-button.pulse { animation: bombPulse 150ms ease; }
+    .bomb-button.shake { animation: bombShake 150ms ease; }
+    @keyframes bombPulse { 0% { transform: scale(1); } 40% { transform: scale(0.95); } 75% { transform: scale(1.02); } 100% { transform: scale(1);} }
+    @keyframes bombShake { 0%{transform:translateX(0);}25%{transform:translateX(-4px);}50%{transform:translateX(3px);}75%{transform:translateX(-2px);}100%{transform:translateX(0);} }
+
+    .bomb-canvas-wrap {
+      width: 100%;
+      height: 100%;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #1a1a1a, #101010);
+      border: 1px solid #41596a;
+      box-shadow: inset 0 0 20px rgba(255,255,255,0.04), 0 10px 25px rgba(0,0,0,0.45);
+      position: relative;
+      overflow: hidden;
+    }
+    .bomb-canvas-wrap::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 22px;
+      background: repeating-linear-gradient(135deg, #1a1a1a 0 12px, #d2b34d 12px 20px);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+    #bomb-canvas { width: 100%; height: 100%; display: block; }
+
+    .floating-layer { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
+    .float-money, .float-cps {
+      position: absolute;
+      transform: translateX(-50%);
+      animation: floatUp 900ms ease forwards;
+      font-weight: 700;
+      text-shadow: 0 0 10px currentColor;
+    }
+    .float-money { color: var(--gold); }
+    .float-cps { color: #7efca0; font-size: 0.95rem; }
+    @keyframes floatUp { from { opacity: 1; transform: translate(-50%, 0);} to { opacity: 0; transform: translate(-50%, -50px);} }
+
+    .bomb-spark {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      animation: bombSpark 450ms ease-out forwards;
+    }
+    @keyframes bombSpark { from { opacity: 1; transform: translate(0,0) scale(1);} to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3);} }
+
+    .buy-panel {
+      padding: 10px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 8px;
+    }
+    .buy-title {
+      margin: 0;
+      color: #d7ecfd;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #2f5268;
+      padding-bottom: 6px;
+      font-size: 1rem;
+    }
+    .shop-items { overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+    .shop-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 8px; }
+    .shop-tab {
+      border: 1px solid #2b5062;
+      background: #10202f;
+      color: #9eb5c8;
+      padding: 7px 4px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      cursor: inherit;
+      transition: 200ms ease;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+    }
+    .shop-tab.active { color: #ecf9ff; border-color: var(--green-bright); box-shadow: inset 0 -2px 0 var(--green-bright); }
+    .tab-badge {
+      min-width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #e4ae39;
+      color: #101820;
+      font-size: 0.68rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+      box-shadow: 0 0 8px rgba(228, 174, 57, 0.45);
+    }
+
+    .tab-content {
+      overflow: auto;
+      padding-right: 2px;
+      animation: fadeIn 150ms ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .shop-item {
+      background: linear-gradient(180deg, #162535, #101b28);
+      border: 1px solid #2a4f63;
+      border-left: 3px solid rgba(76, 175, 80, 0.2);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      transition: 200ms ease;
+    }
+    .shop-item:hover { transform: translateY(-2px); border-color: #3f7089; }
+    .shop-item.locked { opacity: 0.65; border-left-color: #3a4654; }
+
+    .shop-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .shop-name { font-weight: 700; color: #f1f6fb; }
+    .shop-owned { color: #9db1c2; font-size: 0.8rem; }
+    .shop-effect { color: #8af2ab; font-size: 0.84rem; margin-top: 3px; }
+    .shop-actions { display: grid; gap: 6px; margin-top: 7px; }
+
+    .buy-btn, .activate-btn, .buy-case-btn, .open-case-btn, .knife-buy-btn, .preview-open,
+    .case-action-btn, .flip-btn, .preview-close, .case-close-btn {
+      appearance: none;
+      border-radius: 6px;
+      border: 1px solid #345f76;
+      font-family: "Rajdhani", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      cursor: inherit;
+      transition: 0.2s ease;
+      color: #e9f3fa;
+      background: linear-gradient(180deg, #1c3348, #122433);
+      padding: 8px 10px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .buy-btn, .knife-buy-btn { background: linear-gradient(180deg, #2e5f34, #1e4023); border-color: #4f9f58; }
+    .open-case-btn { background: linear-gradient(180deg, #6d5720, #3b2d12); border-color: #d0a84b; color: #ffe7a5; }
+    .buy-case-btn { background: linear-gradient(180deg, #274867, #173049); border-color: #4f88bd; }
+    .activate-btn { background: linear-gradient(180deg, #274867, #18364f); border-color: #63a3dd; }
+    .preview-open { background: transparent; border: none; color: #89d3ff; text-decoration: underline; padding: 0; text-align: left; }
+
+    .buy-btn:hover:not(:disabled), .activate-btn:hover:not(:disabled), .buy-case-btn:hover:not(:disabled),
+    .open-case-btn:hover:not(:disabled), .knife-buy-btn:hover:not(:disabled), .flip-btn:hover:not(:disabled),
+    .case-action-btn:hover:not(:disabled), .preview-close:hover:not(:disabled), .case-close-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+    }
+
+    .buy-btn:active, .activate-btn:active, .buy-case-btn:active, .open-case-btn:active,
+    .knife-buy-btn:active, .flip-btn:active, .case-action-btn:active { transform: scale(0.96); }
+
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .mini-note { color: var(--text-secondary); font-size: 0.84rem; margin: 6px 0 8px; }
+    .subsection-title { color: #cde4f4; text-transform: uppercase; letter-spacing: 1px; font-size: 0.82rem; margin: 10px 0 6px; border-top: 1px solid #2c4c60; padding-top: 8px; }
+
+    .case-box { border: 1px solid #2d5066; border-radius: 8px; background: #12202d; padding: 8px; margin-bottom: 8px; }
+    .case-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; color: #d8e8f3; }
+    .case-row .label { color: #97b5c8; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.8px; }
+
+    .knife-collection { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .knife-card, .inv-card {
+      background: linear-gradient(180deg, #162535, #101a27);
+      border: 1px solid #2f5468;
+      border-radius: 8px;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 8px;
+      align-items: center;
+      position: relative;
+    }
+
+    .knife-glyph {
+      width: 24px; height: 12px; border-radius: 3px;
+      background: linear-gradient(90deg, #afb7be, #f2f7fb);
+      clip-path: polygon(0 45%, 52% 45%, 72% 10%, 100% 50%, 72% 90%, 52% 55%, 0 55%);
+    }
+
+    .knife-main .name, .inv-name { font-size: 0.88rem; font-weight: 700; color: #ecf5fb; }
+    .knife-main .finish, .inv-sub { color: #a7c2d5; font-size: 0.76rem; }
+    .knife-main .cps { color: #8df6ab; font-size: 0.76rem; }
+    .equipped-badge {
+      position: absolute;
+      right: 6px; top: 6px;
+      font-size: 0.65rem;
+      border: 1px solid #907b2d;
+      background: rgba(112,95,21,0.25);
+      color: #ffea99;
+      border-radius: 999px;
+      padding: 1px 6px;
+      text-transform: uppercase;
+    }
+
+    .inventory-list { display: grid; gap: 8px; }
+    .collection-summary { display: flex; justify-content: space-between; border: 1px solid #31566a; border-radius: 8px; padding: 7px 8px; color: #c2d7e8; background: #12202d; margin-bottom: 8px; }
+    .collection-summary strong { color: var(--gold); font-family: "Orbitron", sans-serif; font-size: 0.84rem; }
+    .no-items { border: 1px dashed #365063; border-radius: 8px; color: #86a4ba; padding: 12px; text-align: center; }
+
+    .rarity-consumer { border-left: 4px solid #8e8e8e; }
+    .rarity-industrial { border-left: 4px solid #8db3d9; }
+    .rarity-milspec { border-left: 4px solid var(--rarity-blue); }
+    .rarity-restricted { border-left: 4px solid var(--rarity-purple); }
+    .rarity-classified { border-left: 4px solid var(--rarity-pink); }
+    .rarity-covert { border-left: 4px solid var(--rarity-red); }
+    .rarity-knife { border-left: 4px solid var(--rarity-gold); box-shadow: inset 0 0 0 1px rgba(228,174,57,0.25); }
+
+    .case-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      background: rgba(10, 10, 10, 0.95);
+      backdrop-filter: blur(3px);
+      transition: opacity 0.3s ease;
+    }
+    .case-modal.hidden { opacity: 0; pointer-events: none; }
+
+    .case-modal-card {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto auto auto;
+      gap: 10px;
+      padding: 16px 22px 18px;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(68, 112, 158, 0.18), transparent 45%),
+        linear-gradient(180deg, #101a24, #080d13);
+      border: 1px solid #2f4f64;
+      position: relative;
+    }
+
+    .case-top { display: grid; justify-items: center; gap: 4px; }
+    .case-icon {
+      width: 110px; height: 76px;
+      border-radius: 10px;
+      border: 2px solid #7f6130;
+      background: linear-gradient(145deg, #3b2e1f, #1c1510);
+      position: relative;
+    }
+    .case-icon::before, .case-icon::after {
+      content: "";
+      position: absolute;
+      top: 16%; bottom: 16%; width: 10px;
+      border-radius: 3px;
+      background: #c9a34a;
+    }
+    .case-icon::before { left: 22%; } .case-icon::after { right: 22%; }
+
+    .case-modal-title { font-size: 1.2rem; font-weight: 700; color: #f0f7fc; text-transform: uppercase; letter-spacing: 1px; }
+    .case-opening-text { color: var(--green-bright); text-shadow: 0 0 8px rgba(0,255,136,0.6); letter-spacing: 1.6px; }
+
+    .reel-shell { position: relative; display: grid; align-content: center; }
+    .reel-window {
+      position: relative;
+      width: 100%;
+      height: 128px;
+      border: 1px solid #35586d;
+      border-radius: 8px;
+      background: #0c141d;
+      overflow: hidden;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.65);
+    }
+    .reel-track {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-inline: 44vw;
+      transition: transform 7s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform;
+    }
+
+    .reel-item {
+      flex: 0 0 160px;
+      height: 104px;
+      border: 3px solid #446476;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #1b2a38, #101a24);
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 4px;
+      color: #ecf5fb;
+      text-align: center;
+      font-size: 0.78rem;
+      padding: 8px;
+      transition: transform 0.3s ease;
+    }
+    .reel-item .tiny { font-size: 0.68rem; color: #b6c8d8; }
+    .weapon-glyph { width: 44px; height: 10px; border-radius: 10px; background: linear-gradient(90deg, rgba(255,255,255,.6), rgba(255,255,255,.15)); position: relative; }
+    .weapon-glyph::after { content:""; position:absolute; width:8px; height:8px; border-radius:2px; right:-2px; top:1px; background: rgba(255,255,255,0.7); }
+
+    .reel-item.winner { border-color: #ffd76a; box-shadow: 0 0 20px rgba(255,205,68,0.7); }
+    .reel-item.win-zoom { transform: scale(1.3) rotate(0.0001deg); z-index: 10; }
+
+    .reel-marker {
+      position: absolute;
+      top: 8px; bottom: 8px; left: 50%;
+      width: 2px; transform: translateX(-50%);
+      background: linear-gradient(180deg, transparent, #f1cb5b 20%, #f1cb5b 80%, transparent);
+      z-index: 4;
+    }
+    .reel-pointer {
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 11px solid transparent;
+      border-right: 11px solid transparent;
+      z-index: 5;
+      filter: drop-shadow(0 0 8px rgba(248,196,77,0.9));
+    }
+    .reel-pointer.top { top: -2px; border-bottom: 16px solid #f6ca58; }
+    .reel-pointer.bottom { bottom: -2px; border-top: 16px solid #f6ca58; }
+
+    .reel-fade { position: absolute; top: 0; bottom: 0; width: 14%; z-index: 3; pointer-events: none; }
+    .reel-fade.left { left: 0; background: linear-gradient(90deg, rgba(8,13,19,0.96), transparent); }
+    .reel-fade.right { right: 0; background: linear-gradient(270deg, rgba(8,13,19,0.96), transparent); }
+
+    .drop-banner { text-align: center; color: #ffe4a6; font-size: 1.3rem; font-weight: 700; letter-spacing: 2px; opacity: 0; transition: opacity .2s ease; }
+    .drop-banner.show { opacity: 1; }
+
+    .drop-details {
+      border: 1px solid #35566b;
+      border-radius: 8px;
+      background: rgba(10, 18, 26, 0.88);
+      padding: 10px;
+      display: grid;
+      justify-items: center;
+      gap: 3px;
+    }
+    .drop-details.knife-drop-card {
+      border-color: #e4ae39;
+      box-shadow: 0 0 16px rgba(228, 174, 57, 0.25);
+      background: rgba(20, 16, 8, 0.88);
+    }
+    .drop-special {
+      color: #e4ae39;
+      font-weight: 800;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(228, 174, 57, 0.35);
+    }
+    .drop-name { font-size: 1.2rem; font-weight: 700; }
+    .drop-rarity { font-size: 0.94rem; }
+    .drop-extra { color: #88f7af; font-size: 0.9rem; }
+
+    .wear-row { width: min(560px, 94%); display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .wear-bar { height: 10px; border-radius: 10px; background: #141d26; border: 1px solid #375972; overflow: hidden; }
+    .wear-fill { height: 100%; width: 30%; }
+    .wear-label { color: #c9dced; font-size: 0.8rem; }
+
+    .drop-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      pointer-events: none;
+    }
+    .drop-actions.show-actions {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .case-action-add { background: #4caf50; border-color: #4caf50; color: #ffffff; }
+    .case-action-open { background: #1a5fa8; border-color: #1a5fa8; color: #ffffff; }
+    .case-action-sell { background: #333333; border-color: #4d4d4d; color: #f0a500; }
+
+    .case-close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid #3f6278;
+      background: rgba(12, 22, 31, 0.85);
+      color: #d0e2ef;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+      z-index: 12;
+    }
+
+    .case-particles { position: absolute; inset: 0; pointer-events: none; z-index: 9; }
+    .case-particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; animation: caseParticle .9s ease-out forwards; box-shadow: 0 0 8px currentColor; }
+    @keyframes caseParticle { from { opacity: 1; transform: translate(0,0) scale(1);} to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3);} }
+
+    .preview-modal, .coin-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9998;
+      display: grid;
+      place-items: center;
+      background: rgba(8, 8, 8, 0.92);
+      backdrop-filter: blur(2px);
+      transition: opacity .25s ease;
+    }
+    .preview-modal.hidden, .coin-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .preview-card {
+      width: min(920px, 94vw);
+      max-height: 90vh;
+      overflow: auto;
+      border: 1px solid #355b72;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #122131, #0c1621);
+      padding: 14px;
+    }
+    .preview-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .preview-header h3 { margin: 0; color: #e6f2fb; letter-spacing: 1px; text-transform: uppercase; }
+    .preview-list details { border: 1px solid #33576d; border-radius: 6px; padding: 8px; margin-bottom: 8px; background: #101d2b; }
+    .preview-list summary { cursor: pointer; font-weight: 700; }
+    .preview-item { color: #d2e2ef; font-size: 0.88rem; padding: 2px 0; }
+
+    .coinflip-wrap { display: grid; gap: 10px; }
+    .coinflip-record { color: #8ef0b2; font-family: "Orbitron", sans-serif; font-size: 0.85rem; }
+    .coinflip-step { display: grid; gap: 10px; }
+    .flip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+    .flip-item {
+      border: 2px solid #355b72;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #162535, #101b27);
+      color: #ecf4fb;
+      text-align: left;
+      padding: 8px;
+      font-family: inherit;
+      cursor: inherit;
+      transition: 0.2s ease;
+    }
+    .flip-item.active { border-color: #f5c85d; box-shadow: 0 0 12px rgba(245,200,93,0.45); }
+    .flip-badge { display: inline-block; margin-top: 4px; border: 1px solid #f5c85d; color: #ffe6a7; border-radius: 999px; padding: 1px 7px; font-size: 0.68rem; text-transform: uppercase; }
+    .flip-opponent { border: 1px solid #3a6076; border-radius: 8px; background: #111e2a; padding: 8px; color: #d5e6f2; }
+    .flip-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+    .flip-btn.ct { background: linear-gradient(180deg, #264467, #1a2f44); border-color: #4f8fc6; }
+    .flip-btn.t { background: linear-gradient(180deg, #5f3f23, #3d2917); border-color: #c38c4b; }
+    .flip-history { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+    .flip-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .flip-dot.win { background: #57d169; box-shadow: 0 0 7px rgba(87,209,105,0.65); }
+    .flip-dot.loss { background: #d25252; box-shadow: 0 0 7px rgba(210,82,82,0.65); }
+
+    .coin-card {
+      width: min(640px, 92vw);
+      border: 1px solid #355b72;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #142232, #0a1119);
+      padding: 20px;
+      text-align: center;
+    }
+    .coin-coin {
+      width: 140px; height: 140px;
+      border-radius: 50%;
+      margin: 10px auto;
+      display: grid; place-items: center;
+      color: #fff;
+      font-weight: 700;
+      font-family: "Orbitron", sans-serif;
+      background: radial-gradient(circle at 25% 25%, #79a5d6, #2c4f7f);
+      box-shadow: 0 0 20px rgba(74,122,180,0.55);
+      transform-style: preserve-3d;
+    }
+    .coin-coin.t-side { background: radial-gradient(circle at 25% 25%, #ffd38b, #9a5d23); box-shadow: 0 0 20px rgba(205,140,67,0.55); }
+    .coin-result { margin-top: 10px; font-size: clamp(1.2rem, 3.8vw, 2.2rem); font-weight: 700; letter-spacing: 1px; }
+    .coin-result.win { color: #7af088; }
+    .coin-result.loss { color: #ff7a7a; }
+
+    .knife-drop-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10010;
+      pointer-events: none;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+    }
+    .knife-drop-overlay.show { animation: knifeDropShow 1.1s ease-out; }
+    .knife-drop-text { color: #ffd56b; font-size: clamp(2rem, 7vw, 4rem); font-weight: 700; letter-spacing: 2px; text-shadow: 0 0 14px rgba(255,215,100,.85); text-transform: uppercase; }
+    @keyframes knifeDropShow { 0% {opacity:0;transform:scale(.9);} 25% {opacity:1;transform:scale(1.05);} 100% {opacity:0;transform:scale(1);} }
+    .knife-particle-layer { position: fixed; inset: 0; z-index: 10009; pointer-events: none; }
+    .knife-particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ffd56c; box-shadow: 0 0 9px rgba(255,213,108,.8); animation: knifeParticle 900ms ease-out forwards; }
+    @keyframes knifeParticle { from {opacity:1;transform:translate(0,0) scale(1);} to {opacity:0;transform:translate(var(--dx), var(--dy)) scale(.3);} }
+
+    .bottom-strip { display: none !important; }
+
+    @media (max-width: 1200px) {
+      .arena { grid-template-columns: 240px 1fr 300px; }
+    }
+
+    @media (max-width: 980px) {
+      .hud-top { grid-template-columns: 1fr; height: auto; }
+      .arena {
+        height: auto;
+        min-height: calc(100vh - 80px);
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        overflow: auto;
+      }
+      .left-sidebar, .buy-panel, .center-zone { min-height: 260px; }
+      .shop-tabs { grid-template-columns: repeat(3, 1fr); }
+      .bomb-button { width: 190px; height: 250px; }
+      .kill-feed { width: 82vw; }
+    }
+  </style>
+</head>
+<body>
+  <div id="click-flash" class="screen-flash"></div>
+  <div id="he-flash" class="screen-flash"></div>
+  <div id="knife-flash" class="knife-flash"></div>
+  <div id="knife-particle-layer" class="knife-particle-layer"></div>
+  <div id="knife-drop-overlay" class="knife-drop-overlay">
+    <div class="knife-drop-text">KNIFE DROPPED</div>
+  </div>
+  <div id="floating-layer" class="floating-layer"></div>
+
+  <header class="hud-top">
+    <section class="hud-card money-wrap">
+      <span class="money-label">Money</span>
+      <span class="money-value" id="money-value">$0.00</span>
+    </section>
+    <section class="hud-card round-wrap">
+      <div class="round-title">Round Timer</div>
+      <div class="round-time" id="round-time">1:55</div>
+      <div class="round-num" id="round-number">Round 1</div>
+    </section>
+    <section class="hud-card stats-wrap">
+      <div class="bar-row health">
+        <span>Health</span>
+        <div class="bar"><div class="bar-fill"></div></div>
+        <span class="bar-val">100</span>
+      </div>
+      <div class="bar-row armor">
+        <span>Armor</span>
+        <div class="bar"><div class="bar-fill"></div></div>
+        <span class="bar-val">100</span>
+      </div>
+    </section>
+  </header>
+
+  <aside id="kill-feed" class="kill-feed" aria-live="polite"></aside>
+
+  <main class="arena">
+    <aside class="left-sidebar">
+      <section class="side-indicator">
+        <div>YOU ARE</div>
+        <div class="side-value" id="side-value">CT</div>
+      </section>
+      <section class="prestige-box">
+        <div class="rank-wrap">
+          <div id="rank-icon" class="rank-icon rank-0">S1</div>
+          <div class="rank-text">
+            <div id="rank-name" class="rank-name">Silver</div>
+            <div id="rank-multi" class="rank-multi">Earnings Multiplier x1.00</div>
+          </div>
+        </div>
+        <button id="prestige-btn" class="prestige-btn">Prestige (Need $5000)</button>
+      </section>
+      <section class="stats-panel">
+        <div class="stats-title">Operator Stats</div>
+        <div class="stat-row"><span class="stat-icon">⚡</span><span>Clicks / sec</span><span class="stat-dots"></span><span id="stat-cps" class="stat-value">0.0</span></div>
+        <div class="stat-row"><span class="stat-icon">◎</span><span>Total Clicks</span><span class="stat-dots"></span><span id="stat-total-clicks" class="stat-value">0</span></div>
+        <div class="stat-row"><span class="stat-icon">▣</span><span>Cases Opened</span><span class="stat-dots"></span><span id="stat-cases-opened" class="stat-value">0</span></div>
+        <div class="stat-row"><span class="stat-icon">★</span><span>Knives Owned</span><span class="stat-dots"></span><span id="stat-knives-owned" class="stat-value">0</span></div>
+      </section>
+      <section id="equipped-knife-display" class="equipped-knife-display">
+        <span class="label">Equipped Knife</span>
+        <span class="knife-mini-icon"></span>
+        <span id="equipped-knife-name" class="knife-name">None</span>
+        <span id="equipped-knife-cps" class="knife-cps">(+0.0 CPS)</span>
+      </section>
+    </aside>
+
+    <section class="center-zone">
+      <div class="click-label">CLICK TO EARN</div>
+      <button id="bomb-button" class="bomb-button" aria-label="Click bomb to earn money">
+        <div class="bomb-canvas-wrap">
+          <canvas id="bomb-canvas" width="220" height="220" aria-hidden="true"></canvas>
+        </div>
+      </button>
+    </section>
+
+    <section class="buy-panel">
+      <h2 class="buy-title">Buy Menu</h2>
+      <div id="shop-items" class="shop-items"></div>
+    </section>
+  </main>
+
+  <div id="case-modal" class="case-modal hidden" aria-hidden="true">
+    <div class="case-modal-card">
+      <div class="case-top">
+        <div class="case-icon"></div>
+        <div id="case-modal-title" class="case-modal-title">CS:GO Weapon Case</div>
+        <div class="case-opening-text">OPENING...</div>
+      </div>
+      <div class="reel-shell">
+        <div class="reel-pointer top"></div>
+        <div class="reel-pointer bottom"></div>
+        <div class="reel-fade left"></div>
+        <div class="reel-fade right"></div>
+        <div class="reel-window">
+          <div class="reel-marker"></div>
+          <div id="reel-track" class="reel-track"></div>
+        </div>
+        <div id="case-particles" class="case-particles"></div>
+      </div>
+      <div id="drop-banner" class="drop-banner">ITEM DROPPED</div>
+      <div id="reveal-details" class="drop-details hidden">
+        <div id="reveal-special-header" class="drop-special hidden">★ KNIFE DROPPED ★</div>
+        <div id="reveal-item-name" class="drop-name">AK-47 | Ember Core</div>
+        <div id="reveal-item-meta" class="drop-rarity">★ Covert</div>
+        <div id="reveal-item-cps" class="drop-extra"></div>
+        <div class="wear-row">
+          <div class="wear-bar"><div id="reveal-wear-fill" class="wear-fill"></div></div>
+          <span id="reveal-wear-label" class="wear-label">Factory New</span>
+        </div>
+      </div>
+      <div id="case-action-row" class="drop-actions hidden">
+        <button id="add-inv-btn" class="case-action-btn case-action-add" data-add-inventory="1">ADD TO INVENTORY</button>
+        <button id="open-another-btn" class="case-action-btn case-action-open" data-open-another="1">OPEN ANOTHER</button>
+        <button id="sell-drop-btn" class="case-action-btn case-action-sell" data-sell-drop="1">SELL FOR $0</button>
+      </div>
+      <button id="case-close-btn" class="case-close-btn" aria-label="Close case overlay">✕</button>
+    </div>
+  </div>
+
+  <div id="case-preview-modal" class="preview-modal hidden" aria-hidden="true">
+    <div class="preview-card">
+      <div class="preview-header">
+        <h3>Case Contents</h3>
+        <button id="preview-close-btn" class="preview-close" data-preview-close="1">Close</button>
+      </div>
+      <div id="case-preview-body" class="preview-list"></div>
+    </div>
+  </div>
+
+  <div id="coinflip-modal" class="coin-overlay hidden" aria-hidden="true">
+    <div class="preview-card coinflip-wrap">
+      <div class="preview-header">
+        <h3>Coin Flip</h3>
+        <div id="coinflip-record" class="coinflip-record">Flips: 0W / 0L</div>
+      </div>
+      <div id="coinflip-step" class="coinflip-step"></div>
+      <div id="coinflip-history" class="flip-history"></div>
+      <button id="coinflip-close-btn" class="preview-close" data-coinflip-close="1">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const upgrades = [
+      { id: "knife", name: "Knife", cost: 50, cps: 0.1, effect: "+0.1 clicks/sec" },
+      { id: "glock", name: "Glock-18", cost: 150, cps: 0.5, effect: "+0.5 clicks/sec" },
+      { id: "ak47", name: "AK-47", cost: 500, cps: 2, effect: "+2 clicks/sec" },
+      { id: "awp", name: "AWP", cost: 1200, cps: 5, effect: "+5 clicks/sec" },
+      { id: "m4a4", name: "M4A4", cost: 800, cps: 3, effect: "+3 clicks/sec" },
+      { id: "he", name: "HE Grenade", cost: 300, cps: 1, effect: "+1 click/sec" },
+      { id: "flash", name: "Flashbang", cost: 250, cps: 0, effect: "Activate: 2x click value for 10s (30s cooldown)" },
+      { id: "deagle", name: "Deagle", cost: 400, cps: 1.5, effect: "+1.5 clicks/sec" }
+    ];
+
+    const ranks = [
+      { name: "Silver", short: "S1" },
+      { name: "Gold Nova", short: "GN" },
+      { name: "AK", short: "AK" },
+      { name: "Eagle", short: "EGL" },
+      { name: "Global Elite", short: "GE" }
+    ];
+
+    const skinPools = {
+      milspec: ["Glock | Night Raid", "P250 | Hazard Zone", "MP9 | Static Field"],
+      restricted: ["AK-47 | Ember Core", "M4A4 | Fractured", "USP-S | Dark Signal"],
+      classified: ["AWP | Void Walker", "AK-47 | Neon Siege", "M4A4 | Ghost Protocol"],
+      covert: ["AWP | Dragon's Eye", "AK-47 | Crimson Throne"],
+      consumer: ["Dual Berettas | Dust Trail", "Nova | Factory Prime", "PP-Bizon | Carbon Rush"],
+      industrial: ["FAMAS | Arctic Bus", "MAC-10 | Night Grid", "UMP-45 | Circuit Line"]
+    };
+
+    const knifeTypes = [
+      { id: "bayonet", name: "Bayonet", cps: 5 },
+      { id: "karambit", name: "Karambit", cps: 8 },
+      { id: "butterfly", name: "Butterfly Knife", cps: 10 },
+      { id: "m9", name: "M9 Bayonet", cps: 7 },
+      { id: "huntsman", name: "Huntsman Knife", cps: 6 },
+      { id: "falchion", name: "Falchion Knife", cps: 5 },
+      { id: "shadow", name: "Shadow Daggers", cps: 4 },
+      { id: "navaja", name: "Navaja Knife", cps: 3 },
+      { id: "stiletto", name: "Stiletto Knife", cps: 6 },
+      { id: "talon", name: "Talon Knife", cps: 9 }
+    ];
+
+    const directKnifePrices = {
+      bayonet: 15000,
+      karambit: 25000,
+      butterfly: 30000,
+      m9: 20000,
+      huntsman: 18000,
+      talon: 28000
+    };
+
+    const rarityMeta = {
+      consumer: { label: "Consumer Grade", css: "rarity-consumer", color: "#8e8e8e", value: 10, order: 0 },
+      industrial: { label: "Industrial", css: "rarity-industrial", color: "#8db3d9", value: 50, order: 1 },
+      milspec: { label: "Mil-Spec", css: "rarity-milspec", color: "#4b69ff", value: 50, order: 2 },
+      restricted: { label: "Restricted", css: "rarity-restricted", color: "#8847ff", value: 200, order: 3 },
+      classified: { label: "Classified", css: "rarity-classified", color: "#d32ce6", value: 500, order: 4 },
+      covert: { label: "Covert", css: "rarity-covert", color: "#eb4b4b", value: 1500, order: 5 },
+      knife: { label: "Contraband", css: "rarity-knife", color: "#e4ae39", value: 5000, order: 6 }
+    };
+
+    const funnyVictims = ["Economy", "Poverty", "Budget Build", "No Armor", "Eco Rush", "Save Round"];
+    const killEvents = ["killed", "headshot", "one-tapped", "wallbanged", "deleted"];
+    const wearTiers = [
+      { label: "Factory New", max: 0.07, color: "#4caf50" },
+      { label: "Minimal Wear", max: 0.15, color: "#8bc34a" },
+      { label: "Field-Tested", max: 0.38, color: "#c0ca33" },
+      { label: "Well-Worn", max: 0.45, color: "#ff9800" },
+      { label: "Battle-Scarred", max: 1.0, color: "#f44336" }
+    ];
+    const cpuNames = [
+      "xX_AWP_God_Xx",
+      "noscope_king",
+      "clutch_master_99",
+      "eco_destroyer",
+      "mirage_smurf",
+      "deagle_only",
+      "spray_transfer",
+      "dust2_legend"
+    ];
+
+    const state = {
+      money: 0,
+      displayedMoney: 0,
+      totalClicks: 0,
+      round: 1,
+      timeLeft: 115,
+      side: "CT",
+      prestigeLevel: 0,
+      prestigeMultiplier: 1,
+      clickBase: 1,
+      flashActiveUntil: 0,
+      flashCooldownUntil: 0,
+      upgradesOwned: Object.fromEntries(upgrades.map((u) => [u.id, 0])),
+      activeTab: "shop",
+      caseInventory: 0,
+      casesOpened: 0,
+      inventorySkins: [],
+      knifeInventory: [],
+      equippedKnifeId: null,
+      caseAnimating: false,
+      bombFlashUntil: 0,
+      casePendingDrop: null,
+      casePendingInventoryItem: null,
+      casePendingInventoryId: null,
+      currentDroppedItem: null,
+      casePendingWear: null,
+      caseWinnerNode: null,
+      caseRevealTimer: null,
+      caseActionDelayTimer: null,
+      caseFailsafeTimer: null,
+      inventoryBadgeCount: 0,
+      coinFlip: {
+        selectedRef: null,
+        opponent: null,
+        playerSide: null,
+        pendingWager: null,
+        wins: 0,
+        losses: 0,
+        lossStreak: 0,
+        history: [],
+        searching: false
+      }
+    };
+
+    const el = {
+      money: document.getElementById("money-value"),
+      roundTime: document.getElementById("round-time"),
+      roundNum: document.getElementById("round-number"),
+      shop: document.getElementById("shop-items"),
+      side: document.getElementById("side-value"),
+      rankIcon: document.getElementById("rank-icon"),
+      rankName: document.getElementById("rank-name"),
+      rankMulti: document.getElementById("rank-multi"),
+      prestigeBtn: document.getElementById("prestige-btn"),
+      bombBtn: document.getElementById("bomb-button"),
+      bombCanvas: document.getElementById("bomb-canvas"),
+      clickFlash: document.getElementById("click-flash"),
+      heFlash: document.getElementById("he-flash"),
+      knifeFlash: document.getElementById("knife-flash"),
+      floatingLayer: document.getElementById("floating-layer"),
+      killFeed: document.getElementById("kill-feed"),
+      equippedKnifeName: document.getElementById("equipped-knife-name"),
+      equippedKnifeCps: document.getElementById("equipped-knife-cps"),
+      statCps: document.getElementById("stat-cps"),
+      statTotalClicks: document.getElementById("stat-total-clicks"),
+      statCasesOpened: document.getElementById("stat-cases-opened"),
+      statKnivesOwned: document.getElementById("stat-knives-owned"),
+      knifeParticleLayer: document.getElementById("knife-particle-layer"),
+      knifeDropOverlay: document.getElementById("knife-drop-overlay"),
+      caseModal: document.getElementById("case-modal"),
+      caseModalTitle: document.getElementById("case-modal-title"),
+      reelTrack: document.getElementById("reel-track"),
+      dropBanner: document.getElementById("drop-banner"),
+      caseCloseBtn: document.getElementById("case-close-btn"),
+      caseParticles: document.getElementById("case-particles"),
+      revealDetails: document.getElementById("reveal-details"),
+      revealSpecialHeader: document.getElementById("reveal-special-header"),
+      revealItemName: document.getElementById("reveal-item-name"),
+      revealItemMeta: document.getElementById("reveal-item-meta"),
+      revealItemCps: document.getElementById("reveal-item-cps"),
+      revealWearFill: document.getElementById("reveal-wear-fill"),
+      revealWearLabel: document.getElementById("reveal-wear-label"),
+      caseActionRow: document.getElementById("case-action-row"),
+      addInvBtn: document.getElementById("add-inv-btn"),
+      openAnotherBtn: document.getElementById("open-another-btn"),
+      sellDropBtn: document.getElementById("sell-drop-btn"),
+      casePreviewModal: document.getElementById("case-preview-modal"),
+      casePreviewBody: document.getElementById("case-preview-body"),
+      previewCloseBtn: document.getElementById("preview-close-btn"),
+      coinflipModal: document.getElementById("coinflip-modal"),
+      coinflipStep: document.getElementById("coinflip-step"),
+      coinflipHistory: document.getElementById("coinflip-history"),
+      coinflipRecord: document.getElementById("coinflip-record"),
+      coinflipCloseBtn: document.getElementById("coinflip-close-btn")
+    };
+
+    let audioCtx = null;
+    let bombCtx = null;
+    let bombHover = false;
+    const inventoryStorageKey = "csgo_clicker_inventory";
+    const legacyInventoryStorageKey = "csgo_inventory";
+    const moneyStorageKey = "csgo_money";
+    const casesOpenedStorageKey = "csgo_cases_opened";
+    const casesOwnedStorageKey = "csgo_cases_owned";
+    const totalClicksStorageKey = "csgo_total_clicks";
+    let currentDroppedItem = null;
+    let inventory = (() => {
+      try {
+        const raw = localStorage.getItem(inventoryStorageKey) || localStorage.getItem(legacyInventoryStorageKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
+    window.pendingCaseItem = null;
+
+    function roundedRectPath(ctx, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq = 600, duration = 0.08, type = "square", volume = 0.06, delay = 0) {
+      if (!audioCtx) return;
+      const t0 = audioCtx.currentTime + delay;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.01);
+    }
+
+    function playClickSound() {
+      playTone(920, 0.05, "square", 0.045);
+    }
+
+    function playPurchaseSound() {
+      playTone(520, 0.09, "triangle", 0.06);
+      playTone(780, 0.07, "triangle", 0.05, 0.08);
+    }
+
+    function playRoundEndSound() {
+      playTone(520, 0.08, "sawtooth", 0.07);
+      playTone(660, 0.09, "sawtooth", 0.07, 0.12);
+      playTone(860, 0.11, "sawtooth", 0.08, 0.24);
+    }
+
+    function playCaseSpinSound() {
+      playTone(350, 0.05, "square", 0.03);
+      playTone(460, 0.05, "square", 0.03, 0.06);
+      playTone(560, 0.05, "square", 0.03, 0.12);
+    }
+
+    function playKnifeDropSound() {
+      playTone(630, 0.08, "triangle", 0.06);
+      playTone(830, 0.1, "triangle", 0.06, 0.1);
+      playTone(1120, 0.12, "triangle", 0.065, 0.22);
+    }
+
+    function getPrestigeCost() {
+      return 5000 * (state.prestigeLevel + 1);
+    }
+
+    function getCurrentRankIndex() {
+      return Math.min(state.prestigeLevel, ranks.length - 1);
+    }
+
+    function getCaseCost() {
+      return 500 + Math.floor(state.casesOpened / 10) * 100;
+    }
+
+    function getEquippedKnife() {
+      return state.knifeInventory.find((knife) => knife.id === state.equippedKnifeId) || null;
+    }
+
+    function getKnifeCpsBonus() {
+      const knife = getEquippedKnife();
+      return knife ? knife.cps : 0;
+    }
+
+    function getCps() {
+      let total = 0;
+      for (const item of upgrades) {
+        total += (item.cps || 0) * state.upgradesOwned[item.id];
+      }
+      total += getKnifeCpsBonus();
+      return total * state.prestigeMultiplier;
+    }
+
+    function getClickValue() {
+      let value = state.clickBase * state.prestigeMultiplier;
+      if (Date.now() < state.flashActiveUntil) value *= 2;
+      return value;
+    }
+
+    function formatMoney(value) {
+      return value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = seconds % 60;
+      return `${min}:${String(sec).padStart(2, "0")}`;
+    }
+
+    function normalizeRarity(rarity) {
+      const fallback = "milspec";
+      if (!rarity) return fallback;
+      const normalized = String(rarity).toLowerCase();
+      if (rarityMeta[normalized]) return normalized;
+      const rarityAliasToCanonical = {
+        gray: "consumer",
+        blue: "milspec",
+        purple: "restricted",
+        pink: "classified",
+        red: "covert",
+        gold: "knife"
+      };
+      return rarityAliasToCanonical[normalized] || fallback;
+    }
+
+    function getRarityTier(rarity) {
+      if (rarity === "knife") return "gold";
+      if (rarity === "covert") return "red";
+      if (rarity === "classified") return "pink";
+      if (rarity === "restricted") return "purple";
+      if (rarity === "milspec") return "blue";
+      return "gray";
+    }
+
+    function getRandomWearCondition() {
+      return randomFrom(wearTiers).label;
+    }
+
+    function normalizeInventoryItem(item) {
+      if (!item) return null;
+      const rarity = normalizeRarity(item.rarity || item.rarityTier || "milspec");
+      const type = item.type || item.kind || (rarity === "knife" ? "knife" : "skin");
+      const id = item.id || `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      const finish = item.finish || "";
+      const baseName = item.name || (type === "knife" ? "Unknown Knife" : "Unknown Skin");
+      const defaultValue = rarityMeta[rarity]?.value || 50;
+      return {
+        id,
+        name: baseName,
+        rarity,
+        rarityLabel: item.rarityLabel || rarityMeta[rarity]?.label || "Unknown",
+        rarityTier: item.rarityTier || getRarityTier(rarity),
+        type,
+        kind: type,
+        cps: Number(item.cps || 0),
+        knifeType: item.knifeType || (type === "knife" ? baseName : null),
+        finish,
+        float: item.float || getRandomWearCondition(),
+        value: Number(item.value ?? defaultValue),
+        wonInFlip: Boolean(item.wonInFlip),
+        wonTag: item.wonTag || ""
+      };
+    }
+
+    function refreshInventoryBuckets() {
+      state.inventorySkins = inventory.filter((item) => item.type === "skin");
+      state.knifeInventory = inventory.filter((item) => item.type === "knife");
+    }
+
+    function updateInventoryBadge(delta = 0, reset = false) {
+      if (reset) {
+        state.inventoryBadgeCount = 0;
+      } else if (delta !== 0) {
+        state.inventoryBadgeCount = Math.max(0, state.inventoryBadgeCount + delta);
+      }
+    }
+
+    function saveInventory() {
+      try {
+        localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory));
+        localStorage.setItem(legacyInventoryStorageKey, JSON.stringify(inventory));
+        console.log("💾 Inventory saved:", inventory.length, "items");
+      } catch (error) {
+        console.error("Failed to save inventory:", error);
+      }
+    }
+
+    function saveProgressState() {
+      try {
+        localStorage.setItem(moneyStorageKey, String(state.money));
+        localStorage.setItem(casesOpenedStorageKey, String(state.casesOpened));
+        localStorage.setItem(casesOwnedStorageKey, String(state.caseInventory));
+        localStorage.setItem(totalClicksStorageKey, String(state.totalClicks));
+      } catch (error) {
+        console.error("Failed to save progress state:", error);
+      }
+    }
+
+    function loadProgressState() {
+      try {
+        const moneyRaw = localStorage.getItem(moneyStorageKey);
+        const casesOpenedRaw = localStorage.getItem(casesOpenedStorageKey);
+        const casesOwnedRaw = localStorage.getItem(casesOwnedStorageKey);
+        const totalClicksRaw = localStorage.getItem(totalClicksStorageKey);
+
+        if (moneyRaw !== null) {
+          const parsed = Number.parseFloat(moneyRaw);
+          if (Number.isFinite(parsed)) state.money = Math.max(0, parsed);
+        }
+        if (casesOpenedRaw !== null) {
+          const parsed = Number.parseInt(casesOpenedRaw, 10);
+          if (Number.isFinite(parsed)) state.casesOpened = Math.max(0, parsed);
+        }
+        if (casesOwnedRaw !== null) {
+          const parsed = Number.parseInt(casesOwnedRaw, 10);
+          if (Number.isFinite(parsed)) state.caseInventory = Math.max(0, parsed);
+        }
+        if (totalClicksRaw !== null) {
+          const parsed = Number.parseInt(totalClicksRaw, 10);
+          if (Number.isFinite(parsed)) state.totalClicks = Math.max(0, parsed);
+        }
+        state.displayedMoney = state.money;
+      } catch (error) {
+        console.error("Failed to load progress state:", error);
+      }
+    }
+
+    function initInventory() {
+      try {
+        const raw = localStorage.getItem(inventoryStorageKey) || localStorage.getItem(legacyInventoryStorageKey);
+        if (!raw) {
+          inventory = [];
+          refreshInventoryBuckets();
+          console.log("✅ Inventory loaded:", inventory.length, "items");
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        inventory = Array.isArray(parsed)
+          ? parsed.map((entry) => normalizeInventoryItem(entry)).filter(Boolean)
+          : [];
+        refreshInventoryBuckets();
+        saveInventory();
+        console.log("✅ Inventory loaded:", inventory.length, "items");
+      } catch (error) {
+        console.error("Inventory load failed, resetting inventory:", error);
+        inventory = [];
+        refreshInventoryBuckets();
+      }
+    }
+
+    function loadInventory() {
+      initInventory();
+    }
+
+    function resolveRarityKey(item = {}) {
+      return normalizeRarity(item.rarity || item.rarityTier || (item.type === "knife" || item.kind === "knife" ? "knife" : "milspec"));
+    }
+
+    function createInventoryItemFromDrop(drop, wearInfo = null) {
+      const isKnife = (drop.type || drop.kind) === "knife" || drop.rarity === "knife";
+      const normalizedWear = wearInfo?.condition?.name || drop.float || getRandomWearCondition();
+      const rarityKey = resolveRarityKey(drop);
+      return normalizeInventoryItem({
+        id: drop.id || `${isKnife ? "knife" : "skin"}-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        name: drop.name,
+        rarity: rarityKey,
+        rarityLabel: rarityMeta[rarityKey]?.label || drop.rarityLabel || "Unknown",
+        type: isKnife ? "knife" : "skin",
+        kind: isKnife ? "knife" : "skin",
+        cps: drop.cps || 0,
+        knifeType: isKnife ? drop.name : null,
+        finish: drop.finish || null,
+        float: normalizedWear,
+        value: drop.value ?? getItemValue({ ...drop, rarity: rarityKey, kind: isKnife ? "knife" : "skin" }),
+        wonInFlip: Boolean(drop.wonInFlip),
+        wonTag: drop.wonTag || ""
+      });
+    }
+
+    function addItemToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
+      const { skipRender = false, skipBadge = false } = options;
+      console.log("➕ addItemToInventory called with:", item);
+      if (!item || typeof item !== "object") {
+        console.error("❌ Invalid item:", item);
+        return false;
+      }
+
+      const normalizedItem = normalizeInventoryItem(item);
+      if (!normalizedItem) {
+        console.error("❌ addItemToInventory normalization failed:", item);
+        return false;
+      }
+
+      inventory.push(normalizedItem);
+      refreshInventoryBuckets();
+
+      if (!skipBadge) {
+        updateInventoryBadge(1);
+      }
+
+      if (normalizedItem.type === "knife") {
+        showKnifeDropCelebration();
+        playKnifeDropSound();
+      }
+
+      const sourceLabelSafe = String(sourceLabel || "DROP").replace(/[<>]/g, "");
+      if (normalizedItem.type === "knife") {
+        showKillFeed(`<span class="weapon">KNIFE DROPPED</span> ${normalizedItem.name}<span class="event"> ${normalizedItem.finish}</span>`);
+      } else {
+        showKillFeed(`<span class="weapon">${sourceLabelSafe}</span> ${normalizedItem.name}<span class="event"> ${rarityMeta[normalizedItem.rarity]?.label || normalizedItem.rarityLabel}</span>`);
+      }
+
+      updateEquippedKnife();
+      updateEquippedKnifeHud();
+      updatePrestigeHud();
+      updateOperatorStats();
+      saveInventory();
+
+      if (!skipRender) {
+        renderShopView();
+      }
+      console.log("✅ Item added! Inventory now:", inventory.length, "items");
+      console.log("✅ Item details:", normalizedItem);
+      return true;
+    }
+
+    function finalizePendingInventoryAdd(sourceLabel = "CASE OPENING") {
+      if (!state.casePendingInventoryItem) {
+        console.error("No pending inventory item to finalize.");
+        return false;
+      }
+      const pending = state.casePendingInventoryItem;
+      const added = addItemToInventory(pending, sourceLabel);
+      if (added) {
+        state.casePendingInventoryItem = null;
+      }
+      return added;
+    }
+
+    function addToInventory(item, sourceLabel = "CASE OPENING", options = {}) {
+      return addItemToInventory(item, sourceLabel, options);
+    }
+
+    function handleAddToInventory() {
+      console.log("=== ADD TO INVENTORY CLICKED ===");
+      console.log("Dropped item:", window.pendingCaseItem || state.casePendingDrop || currentDroppedItem);
+      console.log("Current inventory before add:", JSON.stringify(inventory));
+
+      if (state.casePendingInventoryId) {
+        console.log("✅ Drop already queued in inventory:", state.casePendingInventoryId);
+        window.pendingCaseItem = null;
+        state.casePendingDrop = null;
+        state.currentDroppedItem = null;
+        currentDroppedItem = null;
+        state.casePendingInventoryItem = null;
+        state.casePendingWear = null;
+        state.caseWinnerNode = null;
+        state.casePendingInventoryId = null;
+        return true;
+      }
+
+      if (!state.casePendingInventoryItem) {
+        console.error("No pending inventory item found.");
+        return false;
+      }
+
+      const added = finalizePendingInventoryAdd("CASE OPENING");
+      if (added) {
+        window.pendingCaseItem = null;
+        state.casePendingDrop = null;
+        state.currentDroppedItem = null;
+        currentDroppedItem = null;
+        state.casePendingInventoryItem = null;
+        state.casePendingInventoryId = null;
+        state.casePendingWear = null;
+        state.caseWinnerNode = null;
+      }
+
+      console.log("Inventory after:", JSON.stringify(inventory));
+      console.log("localStorage:", localStorage.getItem(inventoryStorageKey));
+      return added;
+    }
+
+    function flashOverlay(overlayEl) {
+      overlayEl.classList.remove("active");
+      void overlayEl.offsetWidth;
+      overlayEl.classList.add("active");
+    }
+
+    function addMoney(amount) {
+      state.money += amount;
+      if (state.money < 0) state.money = 0;
+      saveProgressState();
+    }
+
+    function animateMoneyHud() {
+      const delta = state.money - state.displayedMoney;
+      state.displayedMoney += delta * 0.18;
+      if (Math.abs(delta) < 0.01) {
+        state.displayedMoney = state.money;
+      }
+      el.money.textContent = `$${formatMoney(state.displayedMoney)}`;
+      requestAnimationFrame(animateMoneyHud);
+    }
+
+    function spawnFloatingMoney(x, y, amount) {
+      const note = document.createElement("div");
+      note.className = "float-money";
+      note.textContent = `+$${formatMoney(amount)}`;
+      note.style.left = `${x}px`;
+      note.style.top = `${y}px`;
+      el.floatingLayer.appendChild(note);
+      setTimeout(() => note.remove(), 920);
+    }
+
+    function spawnPurchaseFloat(fromButton, text) {
+      if (!fromButton) return;
+      const rect = fromButton.getBoundingClientRect();
+      const note = document.createElement("div");
+      note.className = "float-cps";
+      note.textContent = text;
+      note.style.left = `${rect.left + rect.width / 2}px`;
+      note.style.top = `${rect.top - 2}px`;
+      el.floatingLayer.appendChild(note);
+      setTimeout(() => note.remove(), 900);
+    }
+
+    function spawnSparkBurst(x, y, color = "#72d8ff", count = 12) {
+      for (let i = 0; i < count; i += 1) {
+        const spark = document.createElement("div");
+        spark.className = "bomb-spark";
+        spark.style.left = `${x}px`;
+        spark.style.top = `${y}px`;
+        spark.style.background = color;
+        spark.style.boxShadow = `0 0 10px ${color}`;
+        spark.style.setProperty("--dx", `${(Math.random() - 0.5) * 80}px`);
+        spark.style.setProperty("--dy", `${(Math.random() - 0.5) * 70}px`);
+        el.floatingLayer.appendChild(spark);
+        setTimeout(() => spark.remove(), 500);
+      }
+    }
+
+    function showKillFeed(text) {
+      const row = document.createElement("div");
+      row.className = "kill-entry";
+      row.innerHTML = text;
+      el.killFeed.prepend(row);
+      while (el.killFeed.children.length > 6) {
+        el.killFeed.lastElementChild.remove();
+      }
+      setTimeout(() => row.remove(), 5000);
+    }
+
+    function randomKillMessage() {
+      const w = upgrades[Math.floor(Math.random() * upgrades.length)].name;
+      const victim = funnyVictims[Math.floor(Math.random() * funnyVictims.length)];
+      const event = killEvents[Math.floor(Math.random() * killEvents.length)];
+      return `<span class="weapon">${w}</span> ${event} ${victim}`;
+    }
+
+    function updateLedSpeed() {
+      let speed = 1.2;
+      if (state.timeLeft <= 30) {
+        speed = 0.16 + (state.timeLeft / 30) * 0.64;
+      }
+      document.documentElement.style.setProperty("--led-speed", `${speed.toFixed(2)}s`);
+    }
+
+    function drawBombDevice(ts = 0) {
+      if (!bombCtx) return;
+      const ctx = bombCtx;
+      const canvas = el.bombCanvas;
+      const w = canvas.width;
+      const h = canvas.height;
+      const pulse = 0.5 + 0.5 * Math.sin(ts / 1000 * Math.PI);
+      const wireWiggle = Math.sin(ts / 280) * 4;
+
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.fillStyle = "rgba(14, 18, 22, 0.95)";
+      roundedRectPath(ctx, 20, 28, 180, 164, 16);
+      ctx.fill();
+
+      const glow = bombHover ? 0.55 : 0.22 + pulse * 0.1;
+      ctx.strokeStyle = `rgba(120, 232, 255, ${glow})`;
+      ctx.lineWidth = 2.2;
+      roundedRectPath(ctx, 20, 28, 180, 164, 16);
+      ctx.stroke();
+
+      ctx.fillStyle = "#2a2a2a";
+      roundedRectPath(ctx, 36, 48, 148, 108, 10);
+      ctx.fill();
+      ctx.strokeStyle = "#3b3b3b";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.strokeStyle = "#4caf50";
+      ctx.lineWidth = 1.3;
+      for (let i = 0; i < 5; i += 1) {
+        const y = 62 + i * 16;
+        ctx.beginPath();
+        ctx.moveTo(50, y);
+        ctx.lineTo(170 - (i % 2) * 14, y);
+        ctx.stroke();
+      }
+
+      const ledRateMs = state.timeLeft <= 30 ? 180 : 520;
+      const ledOn = Math.floor(ts / ledRateMs) % 2 === 0;
+      ctx.beginPath();
+      ctx.arc(171, 56, 6, 0, Math.PI * 2);
+      ctx.fillStyle = ledOn ? "#ff3f3f" : "#611313";
+      ctx.shadowColor = ledOn ? "rgba(255, 72, 72, 0.95)" : "transparent";
+      ctx.shadowBlur = ledOn ? 13 : 0;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = "#0d1b0f";
+      roundedRectPath(ctx, 58, 59, 84, 28, 5);
+      ctx.fill();
+      ctx.strokeStyle = "#345d36";
+      ctx.stroke();
+      ctx.fillStyle = "#90ff9a";
+      ctx.font = "700 16px Rajdhani, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatTime(state.timeLeft), 100, 78);
+
+      for (let i = 0; i < 9; i += 1) {
+        const x = 39 + i * 18;
+        ctx.fillStyle = i % 2 ? "#161616" : "#d0b041";
+        ctx.fillRect(x, 143, 12, 13);
+      }
+
+      const wires = ["#d24f4f", "#f2d14d", "#58c776", "#f5f5f5"];
+      wires.forEach((color, idx) => {
+        const y = 72 + idx * 17;
+        const sway = Math.sin(ts / 320 + idx) * 5 + wireWiggle * 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(36, y);
+        ctx.bezierCurveTo(20 + sway, y - 7, 8 - sway, y + 10, 4, y + sway * 0.8);
+        ctx.stroke();
+      });
+
+      if (Date.now() < state.bombFlashUntil) {
+        ctx.fillStyle = "rgba(255, 70, 70, 0.24)";
+        roundedRectPath(ctx, 20, 28, 180, 164, 16);
+        ctx.fill();
+      }
+    }
+
+    function randomFrom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function createSkinDrop(rarity) {
+      return {
+        id: `skin-drop-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        kind: "skin",
+        type: "skin",
+        rarity,
+        rarityLabel: rarityMeta[rarity]?.label || "Mil-Spec",
+        name: randomFrom(skinPools[rarity]),
+        finish: "",
+        cps: 0,
+        float: getRandomWearCondition(),
+        value: rarityMeta[rarity]?.value || 50,
+        wonInFlip: false
+      };
+    }
+
+    function getRandomKnifeType() {
+      return randomFrom(knifeTypes);
+    }
+
+    function rollKnifeFinish() {
+      const weighted = [
+        { name: "Case Hardened", w: 16 },
+        { name: "Doppler Phase 1", w: 9 },
+        { name: "Doppler Phase 2", w: 9 },
+        { name: "Doppler Phase 3", w: 4 },
+        { name: "Doppler Phase 4", w: 9 },
+        { name: "Fade", w: 4 },
+        { name: "Marble Fade", w: 8 },
+        { name: "Tiger Tooth", w: 9 },
+        { name: "Slaughter", w: 9 },
+        { name: "Crimson Web", w: 9 },
+        { name: "Night", w: 10 },
+        { name: "Blue Steel", w: 8 },
+        { name: "Stained", w: 8 }
+      ];
+      const total = weighted.reduce((sum, item) => sum + item.w, 0);
+      let roll = Math.random() * total;
+      for (const item of weighted) {
+        roll -= item.w;
+        if (roll <= 0) return item.name;
+      }
+      return weighted[0].name;
+    }
+
+    function createKnifeDrop(forcedKnifeId = null) {
+      const type = forcedKnifeId
+        ? knifeTypes.find((knife) => knife.id === forcedKnifeId) || getRandomKnifeType()
+        : getRandomKnifeType();
+      const finish = rollKnifeFinish();
+      const extra = finish === "Doppler Phase 3" || finish === "Fade" ? 2 : 0;
+      return {
+        id: `knife-drop-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        kind: "knife",
+        type: "knife",
+        rarity: "knife",
+        rarityLabel: rarityMeta.knife.label,
+        knifeId: type.id,
+        name: type.name,
+        finish,
+        cps: type.cps + extra,
+        float: getRandomWearCondition(),
+        value: rarityMeta.knife.value + Math.round((type.cps + extra) * 120),
+        wonInFlip: false
+      };
+    }
+
+    function randomFillerDrop() {
+      const roll = Math.random();
+      if (roll < 0.34) return createSkinDrop("consumer");
+      if (roll < 0.58) return createSkinDrop("industrial");
+      if (roll < 0.85) return createSkinDrop("milspec");
+      if (roll < 0.95) return createSkinDrop("restricted");
+      if (roll < 0.99) return createSkinDrop("classified");
+      if (roll < 0.997) return createSkinDrop("covert");
+      return createKnifeDrop();
+    }
+
+    function rollDrop() {
+      const r = Math.random();
+      if (r < 0.79) return createSkinDrop("milspec");
+      if (r < 0.94) return createSkinDrop("restricted");
+      if (r < 0.98) return createSkinDrop("classified");
+      if (r < 0.99) return createSkinDrop("covert");
+      return createKnifeDrop();
+    }
+
+    function getDropDisplayName(drop) {
+      const isKnife = drop.kind === "knife" || drop.type === "knife";
+      return isKnife ? `${drop.name} | ${drop.finish}` : drop.name;
+    }
+
+    function getItemValue(item) {
+      const rarity = normalizeRarity(item.rarity);
+      const base = (rarityMeta[rarity] || rarityMeta.milspec).value;
+      const isKnife = item.kind === "knife" || item.type === "knife";
+      if (isKnife) {
+        return base + Math.round(item.cps * 120);
+      }
+      return base;
+    }
+
+    function updateEquippedKnife() {
+      if (state.knifeInventory.length === 0) {
+        state.equippedKnifeId = null;
+        return;
+      }
+      let best = state.knifeInventory[0];
+      for (const knife of state.knifeInventory) {
+        if (knife.cps > best.cps) best = knife;
+      }
+      state.equippedKnifeId = best.id;
+    }
+
+    function updateEquippedKnifeHud() {
+      const knife = getEquippedKnife();
+      if (!knife) {
+        el.equippedKnifeName.textContent = "None";
+        el.equippedKnifeCps.textContent = "(+0.0 CPS)";
+        return;
+      }
+      el.equippedKnifeName.textContent = `${knife.name} | ${knife.finish}`;
+      el.equippedKnifeCps.textContent = `(+${knife.cps.toFixed(1)} CPS)`;
+    }
+
+    function updateOperatorStats() {
+      const cpsVal = Number.isFinite(getCps()) ? getCps() : 0;
+      const totalClicksVal = Number.isFinite(state.totalClicks) ? state.totalClicks : 0;
+      const casesOpenedVal = Number.isFinite(state.casesOpened) ? state.casesOpened : 0;
+      const knivesCount = inventory.filter((item) => item.type === "knife").length;
+      if (el.statCps) el.statCps.textContent = cpsVal.toFixed(1);
+      if (el.statTotalClicks) el.statTotalClicks.textContent = Math.floor(totalClicksVal).toLocaleString();
+      if (el.statCasesOpened) el.statCasesOpened.textContent = `${casesOpenedVal}`;
+      if (el.statKnivesOwned) el.statKnivesOwned.textContent = `${knivesCount}`;
+    }
+
+    function showKnifeDropCelebration() {
+      flashOverlay(el.knifeFlash);
+      el.knifeDropOverlay.classList.remove("show");
+      void el.knifeDropOverlay.offsetWidth;
+      el.knifeDropOverlay.classList.add("show");
+      for (let i = 0; i < 26; i += 1) {
+        const p = document.createElement("div");
+        p.className = "knife-particle";
+        p.style.left = `${50 + (Math.random() - 0.5) * 20}%`;
+        p.style.top = `${50 + (Math.random() - 0.5) * 14}%`;
+        p.style.setProperty("--dx", `${(Math.random() - 0.5) * 280}px`);
+        p.style.setProperty("--dy", `${(Math.random() - 0.5) * 210}px`);
+        el.knifeParticleLayer.appendChild(p);
+        setTimeout(() => p.remove(), 930);
+      }
+      setTimeout(() => el.knifeDropOverlay.classList.remove("show"), 1120);
+    }
+
+    function endRound() {
+      initAudio();
+      playRoundEndSound();
+      const bonus = (300 + state.round * 25) * state.prestigeMultiplier;
+      addMoney(bonus);
+      showKillFeed(`<span class="weapon">ROUND BONUS</span> +$${formatMoney(bonus)}<span class="event"> objective complete</span>`);
+      state.round += 1;
+      state.timeLeft = 115;
+      state.side = state.side === "CT" ? "T" : "CT";
+      el.side.textContent = state.side;
+    }
+
+    function getRarityWeightForPreview(rarity) {
+      if (rarity === "milspec") return 79.92;
+      if (rarity === "restricted") return 15.98;
+      if (rarity === "classified") return 3.2;
+      if (rarity === "covert") return 0.64;
+      return 0.26;
+    }
+
+    function getWear() {
+      const wear = Math.random();
+      const condition = wearConditions.find((c) => wear <= c.max) || wearConditions[wearConditions.length - 1];
+      return { wear, condition };
+    }
+
+    function normalizeInventoryRef(ref) {
+      if (!ref) return null;
+      if (ref.type === "knife") {
+        const knife = state.knifeInventory.find((k) => k.id === ref.id);
+        return knife ? { ...knife, type: "knife", invId: knife.id } : null;
+      }
+      const skin = state.inventorySkins.find((s) => s.id === ref.id);
+      return skin ? { ...skin, type: "skin", invId: skin.id } : null;
+    }
+
+    function removeInventoryRef(ref) {
+      if (!ref) return;
+      inventory = inventory.filter((item) => item.id !== ref.id);
+      refreshInventoryBuckets();
+      saveInventory();
+      updateOperatorStats();
+    }
+
+    function sellInventoryItemById(itemId) {
+      if (!itemId) return false;
+      const idx = inventory.findIndex((item) => item.id === itemId);
+      if (idx === -1) return false;
+
+      const [soldItem] = inventory.splice(idx, 1);
+      refreshInventoryBuckets();
+      updateEquippedKnife();
+      updateEquippedKnifeHud();
+      updateOperatorStats();
+      saveInventory();
+
+      const value = Number(soldItem.value ?? getItemValue(soldItem) ?? 0);
+      addMoney(value);
+      showKillFeed(`<span class="weapon">SOLD</span> ${getDropDisplayName(soldItem)} <span class="event">+$${formatMoney(value)}</span>`);
+
+      renderShopView();
+      return true;
+    }
+
+    function addWonTag(item, label = "WON IN FLIP") {
+      return { ...item, wonTag: label, wonInFlip: true };
+    }
+
+    function renderShopTabs() {
+      const inventoryBadge = state.inventoryBadgeCount > 0
+        ? `<span class="tab-badge">+${state.inventoryBadgeCount}</span>`
+        : "";
+      return `
+        <div class="shop-tabs">
+          <button class="shop-tab ${state.activeTab === "shop" ? "active" : ""}" data-tab="shop">Shop</button>
+          <button class="shop-tab ${state.activeTab === "cases" ? "active" : ""}" data-tab="cases">Cases</button>
+          <button class="shop-tab ${state.activeTab === "knives" ? "active" : ""}" data-tab="knives">Knives</button>
+          <button class="shop-tab ${state.activeTab === "inventory" ? "active" : ""}" data-tab="inventory">Inventory ${inventoryBadge}</button>
+          <button class="shop-tab ${state.activeTab === "coinflip" ? "active" : ""}" data-tab="coinflip">Coin Flip</button>
+        </div>
+      `;
+    }
+
+    function renderMainShopTab() {
+      const now = Date.now();
+      const clickMultActive = now < state.flashActiveUntil;
+      const cooldownLeft = Math.max(0, state.flashCooldownUntil - now);
+      const directRows = knifeTypes
+        .filter((knife) => directKnifePrices[knife.id])
+        .map((knife) => {
+          const price = directKnifePrices[knife.id];
+          const canBuy = state.money >= price && !state.caseAnimating;
+          return `
+            <button class="knife-buy-btn" data-buy-knife="${knife.id}" ${canBuy ? "" : "disabled"}>
+              ${knife.name} ($${formatMoney(price)})
+            </button>
+          `;
+        }).join("");
+
+      const upgradesHtml = upgrades.map((item) => {
+        const owned = state.upgradesOwned[item.id];
+        const affordable = state.money >= item.cost;
+        const lockedClass = affordable ? "" : "locked";
+
+        let extraAction = "";
+        if (item.id === "flash") {
+          const canActivate = owned > 0 && cooldownLeft === 0;
+          const label = clickMultActive
+            ? `Active ${Math.ceil((state.flashActiveUntil - now) / 1000)}s`
+            : cooldownLeft > 0
+              ? `Cooldown ${Math.ceil(cooldownLeft / 1000)}s`
+              : "Activate";
+          extraAction = `
+            <button class="activate-btn" data-activate-flash="1" ${canActivate ? "" : "disabled"}>
+              ${label}
+            </button>
+          `;
+        }
+
+        return `
+          <article class="shop-item ${lockedClass}">
+            <div class="shop-head">
+              <div class="shop-name">${item.name}</div>
+              <div class="shop-owned">Owned: ${owned}</div>
+            </div>
+            <div class="shop-effect">${item.effect}</div>
+            <div class="shop-actions">
+              <button class="buy-btn" data-buy-upgrade="${item.id}" ${affordable ? "" : "disabled"}>
+                Buy ($${item.cost})
+              </button>
+              ${extraAction}
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      return `${upgradesHtml}<div class="subsection-title">Buy Knives</div>${directRows}`;
+    }
+
+    function renderCasesTab() {
+      const caseCost = getCaseCost();
+      const canBuyCase = state.money >= caseCost;
+      const canOpen = state.caseInventory > 0 && !state.caseAnimating;
+
+      return `
+        <div class="case-box">
+          <div class="case-row"><span class="label">Case Price</span><strong data-case-price>$${formatMoney(caseCost)}</strong></div>
+          <div class="case-row"><span class="label">Cases Owned</span><strong data-case-owned>${state.caseInventory}</strong></div>
+          <div class="case-row"><span class="label">Cases Opened</span><strong data-case-opened>${state.casesOpened}</strong></div>
+          <button class="buy-case-btn" data-preview-case="1">View Contents</button>
+          <button class="buy-case-btn" data-buy-case="1" ${canBuyCase ? "" : "disabled"}>Buy Case</button>
+          <button class="open-case-btn" data-open-case="1" ${canOpen ? "" : "disabled"}>Open Case</button>
+        </div>
+        <p class="mini-note">Drop table: 79% Mil-Spec, 15% Restricted, 4% Classified, 1% Covert, 1% Knife.</p>
+      `;
+    }
+
+    function renderKnivesTab() {
+      if (state.knifeInventory.length === 0) {
+        return `<div class="no-items">No knives yet. Open cases or buy one directly.</div>`;
+      }
+      const equippedId = state.equippedKnifeId;
+      const sorted = [...state.knifeInventory].sort((a, b) => b.cps - a.cps);
+      const totalKnifeCps = sorted.reduce((sum, knife) => sum + knife.cps, 0);
+      const equipped = getEquippedKnife();
+
+      return `
+        <div class="mini-note">Best knife auto-equips. Equipped bonus: +${(equipped ? equipped.cps : 0).toFixed(1)} CPS (owned pool: +${totalKnifeCps.toFixed(1)}).</div>
+        <div class="knife-collection">
+          ${sorted.map((knife) => `
+            <article class="knife-card rarity-knife">
+              <div class="knife-glyph"></div>
+              <div class="knife-main">
+                <span class="name">${knife.name}</span>
+                <span class="finish">${knife.finish}</span>
+                <span class="cps">+${knife.cps.toFixed(1)} CPS</span>
+              </div>
+              ${knife.id === equippedId ? `<span class="equipped-badge">Equipped</span>` : ""}
+            </article>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderInventoryTab() {
+      const entries = [...inventory].sort((a, b) => {
+        const aMeta = rarityMeta[normalizeRarity(a.rarity)] || rarityMeta.milspec;
+        const bMeta = rarityMeta[normalizeRarity(b.rarity)] || rarityMeta.milspec;
+        const rarityDelta = bMeta.order - aMeta.order;
+        if (rarityDelta !== 0) return rarityDelta;
+        return getDropDisplayName(a).localeCompare(getDropDisplayName(b));
+      });
+
+      const totalValue = entries.reduce((sum, entry) => sum + getItemValue(entry), 0);
+      const summary = `
+        <div class="collection-summary">
+          <span>Total Collection Value</span>
+          <strong>$${formatMoney(totalValue)}</strong>
+        </div>
+      `;
+
+      if (entries.length === 0) {
+        return `${summary}<div class="no-items">Inventory empty. Start opening cases.</div>`;
+      }
+
+      const rarityColors = {
+        gold: "#e4ae39",
+        red: "#eb4b4b",
+        pink: "#d32ce6",
+        purple: "#8847ff",
+        blue: "#4b69ff",
+        gray: "#aaaaaa"
+      };
+      const rarityOrder = { gold: 0, red: 1, pink: 2, purple: 3, blue: 4, gray: 5 };
+      const mappedEntries = entries.map((entry) => ({
+        ...entry,
+        rarityTier: entry.rarityTier || getRarityTier(normalizeRarity(entry.rarity))
+      })).sort((a, b) => (rarityOrder[a.rarityTier] ?? 5) - (rarityOrder[b.rarityTier] ?? 5));
+
+      return `
+        ${summary}
+        <div class="inventory-list">
+          ${mappedEntries.map((entry) => {
+            const tier = entry.rarityTier || "blue";
+            const meta = rarityMeta[normalizeRarity(entry.rarity)] || rarityMeta.milspec;
+            const isKnife = entry.type === "knife" || entry.kind === "knife";
+            return `
+              <button type="button" data-sell-inventory="${entry.id}" style="
+                display:flex;justify-content:space-between;align-items:center;
+                background:#162030;
+                border-left:4px solid ${rarityColors[tier] || "#555"};
+                border-radius:4px;padding:10px 12px;margin-bottom:6px;
+                width:100%;border:none;cursor:inherit;text-align:left;
+              ">
+                <div>
+                  <div style="color:#e8eef4;font-size:13px;font-weight:bold;">${getDropDisplayName(entry)}</div>
+                  <div style="color:${rarityColors[tier] || "#aaa"};font-size:11px;">
+                    ${(entry.rarityLabel || meta.label)} · ${(entry.float || "Field-Tested")}
+                  </div>
+                  ${entry.cps > 0 ? `<div style="color:#4caf50;font-size:11px;">⚡ +${entry.cps.toFixed(1)} CPS</div>` : ""}
+                  ${entry.wonInFlip ? `<div style="color:#f0a500;font-size:10px;">🪙 Won in flip</div>` : ""}
+                </div>
+                <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+                  <div style="color:#f0a500;font-size:12px;">$${(entry.value || 0).toLocaleString()}</div>
+                  <div style="color:#86a8bf;font-size:10px;">Click to sell</div>
+                  ${isKnife ? `<div style="color:#e4ae39;font-size:10px;">★ KNIFE</div>` : ""}
+                </div>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function buildCoinFlipPool() {
+      const items = [];
+      for (const skin of state.inventorySkins) {
+        items.push({ type: "skin", id: skin.id, item: skin });
+      }
+      for (const knife of state.knifeInventory) {
+        items.push({ type: "knife", id: knife.id, item: knife });
+      }
+      return items;
+    }
+
+    function renderCoinFlipTab() {
+      const pool = buildCoinFlipPool();
+      if (pool.length === 0) {
+        return `
+          <div class="no-items">You need items to flip! Open some cases first.</div>
+          <button class="buy-case-btn" data-go-cases="1">Go To Cases</button>
+        `;
+      }
+      return `
+        <div class="case-box">
+          <div class="case-row"><span class="label">Flip Record</span><strong>${state.coinFlip.wins}W / ${state.coinFlip.losses}L</strong></div>
+          <div class="case-row"><span class="label">Select Wager Item</span><strong>${state.coinFlip.pendingWager ? getDropDisplayName(state.coinFlip.pendingWager.item) : "None"}</strong></div>
+          <button class="open-case-btn" data-open-coinflip="1">Enter Gambling Den</button>
+        </div>
+        <div class="mini-note">Wager one item, pick CT/T, and let fate decide.</div>
+      `;
+    }
+
+    function renderShopView() {
+      let content = "";
+      if (state.activeTab === "shop") content = renderMainShopTab();
+      else if (state.activeTab === "cases") content = renderCasesTab();
+      else if (state.activeTab === "knives") content = renderKnivesTab();
+      else if (state.activeTab === "coinflip") content = renderCoinFlipTab();
+      else content = renderInventoryTab();
+
+      el.shop.innerHTML = `${renderShopTabs()}<div class="tab-content">${content}</div>`;
+      updateShopButtons();
+    }
+
+    function updateShopButtons() {
+      const money = state.money;
+
+      for (const btn of el.shop.querySelectorAll("[data-buy-upgrade]")) {
+        const item = upgrades.find((u) => u.id === btn.dataset.buyUpgrade);
+        if (!item) continue;
+        const affordable = money >= item.cost;
+        btn.disabled = !affordable;
+        const card = btn.closest(".shop-item");
+        if (card) {
+          card.classList.toggle("locked", !affordable);
+          const ownedEl = card.querySelector(".shop-owned");
+          if (ownedEl) ownedEl.textContent = `Owned: ${state.upgradesOwned[item.id]}`;
+        }
+      }
+
+      const flashBtn = el.shop.querySelector("[data-activate-flash]");
+      if (flashBtn) {
+        const now = Date.now();
+        const cooldownLeft = Math.max(0, state.flashCooldownUntil - now);
+        const clickMultActive = now < state.flashActiveUntil;
+        const canActivate = state.upgradesOwned.flash > 0 && cooldownLeft === 0;
+        flashBtn.disabled = !canActivate;
+        flashBtn.textContent = clickMultActive
+          ? `Active ${Math.ceil((state.flashActiveUntil - now) / 1000)}s`
+          : cooldownLeft > 0
+            ? `Cooldown ${Math.ceil(cooldownLeft / 1000)}s`
+            : "Activate";
+      }
+
+      const caseBuy = el.shop.querySelector("[data-buy-case]");
+      if (caseBuy) {
+        caseBuy.disabled = money < getCaseCost() || state.caseAnimating;
+      }
+      const caseOpen = el.shop.querySelector("[data-open-case]");
+      if (caseOpen) {
+        caseOpen.disabled = state.caseInventory <= 0 || state.caseAnimating;
+      }
+      const casePrice = el.shop.querySelector("[data-case-price]");
+      if (casePrice) casePrice.textContent = `$${formatMoney(getCaseCost())}`;
+      const caseOwned = el.shop.querySelector("[data-case-owned]");
+      if (caseOwned) caseOwned.textContent = `${state.caseInventory}`;
+      const caseOpened = el.shop.querySelector("[data-case-opened]");
+      if (caseOpened) caseOpened.textContent = `${state.casesOpened}`;
+
+      for (const btn of el.shop.querySelectorAll("[data-buy-knife]")) {
+        const price = directKnifePrices[btn.dataset.buyKnife];
+        btn.disabled = !price || money < price || state.caseAnimating;
+      }
+
+      const openCoin = el.shop.querySelector("[data-open-coinflip]");
+      if (openCoin) {
+        openCoin.disabled = buildCoinFlipPool().length === 0;
+      }
+    }
+
+    function applyDrop(drop, sourceLabel) {
+      const item = createInventoryItemFromDrop(drop, state.casePendingWear);
+      return addToInventory(item, sourceLabel);
+    }
+
+    function showCaseParticles(color = "#ffd56c", count = 32) {
+      if (!el.caseParticles) return;
+      for (let i = 0; i < count; i += 1) {
+        const p = document.createElement("div");
+        p.className = "case-particle";
+        p.style.color = color;
+        p.style.background = color;
+        p.style.left = `${48 + (Math.random() - 0.5) * 15}%`;
+        p.style.top = `${46 + (Math.random() - 0.5) * 12}%`;
+        p.style.setProperty("--dx", `${(Math.random() - 0.5) * 680}px`);
+        p.style.setProperty("--dy", `${(Math.random() - 0.5) * 420}px`);
+        el.caseParticles.appendChild(p);
+        setTimeout(() => p.remove(), 920);
+      }
+    }
+
+    function revealCaseResult(drop, winnerEl) {
+      clearCaseTimers();
+      const wearInfo = getWear();
+      console.log("=== CASE OPENED ===");
+      console.log("Item dropped:", drop);
+      console.log("Inventory before:", JSON.stringify(inventory));
+      state.casePendingDrop = drop;
+      state.currentDroppedItem = drop;
+      currentDroppedItem = drop;
+      window.pendingCaseItem = drop;
+      state.casePendingWear = wearInfo;
+      state.casePendingInventoryItem = createInventoryItemFromDrop(drop, wearInfo);
+      state.casePendingInventoryId = null;
+      if (state.casePendingInventoryItem) {
+        const queued = addItemToInventory(state.casePendingInventoryItem, "CASE OPENING", { skipRender: true });
+        if (queued) {
+          state.casePendingInventoryId = state.casePendingInventoryItem.id;
+          state.casePendingInventoryItem = null;
+          console.log("✅ Drop queued immediately:", state.casePendingInventoryId);
+        } else {
+          console.warn("⚠️ Immediate queue failed; waiting for manual add.");
+        }
+      }
+      state.caseWinnerNode = winnerEl;
+      el.revealDetails.classList.remove("hidden");
+      el.revealDetails.classList.toggle("knife-drop-card", drop.kind === "knife");
+      el.revealSpecialHeader.classList.toggle("hidden", drop.kind !== "knife");
+      el.caseActionRow.classList.add("hidden");
+      el.caseActionRow.classList.remove("show-actions");
+      el.caseCloseBtn.classList.remove("hidden");
+
+      const rarity = rarityMeta[drop.rarity];
+      el.revealItemName.textContent = getDropDisplayName(drop);
+      el.revealItemMeta.textContent = `★ ${rarity.label}`;
+      el.revealItemMeta.style.color = rarity.color;
+      el.revealItemCps.textContent = drop.kind === "knife" ? `+${drop.cps.toFixed(1)} CPS` : "";
+      el.revealWearLabel.textContent = wearInfo.condition.name;
+      el.revealWearFill.style.width = `${Math.min(100, wearInfo.wear * 100)}%`;
+      el.revealWearFill.style.background = wearInfo.condition.color;
+
+      if (winnerEl) winnerEl.classList.add("win-zoom");
+      const value = getItemValue(drop);
+      el.sellDropBtn.textContent = `SELL FOR $${formatMoney(value)}`;
+      el.addInvBtn.textContent = drop.kind === "knife" ? "EQUIP KNIFE" : "ADD TO INVENTORY";
+      const hasMoreCases = state.caseInventory > 0;
+      el.openAnotherBtn.disabled = !hasMoreCases;
+      el.openAnotherBtn.textContent = hasMoreCases ? "OPEN ANOTHER" : "NO CASES LEFT";
+      state.caseAnimating = false;
+      state.caseActionDelayTimer = setTimeout(() => {
+        if (!state.casePendingDrop || el.caseModal.classList.contains("hidden")) return;
+        el.caseActionRow.classList.remove("hidden");
+        requestAnimationFrame(() => {
+          el.caseActionRow.classList.add("show-actions");
+        });
+      }, 1500);
+
+      if (drop.rarity === "restricted") showCaseParticles("#9f6aff", 28);
+      if (drop.rarity === "classified") {
+        showCaseParticles("#df58ff", 36);
+        flashOverlay(el.heFlash);
+      }
+      if (drop.rarity === "covert") {
+        showCaseParticles("#ff6161", 44);
+        flashOverlay(el.clickFlash);
+      }
+      if (drop.rarity === "knife") {
+        showCaseParticles("#ffd56c", 60);
+        showKnifeDropCelebration();
+      }
+    }
+
+    function clearCaseTimers() {
+      if (state.caseRevealTimer) {
+        clearTimeout(state.caseRevealTimer);
+        state.caseRevealTimer = null;
+      }
+      if (state.caseActionDelayTimer) {
+        clearTimeout(state.caseActionDelayTimer);
+        state.caseActionDelayTimer = null;
+      }
+      if (state.caseFailsafeTimer) {
+        clearTimeout(state.caseFailsafeTimer);
+        state.caseFailsafeTimer = null;
+      }
+    }
+
+    function finalizeCaseReveal(drop, winnerIndex) {
+      if (!state.caseAnimating || state.casePendingDrop) return;
+      const winnerEl = el.reelTrack.children[winnerIndex] || null;
+      if (winnerEl) winnerEl.classList.add("winner");
+      el.dropBanner.textContent = drop.kind === "knife"
+        ? `KNIFE DROPPED: ${drop.name} | ${drop.finish}`
+        : `ITEM DROPPED: ${drop.name}`;
+      el.dropBanner.classList.add("show");
+      revealCaseResult(drop, winnerEl);
+    }
+
+    function buildReel(drop) {
+      const items = [];
+      const winnerIndex = 28;
+      const count = 38;
+      for (let i = 0; i < count; i += 1) {
+        items.push(i === winnerIndex ? drop : randomFillerDrop());
+      }
+      return { items, winnerIndex };
+    }
+
+    function startCaseReveal(drop, titleText = "Case Opening") {
+      state.caseAnimating = true;
+      initAudio();
+      playCaseSpinSound();
+      clearCaseTimers();
+      state.casePendingDrop = null;
+      state.casePendingInventoryItem = null;
+      state.casePendingWear = null;
+      state.casePendingInventoryId = null;
+      state.caseWinnerNode = null;
+
+      const { items, winnerIndex } = buildReel(drop);
+      el.caseModalTitle.textContent = titleText.includes("Knife") ? "Premium Weapon Case" : "CS:GO Weapon Case";
+      el.dropBanner.classList.remove("show");
+      el.dropBanner.textContent = "OPENING...";
+      el.revealDetails.classList.add("hidden");
+      el.revealDetails.classList.remove("knife-drop-card");
+      el.revealSpecialHeader.classList.add("hidden");
+      el.caseActionRow.classList.add("hidden");
+      el.caseActionRow.classList.remove("show-actions");
+      el.caseCloseBtn.classList.remove("hidden");
+      el.caseParticles.innerHTML = "";
+      el.caseModal.classList.remove("hidden");
+      el.caseModal.setAttribute("aria-hidden", "false");
+
+      el.reelTrack.innerHTML = items.map((item, index) => {
+        const meta = rarityMeta[item.rarity];
+        const name = getDropDisplayName(item);
+        return `
+          <div class="reel-item ${meta.css}" data-reel-index="${index}">
+            <div class="weapon-glyph"></div>
+            <div>${name}</div>
+            <div class="tiny">${meta.label}</div>
+          </div>
+        `;
+      }).join("");
+
+      el.reelTrack.style.transition = "none";
+      el.reelTrack.style.transform = "translateX(0px)";
+      el.reelTrack.style.filter = "blur(2px)";
+      void el.reelTrack.offsetWidth;
+
+      requestAnimationFrame(() => {
+        el.reelTrack.style.transition = "transform 7s cubic-bezier(0.22, 1, 0.36, 1), filter 1.4s ease";
+        const reelWindow = el.reelTrack.parentElement;
+        const winnerEl = el.reelTrack.children[winnerIndex];
+        const markerX = reelWindow.clientWidth / 2;
+        const winnerCenter = winnerEl.offsetLeft + winnerEl.offsetWidth / 2;
+        const jitter = (Math.random() - 0.5) * 14;
+        const target = markerX - winnerCenter + jitter;
+        el.reelTrack.style.transform = `translateX(${target}px)`;
+        setTimeout(() => { el.reelTrack.style.filter = "blur(0px)"; }, 5400);
+      });
+
+      state.caseRevealTimer = setTimeout(() => {
+        finalizeCaseReveal(drop, winnerIndex);
+      }, 7000);
+      state.caseFailsafeTimer = setTimeout(() => {
+        finalizeCaseReveal(drop, winnerIndex);
+      }, 12000);
+    }
+
+    function closeCaseModal(options = {}) {
+      const { discardQueuedDrop = true } = options;
+      clearCaseTimers();
+      el.caseModal.classList.add("hidden");
+      el.caseModal.setAttribute("aria-hidden", "true");
+      state.caseAnimating = false;
+      if (discardQueuedDrop && state.casePendingInventoryId) {
+        const pendingIndex = inventory.findIndex((item) => item.id === state.casePendingInventoryId);
+        if (pendingIndex >= 0) {
+          inventory.splice(pendingIndex, 1);
+          refreshInventoryBuckets();
+          updateEquippedKnife();
+          updateEquippedKnifeHud();
+          updateOperatorStats();
+          saveInventory();
+          updateInventoryBadge(-1);
+        }
+      }
+      state.casePendingDrop = null;
+      state.currentDroppedItem = null;
+      currentDroppedItem = null;
+      window.pendingCaseItem = null;
+      state.casePendingInventoryItem = null;
+      state.casePendingInventoryId = null;
+      state.casePendingWear = null;
+      state.caseWinnerNode = null;
+      state.activeTab = "cases";
+      renderShopView();
+    }
+
+    function openCase() {
+      if (state.caseAnimating || state.caseInventory <= 0) return;
+      state.caseInventory -= 1;
+      state.casesOpened += 1;
+      const drop = rollDrop();
+      startCaseReveal(drop, "Case Opening");
+      saveProgressState();
+      updateOperatorStats();
+      updateShopButtons();
+    }
+
+    function buyCase(sourceButton = null) {
+      const cost = getCaseCost();
+      if (state.money < cost || state.caseAnimating) return;
+      initAudio();
+      playPurchaseSound();
+      addMoney(-cost);
+      state.caseInventory += 1;
+      saveProgressState();
+      spawnPurchaseFloat(sourceButton, "+1 CASE");
+      showKillFeed(`<span class="weapon">CASE</span> purchased <span class="event">$${formatMoney(cost)}</span>`);
+      updatePrestigeHud();
+      updateShopButtons();
+    }
+
+    function buyKnifeDirect(knifeId, sourceButton = null) {
+      const price = directKnifePrices[knifeId];
+      if (!price || state.money < price || state.caseAnimating) return;
+      initAudio();
+      playPurchaseSound();
+      addMoney(-price);
+      spawnPurchaseFloat(sourceButton, "KNIFE ROLL");
+      const drop = createKnifeDrop(knifeId);
+      startCaseReveal(drop, "Knife Purchase");
+      updatePrestigeHud();
+      updateShopButtons();
+    }
+
+    function updateRoundHud() {
+      el.roundTime.textContent = formatTime(state.timeLeft);
+      el.roundNum.textContent = `Round ${state.round}`;
+      el.side.textContent = state.side;
+      updateLedSpeed();
+    }
+
+    function updatePrestigeHud() {
+      const rankIndex = getCurrentRankIndex();
+      const rank = ranks[rankIndex];
+      el.rankIcon.className = `rank-icon rank-${rankIndex}`;
+      el.rankIcon.textContent = rank.short;
+      el.rankName.textContent = rank.name;
+      el.rankMulti.textContent = `Earnings Multiplier x${state.prestigeMultiplier.toFixed(2)}`;
+
+      const price = getPrestigeCost();
+      const canPrestige = state.money >= price;
+      el.prestigeBtn.disabled = !canPrestige;
+      el.prestigeBtn.textContent = canPrestige
+        ? `Prestige Ready ($${formatMoney(price)})`
+        : `Prestige (Need $${formatMoney(price)})`;
+    }
+
+    function purchaseUpgrade(id, sourceButton = null) {
+      const item = upgrades.find((u) => u.id === id);
+      if (!item || state.money < item.cost) return;
+      initAudio();
+      addMoney(-item.cost);
+      state.upgradesOwned[id] += 1;
+      playPurchaseSound();
+      const cpsText = item.cps > 0 ? `+${item.cps.toFixed(1)} CPS` : "+UTILITY";
+      spawnPurchaseFloat(sourceButton, cpsText);
+
+      if (id === "he") {
+        flashOverlay(el.heFlash);
+      }
+
+      showKillFeed(`<span class="weapon">${item.name}</span> bought <span class="event">+${item.cps || "utility"}</span>`);
+      updatePrestigeHud();
+      updateShopButtons();
+    }
+
+    function activateFlash(sourceButton = null) {
+      const now = Date.now();
+      if (state.upgradesOwned.flash <= 0 || now < state.flashCooldownUntil) return;
+      state.upgradesOwned.flash -= 1;
+      state.flashActiveUntil = now + 10000;
+      state.flashCooldownUntil = now + 30000;
+      initAudio();
+      playTone(1300, 0.05, "triangle", 0.05);
+      playTone(1600, 0.05, "triangle", 0.045, 0.05);
+      spawnPurchaseFloat(sourceButton, "2X CLICKS");
+      showKillFeed(`<span class="weapon">Flashbang</span> popped<span class="event"> 2x click power</span>`);
+      updateShopButtons();
+    }
+
+    function onBombClick(evt) {
+      initAudio();
+      const gain = getClickValue();
+      addMoney(gain);
+      state.totalClicks += 1;
+      playClickSound();
+      flashOverlay(el.clickFlash);
+
+      const rect = el.bombBtn.getBoundingClientRect();
+      const x = evt.clientX || rect.left + rect.width / 2;
+      const y = evt.clientY || rect.top + rect.height / 2;
+      spawnFloatingMoney(x, y, gain);
+      spawnSparkBurst(x, y, "#73ddff", 12);
+      spawnSparkBurst(rect.left + rect.width * 0.2, rect.top + rect.height * 0.46, "#8ff4ff", 8);
+      state.bombFlashUntil = Date.now() + 130;
+
+      el.bombBtn.classList.remove("pulse");
+      void el.bombBtn.offsetWidth;
+      el.bombBtn.classList.add("pulse");
+      el.bombBtn.classList.remove("shake");
+      void el.bombBtn.offsetWidth;
+      el.bombBtn.classList.add("shake");
+      updateOperatorStats();
+    }
+
+    function tryPrestige() {
+      const cost = getPrestigeCost();
+      if (state.money < cost || state.caseAnimating) return;
+      initAudio();
+      playTone(390, 0.1, "triangle", 0.06);
+      playTone(590, 0.12, "triangle", 0.055, 0.1);
+      playTone(860, 0.16, "triangle", 0.05, 0.22);
+
+      state.prestigeLevel += 1;
+      state.prestigeMultiplier = 1 + state.prestigeLevel * 0.75;
+      state.money = 0;
+      state.displayedMoney = 0;
+      state.round = 1;
+      state.timeLeft = 115;
+      state.side = "CT";
+      state.flashActiveUntil = 0;
+      state.flashCooldownUntil = 0;
+      state.caseInventory = 0;
+      state.casesOpened = 0;
+      state.inventorySkins = [];
+      state.knifeInventory = [];
+      inventory = [];
+      saveInventory();
+      saveProgressState();
+      state.equippedKnifeId = null;
+      updateInventoryBadge(0, true);
+      state.activeTab = "shop";
+      clearCaseTimers();
+      for (const key of Object.keys(state.upgradesOwned)) {
+        state.upgradesOwned[key] = 0;
+      }
+      showKillFeed(`<span class="weapon">Prestige</span> promoted to <span class="event">${ranks[getCurrentRankIndex()].name}</span>`);
+      updateEquippedKnifeHud();
+      renderShopView();
+      updateRoundHud();
+      updatePrestigeHud();
+      updateOperatorStats();
+    }
+
+    function gameTick() {
+      const passive = getCps();
+      if (passive > 0) {
+        addMoney(passive);
+      }
+
+      state.timeLeft -= 1;
+      if (state.timeLeft <= 0) {
+        endRound();
+      }
+
+      updateRoundHud();
+      updatePrestigeHud();
+      updateShopButtons();
+      updateEquippedKnifeHud();
+      updateOperatorStats();
+      drawBombDevice(performance.now());
+    }
+
+    function handleShopClick(event) {
+      const button = event.target.closest("button");
+      if (!button || !el.shop.contains(button)) return;
+
+      if (button.dataset.tab) {
+        state.activeTab = button.dataset.tab;
+        if (state.activeTab === "inventory") {
+          updateInventoryBadge(0, true);
+        }
+        renderShopView();
+        return;
+      }
+
+      if (button.dataset.buyUpgrade) {
+        purchaseUpgrade(button.dataset.buyUpgrade, button);
+        return;
+      }
+
+      if (button.dataset.activateFlash) {
+        activateFlash(button);
+        return;
+      }
+
+      if (button.dataset.buyCase) {
+        buyCase(button);
+        return;
+      }
+
+      if (button.dataset.openCase) {
+        openCase();
+        return;
+      }
+
+      if (button.dataset.buyKnife) {
+        buyKnifeDirect(button.dataset.buyKnife, button);
+        return;
+      }
+
+      if (button.dataset.previewCase) {
+        openCasePreview();
+        return;
+      }
+
+      if (button.dataset.openCoinflip) {
+        openCoinFlipModal();
+        return;
+      }
+
+      if (button.dataset.goCases) {
+        state.activeTab = "cases";
+        renderShopView();
+        return;
+      }
+
+      if (button.dataset.sellInventory) {
+        sellInventoryItemById(button.dataset.sellInventory);
+      }
+    }
+
+    function commitPendingCaseDrop() {
+      return handleAddToInventory();
+    }
+
+    function sellPendingCaseDrop() {
+      const droppedItem = window.pendingCaseItem || state.casePendingDrop || currentDroppedItem;
+      if (!droppedItem) return;
+      state.casePendingDrop = null;
+      state.currentDroppedItem = null;
+      currentDroppedItem = null;
+      window.pendingCaseItem = null;
+      state.casePendingInventoryItem = null;
+      if (state.casePendingInventoryId) {
+        const soldItemIndex = inventory.findIndex((item) => item.id === state.casePendingInventoryId);
+        if (soldItemIndex >= 0) {
+          const [soldItem] = inventory.splice(soldItemIndex, 1);
+          refreshInventoryBuckets();
+          updateEquippedKnife();
+          updateEquippedKnifeHud();
+          updateOperatorStats();
+          saveInventory();
+          updateInventoryBadge(-1);
+          const value = getItemValue(soldItem);
+          addMoney(value);
+          showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(value)}<span class="event"> instant cashout</span>`);
+          state.casePendingInventoryId = null;
+          state.casePendingWear = null;
+          state.caseWinnerNode = null;
+          updatePrestigeHud();
+          closeCaseModal({ discardQueuedDrop: false });
+          return;
+        }
+      }
+      const fallbackValue = getItemValue(droppedItem);
+      addMoney(fallbackValue);
+      showKillFeed(`<span class="weapon">SOLD</span> +$${formatMoney(fallbackValue)}<span class="event"> instant cashout</span>`);
+      state.casePendingInventoryId = null;
+      state.casePendingWear = null;
+      state.caseWinnerNode = null;
+      updatePrestigeHud();
+      closeCaseModal({ discardQueuedDrop: false });
+    }
+
+    function openCasePreview() {
+      const tiers = [
+        ["milspec", skinPools.milspec],
+        ["restricted", skinPools.restricted],
+        ["classified", skinPools.classified],
+        ["covert", skinPools.covert],
+        ["knife", knifeTypes.map((k) => `${k.name} | random finish`)]
+      ];
+      el.casePreviewBody.innerHTML = tiers.map(([rarity, items], idx) => {
+        const meta = rarityMeta[rarity];
+        const odds = getRarityWeightForPreview(rarity).toFixed(2);
+        return `
+          <details ${idx === 0 ? "open" : ""}>
+            <summary style="color:${meta.color}">${meta.label} — ${odds}%</summary>
+            ${items.map((it) => `<div class="preview-item">${it}</div>`).join("")}
+          </details>
+        `;
+      }).join("");
+      el.casePreviewModal.classList.remove("hidden");
+      el.casePreviewModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeCasePreview() {
+      el.casePreviewModal.classList.add("hidden");
+      el.casePreviewModal.setAttribute("aria-hidden", "true");
+    }
+
+    function getComparableOpponentItem(playerRef) {
+      const value = getItemValue(playerRef.item);
+      const pityBoost = state.coinFlip.lossStreak >= 3 ? 1.15 : 1;
+      const targetMin = value * 0.95 * pityBoost;
+      const targetMax = value * 1.35 * pityBoost;
+      const rarityOrder = ["milspec", "restricted", "classified", "covert", "knife"];
+      const all = [];
+      for (const rarity of rarityOrder) {
+        if (rarity === "knife") {
+          const k = createKnifeDrop();
+          all.push({ type: "knife", item: k });
+        } else {
+          all.push({ type: "skin", item: createSkinDrop(rarity) });
+        }
+      }
+      const candidate = all.find((x) => {
+        const v = getItemValue(x.item);
+        return v >= targetMin && v <= targetMax;
+      }) || all[all.length - 1];
+      return candidate;
+    }
+
+    function renderCoinflipHistory() {
+      el.coinflipHistory.innerHTML = state.coinFlip.history.map((h) => `<span class="flip-dot ${h ? "win" : "loss"}"></span>`).join("");
+      el.coinflipRecord.textContent = `Flips: ${state.coinFlip.wins}W / ${state.coinFlip.losses}L`;
+    }
+
+    function renderCoinflipStep() {
+      const pool = buildCoinFlipPool();
+      if (pool.length === 0) {
+        el.coinflipStep.innerHTML = `
+          <div class="no-items">You need items to flip! Open some cases first.</div>
+          <button class="buy-case-btn" data-go-cases-modal="1">Go To Cases</button>
+        `;
+        return;
+      }
+
+      const wager = state.coinFlip.pendingWager;
+      const opponent = state.coinFlip.opponent;
+      const side = state.coinFlip.playerSide;
+      el.coinflipStep.innerHTML = `
+        <div class="coinflip-wrap">
+          <div class="mini-note">Pick an item to wager.</div>
+          <div class="flip-grid">
+            ${pool.map((entry) => {
+              const val = getItemValue(entry.item);
+              const active = wager && wager.id === entry.id && wager.type === entry.type;
+              return `
+                <button class="flip-item ${active ? "active" : ""}" data-flip-select="${entry.type}:${entry.id}">
+                  <div>${getDropDisplayName(entry.item)}</div>
+                  <div class="inv-sub">$${formatMoney(val)}</div>
+                  ${active ? `<span class="flip-badge">Wagered</span>` : ""}
+                </button>
+              `;
+            }).join("")}
+          </div>
+          <button class="flip-btn" data-flip-find ${wager ? "" : "disabled"}>${state.coinFlip.searching ? "Finding opponent..." : "Find Opponent"}</button>
+          ${opponent ? `
+            <div class="flip-opponent">
+              <div><strong>${opponent.name}</strong> wagered ${getDropDisplayName(opponent.item)}</div>
+              <div class="inv-sub">Value: $${formatMoney(getItemValue(opponent.item))}</div>
+            </div>
+            <div class="flip-controls">
+              <button class="flip-btn ct" data-flip-side="CT">CT SIDE</button>
+              <button class="flip-btn t" data-flip-side="T">T SIDE</button>
+              <button class="flip-btn" data-flip-start ${side ? "" : "disabled"}>Flip Coin</button>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function openCoinFlipModal() {
+      el.coinflipModal.classList.remove("hidden");
+      el.coinflipModal.setAttribute("aria-hidden", "false");
+      state.coinFlip.pendingWager = null;
+      state.coinFlip.opponent = null;
+      state.coinFlip.playerSide = null;
+      state.coinFlip.searching = false;
+      renderCoinflipHistory();
+      renderCoinflipStep();
+    }
+
+    function closeCoinFlipModal() {
+      el.coinflipModal.classList.add("hidden");
+      el.coinflipModal.setAttribute("aria-hidden", "true");
+      renderShopView();
+    }
+
+    function canWager(entry) {
+      if (entry.type !== "knife") return true;
+      if (state.knifeInventory.length <= 1) return false;
+      return true;
+    }
+
+    function onCoinflipSelect(encoded) {
+      const [type, id] = encoded.split(":");
+      const pool = buildCoinFlipPool();
+      const entry = pool.find((e) => e.type === type && e.id === id);
+      if (!entry) return;
+      if (!canWager(entry)) {
+        showKillFeed(`<span class="weapon">WARNING</span> You can't wager your only knife!`);
+        return;
+      }
+      state.coinFlip.pendingWager = { type, id, item: entry.item };
+      state.coinFlip.opponent = null;
+      state.coinFlip.playerSide = null;
+      renderCoinflipStep();
+    }
+
+    function findCoinflipOpponent() {
+      if (!state.coinFlip.pendingWager || state.coinFlip.searching) return;
+      state.coinFlip.searching = true;
+      renderCoinflipStep();
+      setTimeout(() => {
+        const oppItem = getComparableOpponentItem(state.coinFlip.pendingWager);
+        state.coinFlip.opponent = {
+          name: randomFrom(cpuNames),
+          item: oppItem.item,
+          type: oppItem.type
+        };
+        state.coinFlip.searching = false;
+        renderCoinflipStep();
+      }, 1500);
+    }
+
+    function startCoinflip() {
+      const wager = state.coinFlip.pendingWager;
+      const opponent = state.coinFlip.opponent;
+      const side = state.coinFlip.playerSide;
+      if (!wager || !opponent || !side) return;
+
+      const coinCard = document.createElement("div");
+      coinCard.className = "coin-card";
+      coinCard.innerHTML = `
+        <div class="mini-note">Flipping...</div>
+        <div id="live-coin" class="coin-coin">${side}</div>
+        <div id="coin-result-text" class="coin-result"></div>
+      `;
+      el.coinflipStep.innerHTML = "";
+      el.coinflipStep.appendChild(coinCard);
+      const liveCoin = document.getElementById("live-coin");
+      const resultText = document.getElementById("coin-result-text");
+
+      let finalWinChance = 0.5;
+      const playerVal = getItemValue(wager.item);
+      const oppVal = getItemValue(opponent.item);
+      if (wager.type !== "knife" && oppVal > playerVal) finalWinChance = 0.55;
+      const isWin = Math.random() < finalWinChance;
+      const resultSide = isWin ? side : (side === "CT" ? "T" : "CT");
+
+      liveCoin.style.transition = "transform 5.2s cubic-bezier(0.2, 1, 0.22, 1)";
+      liveCoin.style.transform = "rotateY(3960deg)";
+      setTimeout(() => {
+        liveCoin.classList.toggle("t-side", resultSide === "T");
+        liveCoin.textContent = resultSide;
+        if (isWin) {
+          flashOverlay(el.heFlash);
+          resultText.className = "coin-result win";
+          resultText.textContent = "YOU WIN!";
+          state.coinFlip.wins += 1;
+          state.coinFlip.lossStreak = 0;
+          const wonOpp = addWonTag({
+            ...opponent.item,
+            id: `${opponent.type}-won-${Date.now()}-${Math.floor(Math.random() * 9999)}`
+          });
+          addToInventory(wonOpp, "COIN FLIP", { skipBadge: true, skipRender: true });
+          updateEquippedKnife();
+        } else {
+          flashOverlay(el.clickFlash);
+          resultText.className = "coin-result loss";
+          resultText.textContent = "YOU LOSE";
+          state.coinFlip.losses += 1;
+          state.coinFlip.lossStreak += 1;
+          removeInventoryRef(wager);
+          updateEquippedKnife();
+        }
+        state.coinFlip.history.unshift(isWin);
+        state.coinFlip.history = state.coinFlip.history.slice(0, 10);
+        updateEquippedKnifeHud();
+        renderCoinflipHistory();
+        setTimeout(() => {
+          state.coinFlip.pendingWager = null;
+          state.coinFlip.opponent = null;
+          state.coinFlip.playerSide = null;
+          renderCoinflipStep();
+          renderShopView();
+        }, 1900);
+      }, 5200);
+    }
+
+    function handleCoinflipClick(event) {
+      const button = event.target.closest("button");
+      if (!button) return;
+      if (button.dataset.flipSelect) {
+        onCoinflipSelect(button.dataset.flipSelect);
+        return;
+      }
+      if (button.dataset.flipFind) {
+        findCoinflipOpponent();
+        return;
+      }
+      if (button.dataset.flipSide) {
+        state.coinFlip.playerSide = button.dataset.flipSide;
+        renderCoinflipStep();
+        return;
+      }
+      if (button.dataset.flipStart) {
+        startCoinflip();
+        return;
+      }
+      if (button.dataset.goCasesModal) {
+        closeCoinFlipModal();
+        state.activeTab = "cases";
+        renderShopView();
+      }
+    }
+
+    function initEvents() {
+      document.addEventListener("pointerdown", initAudio, { once: true });
+      el.bombBtn.addEventListener("pointerdown", (evt) => {
+        evt.preventDefault();
+        onBombClick(evt);
+      });
+
+      el.bombBtn.addEventListener("touchstart", (evt) => {
+        evt.preventDefault();
+        const t = evt.changedTouches[0];
+        if (t) onBombClick(t);
+      }, { passive: false });
+      el.bombBtn.addEventListener("pointerenter", () => { bombHover = true; });
+      el.bombBtn.addEventListener("pointerleave", () => { bombHover = false; });
+
+      el.prestigeBtn.addEventListener("click", tryPrestige);
+      el.shop.addEventListener("click", handleShopClick);
+      el.caseCloseBtn.addEventListener("click", () => closeCaseModal({ discardQueuedDrop: true }));
+      el.addInvBtn.addEventListener("click", () => {
+        const committed = commitPendingCaseDrop();
+        if (committed) {
+          closeCaseModal({ discardQueuedDrop: false });
+        }
+      });
+      el.openAnotherBtn.addEventListener("click", () => {
+        const committed = commitPendingCaseDrop();
+        if (committed && state.caseInventory > 0) {
+          openCase();
+        } else {
+          closeCaseModal({ discardQueuedDrop: false });
+        }
+      });
+      el.sellDropBtn.addEventListener("click", sellPendingCaseDrop);
+      el.previewCloseBtn.addEventListener("click", closeCasePreview);
+      el.coinflipCloseBtn.addEventListener("click", closeCoinFlipModal);
+      el.coinflipStep.addEventListener("click", handleCoinflipClick);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !el.caseModal.classList.contains("hidden")) {
+          closeCaseModal({ discardQueuedDrop: true });
+        }
+      });
+    }
+
+    function init() {
+      initInventory();
+      loadProgressState();
+      updateEquippedKnife();
+      updateRoundHud();
+      updatePrestigeHud();
+      updateEquippedKnifeHud();
+      updateOperatorStats();
+      renderShopView();
+      if (el.bombCanvas) {
+        bombCtx = el.bombCanvas.getContext("2d");
+        const drawLoop = (ts) => {
+          drawBombDevice(ts);
+          requestAnimationFrame(drawLoop);
+        };
+        requestAnimationFrame(drawLoop);
+      }
+      initEvents();
+      animateMoneyHud();
+
+      setInterval(gameTick, 1000);
+      setInterval(() => {
+        showKillFeed(randomKillMessage());
+      }, 5600);
+    }
+
+    init();
+  </script>
+
+</body>
+</html>
